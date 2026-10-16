@@ -1,0 +1,130 @@
+# Build and test all six release targets on native runners
+name: Platform compatibility tests
+
+on:
+  pull_request:
+  schedule:
+    - cron: "43 5 * * 1"   # Mondays
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-compatibility-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-amd64:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Install software TPM
+        run: sudo apt-get update -q && sudo apt-get install -y --no-install-recommends swtpm
+      - name: Check Linux x64 compatibility
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+        run: scripts/platform-compatibility-linux.sh amd64
+
+  linux-arm64:
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Install software TPM
+        run: sudo apt-get update -q && sudo apt-get install -y --no-install-recommends swtpm
+      - name: Check Linux ARM64 compatibility
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+        run: scripts/platform-compatibility-linux.sh arm64
+
+  macos:
+    # Apple Silicon (ARM64); retain the existing macos check name.
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Check Apple Silicon macOS compatibility
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+        run: scripts/platform-compatibility-macos.sh arm64
+
+  macos-intel:
+    runs-on: macos-26-intel
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Check Intel macOS compatibility
+        shell: bash
+        env:
+          CGO_ENABLED: "0"
+        run: scripts/platform-compatibility-macos.sh amd64
+
+  windows-x64:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Check Windows x64 compatibility
+        shell: bash
+        run: scripts/platform-compatibility-windows-x64.sh
+
+  windows-arm64:
+    runs-on: windows-11-arm
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Check Windows ARM64 compatibility
+        shell: pwsh
+        env:
+          CGO_ENABLED: "0"
+        run: ./scripts/platform-compatibility-windows-arm64.ps1

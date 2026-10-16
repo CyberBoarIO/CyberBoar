@@ -1,0 +1,2 @@
+# HTTP messages have CRLF line ends that must survive checkout
+*.http -text

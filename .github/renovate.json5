@@ -1,0 +1,72 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    "customManagers:githubActionsVersions",
+  ],
+
+  timezone: "Etc/UTC",
+  schedule: ["before 6am on monday"],
+  labels: ["dependencies"],
+  automerge: false,
+  platformAutomerge: false,
+
+  // A release must be a week old before it is proposed
+  minimumReleaseAge: "7 days",
+
+  // Fixes for known vulnerabilities skip the wait and the schedule
+  osvVulnerabilityAlerts: true,
+  vulnerabilityAlerts: {
+    labels: ["security"],
+    schedule: ["at any time"],
+    minimumReleaseAge: null,
+  },
+
+  semanticCommits: "disabled",
+  commitMessageAction: "update",
+  commitMessageTopic: "{{depName}}",
+  commitMessageExtra: "to {{#if isPinDigest}}{{{newDigestShort}}}{{else}}{{#if isMajor}}{{prettyNewMajor}}{{else}}{{{newVersion}}}{{/if}}{{/if}}",
+  commitBody: "Proposed by Renovate; release notes are in the pull request.",
+
+  postUpdateOptions: ["gomodTidy"],
+
+  packageRules: [
+    {
+      matchManagers: ["gomod"],
+      commitMessagePrefix: "go.mod:",
+    },
+    {
+      matchManagers: ["gomod"],
+      matchDepTypes: ["golang"],
+      rangeStrategy: "bump",
+      commitMessageTopic: "go directive",
+    },
+    {
+      matchManagers: ["github-actions", "custom.regex"],
+      commitMessagePrefix: "ci:",
+      groupName: "ci tools",
+    },
+    {
+      // Released together, usually once a month.
+      matchManagers: ["gomod"],
+      matchPackageNames: ["golang.org/x/**"],
+      groupName: "golang.org/x",
+    },
+  ],
+
+  customManagers: [
+    {
+      // Explicit versions installed by release Actions
+      customType: "regex",
+      managerFilePatterns: ["/^\\.github/workflows/release\\.yml$/"],
+      matchStrings: ["# renovate: datasource=(?<datasource>[^\\s]+) depName=(?<depName>[^\\s]+)\\s+(?:cosign-release|syft-version): (?<currentValue>v\\S+)"],
+    },
+    {
+      customType: "regex",
+      managerFilePatterns: ["/^scripts/quality-checks\\.sh$/"],
+      matchStrings: ["go (?:run|install) (?<depName>[^@\\s]+?)(?:/cmd/[^@\\s]+)?@(?<currentValue>v\\S+)"],
+      datasourceTemplate: "go",
+    },
+  ],
+}

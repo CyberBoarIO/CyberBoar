@@ -1,0 +1,37 @@
+# Build output
+/cyberboar
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+
+# Editor/OS
+.idea/
+*.swp
+.DS_Store
+
+# Python test caches
+__pycache__/
+
+# Local credentials and signing material
+.env
+.env.*
+!.env.example
+!.env.sample
+*.key
+*.pem
+!testdata/protocol/insecure-*.key
+!testdata/protocol/auth/insecure-*.key
+!testdata/protocol/auth/insecure-ca.pem
+/.aws/
+
+# Local agent settings and state
+/.agents/
+/.claude/
+/.codex/
+/.cyberboar/
+/opencode.json
+/opencode.jsonc
+/hook-state/
+/audit*.jsonl

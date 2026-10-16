@@ -1,0 +1,27 @@
+{
+  "description": "team hooks",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "./lint.sh",
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "command": "'cyberboar' hook --agent codex --policy \"$(git rev-parse --show-toplevel)\"/'.cyberboar/policy.yaml' --deadline '5s'",
+            "statusMessage": "cyberboar: checking policy",
+            "timeout": 10,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "Stop": []
+  }
+}

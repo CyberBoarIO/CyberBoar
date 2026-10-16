@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberboar.dev/schemas/audit/event/v1.json",
+  "title": "Audit event",
+  "description": "One line of the audit log: one hook decision (package audit, Event). Field names never change; newer versions add fields, so unknown fields are allowed. Every line CyberBoar writes has time, agent, version, decision, rule, reason and durationMs; a console requires only time and decision (docs/protocol). A line is at most 65536 bytes, no object in it has the same key twice (even in different case), a key naming a field below is spelled exactly so, and it nests at most 32 levels; JSON Schema cannot express these (audit.CheckKeys).",
+  "type": "object",
+  "required": ["time", "decision"],
+  "properties": {
+    "time": {"type": "string", "format": "date-time", "description": "RFC 3339; CyberBoar writes UTC."},
+    "agent": {"type": "string", "description": "The agent that asked, such as claude-code or codex."},
+    "version": {"type": "string", "description": "The version of the binary that decided."},
+    "session": {"type": "string", "description": "The agent's session ID."},
+    "toolUseId": {"type": "string", "description": "The agent's ID for this tool call."},
+    "agentId": {"type": "string", "description": "The subagent's ID, when a subagent made the call."},
+    "agentType": {"type": "string", "description": "The subagent's type."},
+    "permissionMode": {"type": "string", "description": "The agent's permission mode."},
+    "cwd": {"type": "string", "description": "The agent's working directory."},
+    "project": {"type": "string", "description": "The project directory."},
+    "tool": {"type": "string", "description": "The agent's tool name, such as Bash or Read."},
+    "actions": {
+      "type": "array",
+      "description": "The engine actions the tool call became.",
+      "items": {"$ref": "#/$defs/action"}
+    },
+    "decision": {"enum": ["allow", "ask", "deny"]},
+    "rule": {"type": "string", "description": "The rule that decided, such as files.deny or default."},
+    "reason": {"type": "string", "description": "Why, in words for the developer."},
+    "policyName": {"type": "string", "description": "metadata.name of the policy in force."},
+    "policySha256": {"type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Lowercase hex SHA-256 of the policy file's bytes, for drift detection."},
+    "durationMs": {"type": "number", "minimum": 0, "description": "How long the decision took."},
+    "actionsOmitted": {"type": "integer", "minimum": 1, "description": "Actions left out of actions to keep the line within its size bound."}
+  },
+  "$defs": {
+    "action": {
+      "type": "object",
+      "required": ["tool"],
+      "properties": {
+        "tool": {"type": "string", "description": "shell, read, write, list or mcp; more may be added."},
+        "command": {"type": "string", "description": "The command line, for shell."},
+        "path": {"type": "string", "description": "The path, for read, write and list."},
+        "mcpServer": {"type": "string"},
+        "mcpTool": {"type": "string"}
+      }
+    }
+  }
+}

@@ -1,0 +1,38 @@
+# An enumeration must stop allocating before collecting the whole directory.
+# Without a sorted, complete bounded result, ask cannot hide a built-in deny
+fs:
+  - {path: home/dev/repo/bulk, files: 50001}
+
+defaults:
+  action:
+    tool: read
+    path: bulk
+    cwd: "{{root}}/home/dev/repo"
+    home: "{{root}}/home/dev"
+    workspaces: ["{{root}}/home/dev/repo"]
+
+policies:
+  deny:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: deny}
+      spec: {files: {deny: ["**/.env*"]}}
+  ask:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: ask}
+      spec: {files: {containing: ask, deny: ["**/.env*"]}}
+  ignore:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: ignore}
+      spec: {files: {containing: ignore}}
+
+cases:
+  - {name: oversized enumeration denies, policy: deny, action: {}, expect: {decision: deny, rule: files.containing}}
+  - {name: oversized enumeration denies under ask, policy: ask, action: {}, expect: {decision: deny, rule: files.containing}}
+  - {name: oversized enumeration denies under ignore, policy: ignore, action: {}, expect: {decision: deny, rule: files.containing}}
+  - {name: oversized enumeration in a recursive command denies under ask, policy: ask, action: {tool: shell, path: "", command: "grep -R key bulk"}, expect: {decision: deny, rule: files.containing}}

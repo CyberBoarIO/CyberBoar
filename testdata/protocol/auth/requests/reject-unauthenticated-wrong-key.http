@@ -1,0 +1,9 @@
+POST /api/v1/events HTTP/1.1
+Host: console.example
+Content-Type: application/json
+Content-Length: 122
+Content-Digest: sha-256=:n6eq1FArtL4RDZQrLsf/ig9wVxeX5STm73A7ZG1ZXs0=:
+Signature-Input: cyberboar=("@method" "@path" "@query" "content-digest");created=1790856000;keyid="3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24";nonce="Xhed5HzRPe0hsSVQams6kg";alg="ecdsa-p256-sha256";tag="cyberboar.dev/endpoint/v1"
+Signature: cyberboar=:slgS1H4AGsIly/aYfs3hHH7vXxdbKe3SZ9uHN1PaE+uAucwmDjzg7BUAPu5ZjnderCqFJIPL/drrzAweRdBFNQ==:
+
+{"endpoint":{"id":"3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24","hostname":"dev-laptop-17","version":"v1.0.0-rc.1"},"events":[]}

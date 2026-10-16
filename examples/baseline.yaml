@@ -1,0 +1,35 @@
+# Baseline example: deny-listed posture
+# Anything not matched is allowed
+apiVersion: cyberboar.dev/v1
+kind: Policy
+metadata:
+  name: baseline
+  description: Keep secrets and destructive infrastructure commands away from coding agents.
+spec:
+  defaults:
+    posture: deny-listed
+  files:
+    deny:
+      - "**/.env*"
+      - "**/*.pem"
+      - "~/.ssh/**"
+      - "~/.aws/credentials"
+    ask:
+      - "**/terraform.tfstate"
+    # A directory that contains a protected file is treated like that file
+    # (grep -r KEY ., tar ~). deny is the default; ask or ignore loosen it.
+    containing: deny
+  commands:
+    deny:
+      - "terraform apply"
+      - "kubectl delete"
+      - "curl | sh"
+    ask:
+      - "git push"
+    denyInterpreters: true
+  mcp:
+    allow:
+      - "github"
+      - "internal-docs/search"
+  audit:
+    sink: "https://cyberboar.internal/api/v1/events"

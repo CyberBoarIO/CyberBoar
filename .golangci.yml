@@ -1,0 +1,60 @@
+version: "2"
+
+linters:
+  default: standard
+  enable: [gosec, bodyclose, bidichk, nolintlint, depguard]
+  settings:
+    staticcheck:
+      # ST1023 is a redundant type in a declaration
+      # QF are quick-fix suggestions
+      checks: ["all", "-ST1023", "-QF*"]
+    gosec:
+      # G104 duplicates errcheck, which is configured below. 
+      # G304 (opening a path held in a variable) is common in CLI operations on files
+      excludes: [G104, G304]
+    errcheck:
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (*os.File).Close
+        - (io.Closer).Close
+        - (io.ReadCloser).Close
+        - os.Remove
+        - os.RemoveAll
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    depguard:
+      rules:
+        test-only-dependencies:
+          files:
+            - $all
+            - "!$test"
+            - "!**/internal/corpustest/**"
+            - "!**/internal/protocoltest/**"
+            - "!**/internal/secrets/secretstest/**"
+          deny:
+            - pkg: testing
+              desc: "the testing packages are for test files and test helpers only"
+            - pkg: net/http/httptest
+              desc: "httptest is for test files and test helpers only"
+            - pkg: cyberboar.dev/cyberboar/internal/corpustest
+              desc: "a test helper: import it from test files only"
+            - pkg: cyberboar.dev/cyberboar/internal/protocoltest
+              desc: "a test helper: import it from test files only"
+            - pkg: cyberboar.dev/cyberboar/internal/secrets/secretstest
+              desc: "a test helper: import it from test files only"
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters: [gosec, errcheck, bodyclose]
+      - path: internal/endpoint/keystore/cng_windows\.go
+        linters: [gosec]
+        text: G103
+
+formatters:
+  enable: [goimports]
+  settings:
+    goimports:
+      local-prefixes: [cyberboar.dev/cyberboar]

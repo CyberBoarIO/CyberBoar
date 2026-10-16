@@ -1,0 +1,603 @@
+# File rules for the agent's native file tools (read/write).
+#
+# `fs` builds a fixture in a fresh temp directory before the cases run
+# Entries:
+# {path, file: <content>} | {path, dir: true} | {path, symlink: <target>}
+# Parent directories are created as needed
+# `{{root}}` is replaced with the fixture's absolute, symlink-free path in policies, actions, targets, etc.
+
+fs:
+  - {path: etc/shadow, file: ""}
+  - {path: home/dev/.bashrc, file: ""}
+  - {path: home/dev/.ssh/id_rsa, file: ""}
+  - {path: home/dev/.ssh/config, file: ""}
+  - {path: home/dev/.ssh/keys/deploy.pem, file: ""}
+  - {path: home/dev/.aws/credentials, file: ""}
+  - {path: home/dev/.kube/config, file: ""}
+  - {path: home/dev/.kube/.env, file: ""}
+  - {path: home/dev/repo/README.md, file: ""}
+  - {path: home/dev/repo/.env, file: ""}
+  - {path: home/dev/repo/.env.local, file: ""}
+  - {path: home/dev/repo/src/main.go, file: ""}
+  - {path: home/dev/repo/secrets/api.key, file: ""}
+  - {path: home/dev/repo/infra/terraform.tfstate, file: ""}
+  - {path: home/dev/repo/Upper/.ENV, file: ""}
+  # Symlinks out of the workspace
+  - {path: home/dev/repo/key, symlink: ../.ssh/id_rsa}
+  - {path: home/dev/repo/ssh, symlink: ../.ssh}
+  - {path: home/dev/repo/keysdir, symlink: "{{root}}/home/dev/.ssh/keys"}
+  - {path: home/dev/repo/docs, symlink: ../../../elsewhere/docs}
+  - {path: elsewhere/docs/guide.md, file: ""}
+  - {path: home/dev/repo/tools/run.sh, file: ""}
+  - {path: home/dev/repo/tools/aws, symlink: ../../.aws}
+  - {path: home/dev/repo/conf/kubeconfig, symlink: ../../.kube/config}
+  - {path: home/dev/repo/linked/kit, symlink: "{{root}}/elsewhere/kit"}
+  - {path: elsewhere/kit/.env, file: ""}
+  # Symlinks inside the workspace
+  - {path: home/dev/repo/innocent, symlink: .env}
+  - {path: home/dev/repo/loop-a, symlink: loop-b}
+  - {path: home/dev/repo/loop-b, symlink: loop-a}
+  - {path: home/dev/repo/cycle/notes.txt, file: ""}
+  - {path: home/dev/repo/cycle/self, symlink: .}
+  - {path: home/dev/repo/cycle/inner/up, symlink: ..}
+  # Other places
+  - {path: tmp/secrets/notes.txt, file: ""}
+  - {path: work2/secrets/token, file: ""}
+  - {path: "weird[1]/repo/secrets/x", file: ""}
+  - {path: homelink, symlink: home/dev}
+  - {path: ws-to-home, symlink: home/dev}
+  # Links to what the built-in rules deny, in directories that are walked
+  - {path: links/environ/notes, symlink: /proc/self/environ}
+  - {path: links/self/me, symlink: /proc/self}
+  - {path: links/stdin/input, symlink: /dev/stdin}
+  - {path: links/dev/devices, symlink: /dev}
+  - {path: links/mixed/.env, file: ""}
+  - {path: links/mixed/zenv, symlink: /proc/self/environ}
+  - {path: links/loopy/loop-a, symlink: loop-b}
+  - {path: links/loopy/loop-b, symlink: loop-a}
+  - {path: links/loopy/zenv, symlink: /proc/self/environ}
+
+defaults:
+  action:
+    cwd: "{{root}}/home/dev/repo"
+    home: "{{root}}/home/dev"
+    workspaces: ["{{root}}/home/dev/repo"]
+
+policies:
+  secrets:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: secrets}
+      spec:
+        files:
+          deny:
+            - "**/.env*"                 # [0]
+            - "~/.ssh/**"                # [1]
+            - "~/.aws/credentials"       # [2]
+            - "{{root}}/etc/shadow"      # [3]
+            - "secrets/**"               # [4] workspace-relative
+            - "**/cl\u00E9s/**"          # [5] composed \u00E9 (NFC)
+            - "**/re\u0301seau/**"       # [6] decomposed \u00E9 (NFD)
+          ask:
+            - "**/terraform.tfstate"     # [0]
+            - "~/.kube/**"               # [1]
+  secrets-ask:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: secrets-ask}
+      spec:
+        files:
+          deny: ["**/.env*"]
+          containing: ask
+  secrets-ignore:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: secrets-ignore}
+      spec:
+        files:
+          deny: ["**/.env*"]
+          containing: ignore
+  none:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: none}
+      spec: {}
+  strict:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: strict}
+      spec:
+        defaults: {posture: allow-listed}
+        files:
+          allow: ["**"]                  # everything inside the workspace
+          deny: ["**/.env*"]
+          ask: ["~/.kube/**"]
+  strict-ask:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: strict-ask}
+      spec:
+        defaults: {posture: allow-listed}
+        files:
+          allow: ["**"]
+          containing: ask
+  strict-ignore:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: strict-ignore}
+      spec:
+        defaults: {posture: allow-listed}
+        files:
+          allow: ["**"]
+          containing: ignore
+  brackets:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: brackets}
+      spec:
+        files:
+          deny:
+            - "**/api[A-z]key*"          # [0] A-z also holds [ \ ] ^ _ and `
+            - "**/.env.[!e]*"            # [1]
+          ask:
+            - "**/dump[A-z]*.sql"        # [0]
+
+cases:
+  # --- Basic matching -------------------------------------------------------
+  - name: unmatched read is allowed
+    policy: secrets
+    action: {tool: read, path: README.md}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: dotenv is denied
+    policy: secrets
+    action: {tool: read, path: .env}
+    expect: {decision: deny, rule: "files.deny[0]"}
+  - name: dotenv variant is denied
+    policy: secrets
+    action: {tool: read, path: .env.local}
+    expect: {decision: deny, rule: "files.deny[0]"}
+  - name: absolute path into ssh dir is denied
+    policy: secrets
+    action: {tool: read, path: "{{root}}/home/dev/.ssh/id_rsa"}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: tilde path into ssh dir is denied
+    policy: secrets
+    action: {tool: read, path: "~/.ssh/config"}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: exact home-relative file is denied
+    policy: secrets
+    action: {tool: read, path: "~/.aws/credentials"}
+    expect: {decision: deny, rule: "files.deny[2]"}
+  - name: absolute pattern is denied
+    policy: secrets
+    action: {tool: read, path: "{{root}}/etc/shadow"}
+    expect: {decision: deny, rule: "files.deny[3]"}
+  - name: write is matched like read
+    policy: secrets
+    action: {tool: write, path: .env}
+    expect: {decision: deny, rule: "files.deny[0]"}
+  - name: deny and reason discourage retries
+    policy: secrets
+    action: {tool: read, path: .env}
+    expect: {decision: deny, reasonContains: "do not"}
+
+  # --- Traversal --------------------------------------------------------------
+  - name: dot-dot traversal out of the workspace is denied
+    policy: secrets
+    action: {tool: read, path: ../.ssh/id_rsa}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: traversal through a subdirectory is denied
+    policy: secrets
+    action: {tool: read, path: src/../../.ssh/id_rsa}
+    expect: {decision: deny, rule: "files.deny[1]"}
+
+  # --- Symlinks ---------------------------------------------------------------
+  - name: file symlink to a secret is denied
+    policy: secrets
+    action: {tool: read, path: key}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: directory symlink to a secret dir is denied
+    policy: secrets
+    action: {tool: read, path: ssh/id_rsa}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: dot-dot after a symlink follows the kernel, not the lexical path
+    # keysdir -> ~/.ssh/keys, so keysdir/.. is ~/.ssh (lexically it would be the repo)
+    policy: secrets
+    action: {tool: read, path: keysdir/../id_rsa}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: innocent-looking symlink to dotenv is denied
+    policy: secrets
+    action: {tool: read, path: innocent}
+    expect: {decision: deny, rule: "files.deny[0]"}
+  - name: symlink out of the workspace to a harmless file is allowed
+    policy: secrets
+    action: {tool: read, path: docs/guide.md}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: new file under a symlinked secret dir is denied
+    policy: secrets
+    action: {tool: write, path: ssh/new_key}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: new file in new directories is allowed
+    policy: secrets
+    action: {tool: write, path: new/dir/file.txt}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: symlink loop is denied
+    policy: secrets
+    action: {tool: read, path: loop-a}
+    expect: {decision: deny, rule: error.unresolvablePath}
+  - name: home given through a symlink still expands tilde patterns
+    policy: secrets
+    action: {tool: read, path: "{{root}}/home/dev/.ssh/id_rsa", home: "{{root}}/homelink"}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: secret reached through a symlinked home path is denied
+    policy: secrets
+    action: {tool: read, path: "{{root}}/homelink/.ssh/id_rsa"}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: tilde patterns apply when the home directory is the root
+    # HOME=/ is common for containers run with another user ID and for
+    # service accounts. ~/.ssh is then /.ssh
+    policy: secrets
+    action: {tool: read, path: /.ssh/id_rsa, home: /}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: a tilde path is denied when the home directory is the root
+    policy: secrets
+    action: {tool: read, path: "~/.ssh/id_rsa", home: /}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: an exact tilde pattern applies when the home directory is the root
+    policy: secrets
+    action: {tool: read, path: /.aws/credentials, home: /}
+    expect: {decision: deny, rule: "files.deny[2]"}
+
+  # --- Workspace anchoring ----------------------------------------------------
+  - name: workspace-relative deny matches
+    policy: secrets
+    action: {tool: read, path: secrets/api.key}
+    expect: {decision: deny, rule: "files.deny[4]"}
+  - name: workspace-relative deny holds after cd elsewhere
+    policy: secrets
+    action: {tool: read, path: "{{root}}/home/dev/repo/secrets/api.key", cwd: "{{root}}/tmp"}
+    expect: {decision: deny, rule: "files.deny[4]"}
+  - name: workspace-relative deny holds after cd into the secret dir
+    policy: secrets
+    action: {tool: read, path: api.key, cwd: "{{root}}/home/dev/repo/secrets"}
+    expect: {decision: deny, rule: "files.deny[4]"}
+  - name: workspace-relative deny does not follow cwd
+    # secrets/** is anchored to the workspace, so tmp/secrets is not covered
+    policy: secrets
+    action: {tool: read, path: secrets/notes.txt, cwd: "{{root}}/tmp"}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: every workspace root anchors relative patterns
+    policy: secrets
+    action:
+      tool: read
+      path: "{{root}}/work2/secrets/token"
+      workspaces: ["{{root}}/home/dev/repo", "{{root}}/work2"]
+    expect: {decision: deny, rule: "files.deny[4]"}
+  - name: glob characters in a workspace root are escaped
+    policy: secrets
+    action:
+      tool: read
+      path: "{{root}}/weird[1]/repo/secrets/x"
+      cwd: "{{root}}/weird[1]/repo"
+      workspaces: ["{{root}}/weird[1]/repo"]
+    expect: {decision: deny, rule: "files.deny[4]"}
+  - name: workspace root that resolves to home is denied
+    policy: secrets
+    action: {tool: read, path: README.md, workspaces: ["{{root}}/ws-to-home"]}
+    expect: {decision: deny, rule: error.invalidAction, reasonContains: workspace}
+
+  # --- Ask, precedence, case --------------------------------------------------
+  - name: ask rule asks
+    policy: secrets
+    action: {tool: read, path: infra/terraform.tfstate}
+    expect: {decision: ask, rule: "files.ask[0]"}
+  - name: home-relative ask rule asks
+    policy: secrets
+    action: {tool: read, path: "~/.kube/config"}
+    expect: {decision: ask, rule: "files.ask[1]"}
+  - name: deny beats ask
+    policy: secrets
+    action: {tool: read, path: "~/.kube/.env"}
+    expect: {decision: deny, rule: "files.deny[0]"}
+  - name: deny matches regardless of case
+    policy: secrets
+    action: {tool: read, path: Upper/.ENV}
+    expect: {decision: deny, rule: "files.deny[0]"}
+  - name: deny matches a differently cased path that does not exist
+    policy: secrets
+    action: {tool: write, path: "~/.SSH/id_rsa"}
+    expect: {decision: deny, rule: "files.deny[1]"}
+
+  # --- Unicode: spellings macOS treats as the same name ---------------------------
+  # APFS and HFS+ ignore case and Unicode normalization; HFS+ also ignores
+  # zero-width characters such as U+200C and U+FEFF (git's CVE-2014-9390)
+  # Deny and ask rules fold all of these; allow rules stay exact (stricter)
+  - name: deny ignores a zero-width non-joiner in a name
+    policy: secrets
+    action: {tool: read, path: ".e\u200Cnv"}
+    expect: {decision: deny, rule: "files.deny[0]"}
+  - name: deny ignores a byte order mark in a directory name
+    policy: secrets
+    action: {tool: write, path: "~/.ssh\uFEFF/id_rsa"}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: deny ignores a right-to-left override
+    policy: secrets
+    action: {tool: read, path: "~/.aws/cred\u202Eentials"}
+    expect: {decision: deny, rule: "files.deny[2]"}
+  - name: deny uses full case folding (long s is s)
+    policy: secrets
+    action: {tool: read, path: "~/.\u017Fsh/id_rsa"}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: ask uses full case folding (Kelvin sign is k)
+    policy: secrets
+    action: {tool: read, path: "~/.\u212Aube/config"}
+    expect: {decision: ask, rule: "files.ask[1]"}
+  - name: deny matches a decomposed spelling of a composed pattern
+    policy: secrets
+    action: {tool: read, path: "docs/cle\u0301s/prod.key"}
+    expect: {decision: deny, rule: "files.deny[5]"}
+  - name: deny matches a composed spelling of a decomposed pattern
+    policy: secrets
+    action: {tool: read, path: "docs/r\u00E9seau/wifi.txt"}
+    expect: {decision: deny, rule: "files.deny[6]"}
+  - name: deny folds case and normalization together
+    policy: secrets
+    action: {tool: read, path: "docs/CLE\u0301S/prod.key"}
+    expect: {decision: deny, rule: "files.deny[5]"}
+  - name: a different letter is still a different name
+    policy: secrets
+    action: {tool: read, path: "docs/clas/prod.key"}
+    expect: {decision: allow, rule: posture.deny-listed}
+
+  # Folding a bracket expression changes what it holds: [A-z] becomes [a-z],
+  # which loses the punctuation between Z and a, and [!e] then excludes E as well
+  # Deny and ask rules also match as written, so folding never makes them match less
+  - name: deny matches a bracket range as written
+    policy: brackets
+    action: {tool: read, path: api_key.txt}
+    expect: {decision: deny, rule: "files.deny[0]"}
+  - name: deny matches a bracket range folded
+    policy: brackets
+    action: {tool: read, path: APIXKEY.txt}
+    expect: {decision: deny, rule: "files.deny[0]"}
+  - name: deny matches a negated bracket as written
+    policy: brackets
+    action: {tool: read, path: .env.Example}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: a negated bracket still excludes its own letter
+    policy: brackets
+    action: {tool: read, path: .env.example}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: ask matches a bracket range as written
+    policy: brackets
+    action: {tool: read, path: dump_2026.sql}
+    expect: {decision: ask, rule: "files.ask[0]"}
+
+  # --- Built-in rules ----------------------------------------------------------
+  - name: process environment is denied
+    policy: secrets
+    action: {tool: read, path: /proc/self/environ}
+    expect: {decision: deny, rule: builtin.procfs}
+  - name: another process's cwd is denied
+    policy: secrets
+    action: {tool: read, path: /proc/1/cwd/.bashrc}
+    expect: {decision: deny, rule: builtin.procfs}
+  - name: file reached through proc root is denied
+    policy: secrets
+    action: {tool: read, path: "/proc/self/root{{root}}/home/dev/.ssh/id_rsa"}
+    expect: {decision: deny, rule: builtin.procfs}
+  - name: agent file descriptor is denied
+    policy: secrets
+    action: {tool: read, path: /dev/fd/3}
+    expect: {decision: deny, rule: builtin.devfd}
+  - name: standard input device is denied
+    policy: secrets
+    action: {tool: read, path: /dev/stdin}
+    expect: {decision: deny, rule: builtin.devfd}
+  - name: top-level proc info file is allowed
+    policy: secrets
+    action: {tool: read, path: /proc/cpuinfo}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: a differently cased fd path is denied
+    # A case-insensitive root volume (macOS) opens /DEV/fd as /dev/fd
+    policy: secrets
+    action: {tool: read, path: /DEV/fd/3}
+    expect: {decision: deny, rule: builtin.devfd}
+  - name: a differently cased proc path is denied
+    policy: secrets
+    action: {tool: read, path: /Proc/self/environ}
+    expect: {decision: deny, rule: builtin.procfs}
+  - name: reading proc's contents is denied
+    policy: secrets-ignore
+    action: {tool: read, path: /proc}
+    expect: {decision: deny, rule: builtin.procfs}
+  - name: reading the root's contents is denied
+    policy: secrets-ignore
+    action: {tool: read, path: /}
+    expect: {decision: deny, rule: builtin.procfs}
+  - name: reading dev's contents is denied
+    policy: secrets-ignore
+    action: {tool: read, path: /dev}
+    expect: {decision: deny, rule: builtin.devfd}
+  - name: listing proc's names is allowed
+    policy: secrets
+    action: {tool: list, path: /proc}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: a directory holding a link to a process environment is denied
+    policy: secrets
+    action: {tool: read, path: "{{root}}/links/environ"}
+    expect: {decision: deny, rule: builtin.procfs}
+  - name: a directory holding a link into proc is denied
+    policy: secrets
+    action: {tool: read, path: "{{root}}/links/self"}
+    expect: {decision: deny, rule: builtin.procfs}
+  - name: a directory holding a link to standard input is denied
+    policy: secrets
+    action: {tool: read, path: "{{root}}/links/stdin"}
+    expect: {decision: deny, rule: builtin.devfd}
+  - name: a directory holding a link to dev is denied
+    policy: secrets
+    action: {tool: read, path: "{{root}}/links/dev"}
+    expect: {decision: deny, rule: builtin.devfd}
+  - name: links to proc are found with containing ignore
+    # Built-in rules can't be switched off
+    policy: secrets-ignore
+    action: {tool: read, path: "{{root}}/links/environ"}
+    expect: {decision: deny, rule: builtin.procfs}
+  - name: a link to proc after a protected file is denied with containing ask
+    # .env alone would ask. The walk goes on past it, and the link denies
+    policy: secrets-ask
+    action: {tool: read, path: "{{root}}/links/mixed"}
+    expect: {decision: deny, rule: builtin.procfs}
+  - name: an unresolved link denies before a later proc link with containing ask
+    policy: secrets-ask
+    action: {tool: read, path: "{{root}}/links/loopy"}
+    expect: {decision: deny, rule: files.containing, reasonContains: unresolvable link}
+  - name: a link to standard input is denied
+    # Resolved in the hook, /dev/stdin ends at the hook's own input
+    policy: secrets
+    action: {tool: read, path: "{{root}}/links/stdin/input"}
+    expect: {decision: deny, rule: builtin.devfd}
+  - name: listing a directory holding a link to proc is allowed
+    policy: secrets
+    action: {tool: list, path: "{{root}}/links/environ"}
+    expect: {decision: allow, rule: posture.deny-listed}
+
+  # --- Directories that contain protected files (files.containing) ------------
+  - name: reading a directory that contains a protected file is denied
+    policy: secrets
+    action: {tool: read, path: .}
+    expect: {decision: deny, rule: "files.deny[0]", reasonContains: "contains"}
+  - name: reading a clean directory is allowed
+    policy: secrets
+    action: {tool: read, path: src}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: reading a link's dot-dot walks the lexical directory too
+    # docs links to elsewhere/docs, so the kernel opens elsewhere for docs/..,
+    # but a program that cleans the path first opens the workspace and its .env
+    policy: secrets
+    action: {tool: read, path: docs/..}
+    expect: {decision: deny, rule: "files.deny[0]"}
+  - name: reading a directory follows a link to another directory
+    # linked/kit links to elsewhere/kit, and grep -R reads the .env there
+    policy: secrets
+    action: {tool: read, path: linked}
+    expect: {decision: deny, rule: "files.deny[0]", reasonContains: "kit/.env"}
+  - name: a policy walk denies a link back up the tree
+    # cycle/self links to cycle, and cycle/inner/up to cycle as well
+    policy: secrets
+    action: {tool: read, path: cycle}
+    expect: {decision: deny, rule: files.containing, reasonContains: directory link cycle}
+  - name: a built-in-only walk can reuse a directory reached by a cycle
+    policy: none
+    action: {tool: read, path: cycle}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: containing ignore can reuse a directory reached by a cycle
+    policy: secrets-ignore
+    action: {tool: read, path: cycle}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: containing ask denies a directory cycle it cannot check
+    policy: secrets-ask
+    action: {tool: read, path: cycle}
+    expect: {decision: deny, rule: files.containing, reasonContains: directory link cycle}
+  - name: reading home finds the ssh directory
+    policy: secrets
+    action: {tool: read, path: "~"}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: listing names in a directory that contains a protected file is allowed
+    policy: secrets
+    action: {tool: list, path: .}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: listing a protected directory is denied
+    policy: secrets
+    action: {tool: list, path: "~/.ssh"}
+    expect: {decision: deny, rule: "files.deny[1]"}
+  - name: containing ask denies an incomplete walk after a protected file
+    policy: secrets-ask
+    action: {tool: read, path: .}
+    expect: {decision: deny, rule: files.containing, reasonContains: unresolvable link}
+  - name: containing ask asks about a protected file after a complete walk
+    policy: secrets-ask
+    action: {tool: read, path: Upper}
+    expect: {decision: ask, rule: "files.deny[0]"}
+  - name: containing ignore looks for no deny rule inside the directory
+    # Upper holds .ENV, which the deny rule matches
+    policy: secrets-ignore
+    action: {tool: read, path: Upper}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: containing ignore still denies a directory it can't walk
+    # The workspace holds the link loop loop-a and loop-b
+    # A link the walk can't resolve could lead to what the built-in rules deny
+    policy: secrets-ignore
+    action: {tool: read, path: .}
+    expect: {decision: deny, rule: files.containing, reasonContains: loop-a}
+  - name: a policy without file rules denies a directory it can't walk
+    policy: none
+    action: {tool: read, path: .}
+    expect: {decision: deny, rule: files.containing, reasonContains: loop-a}
+
+  # --- Allow-listed posture -----------------------------------------------------
+  - name: file in workspace is allowed by the allow list
+    policy: strict
+    action: {tool: read, path: src/main.go}
+    expect: {decision: allow, rule: "files.allow[0]"}
+  - name: file outside the workspace is not allowed
+    policy: strict
+    action: {tool: read, path: "~/.bashrc"}
+    expect: {decision: deny, rule: posture.allow-listed}
+  - name: cd out of the workspace does not widen the allow list
+    policy: strict
+    action: {tool: read, path: .bashrc, cwd: "{{root}}/home/dev"}
+    expect: {decision: deny, rule: posture.allow-listed}
+  - name: symlink from the workspace to outside is not allowed
+    policy: strict
+    action: {tool: read, path: key}
+    expect: {decision: deny, rule: posture.allow-listed}
+  - name: symlink to a harmless file outside is not allowed either
+    policy: strict
+    action: {tool: read, path: docs/guide.md}
+    expect: {decision: deny, rule: posture.allow-listed}
+  - name: deny beats allow
+    policy: strict
+    action: {tool: read, path: .env}
+    expect: {decision: deny, rule: "files.deny[0]"}
+  - name: reading an allowed directory is allowed
+    policy: strict
+    action: {tool: read, path: src}
+    expect: {decision: allow, rule: "files.allow[0]"}
+  - name: a link inside a directory that leads off the allow list is not allowed
+    # tools/aws links to ~/.aws, and grep -R or a Grep tool reads through it
+    policy: strict
+    action: {tool: read, path: tools}
+    expect: {decision: deny, rule: posture.allow-listed, reasonContains: "tools/aws"}
+  - name: a link to what an ask rule covers asks, as reading through it does
+    policy: strict
+    action: {tool: read, path: conf}
+    expect: {decision: ask, rule: "files.ask[0]"}
+  - name: a link off the allow list asks with containing ask
+    policy: strict-ask
+    action: {tool: read, path: tools}
+    expect: {decision: ask, rule: posture.allow-listed}
+  - name: containing ignore checks only the directory against the allow list
+    # As with deny rules, ignore looks at nothing inside the directory
+    policy: strict-ignore
+    action: {tool: read, path: tools}
+    expect: {decision: allow, rule: "files.allow[0]"}
+  - name: allow rules don't ignore zero-width characters
+    policy: strict
+    action: {tool: read, path: "{{root}}/home/dev/re\u200Cpo/README.md"}
+    expect: {decision: deny, rule: posture.allow-listed}
+  - name: allow rules are case-sensitive
+    # The allow list covers the workspace, but a differently-cased workspace path
+    # is a different directory on case-sensitive filesystems
+    policy: strict
+    action: {tool: read, path: "{{root}}/home/dev/REPO/README.md"}
+    expect: {decision: deny, rule: posture.allow-listed}

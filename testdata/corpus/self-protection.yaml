@@ -1,0 +1,77 @@
+# CyberBoar's own state (builtin.self)
+# The hook passes its state directory (tripwire counts, shipping offsets) as protected,
+# so an agent can't reset a tripwire lock or tamper with what gets shipped.
+# Any path inside is denied, whatever the policy says, and so is touching the
+# contents of a directory that holds it (rm -rf ~/.local, tar ~).
+
+fs:
+  - {path: home/dev/.local/state/cyberboar/sessions/abc.json, file: "{}"}
+  - {path: home/dev/.local/share/notes.txt, file: ""}
+  - {path: home/dev/repo/README.md, file: ""}
+  - {path: home/dev/repo/state-link, symlink: ../.local/state/cyberboar}
+  - {path: home/dev/repo/sub/local, symlink: ../../.local}
+  - {path: var/log/cyberboar.jsonl, file: ""}
+  - {path: var/log/syslog, file: ""}
+
+defaults:
+  action:
+    cwd: "{{root}}/home/dev/repo"
+    home: "{{root}}/home/dev"
+    workspaces: ["{{root}}/home/dev/repo"]
+    protected: ["{{root}}/home/dev/.local/state/cyberboar"]
+
+policies:
+  none:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: none}
+      spec:
+        files: {containing: ignore}
+        commands: {denyInterpreters: false}
+  open:
+    # Allows everything under the home directory, which doesn't reach the state
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: open}
+      spec:
+        defaults: {posture: allow-listed}
+        files: {allow: ["~/**"]}
+  logs-forbidden:
+    # The audit log's whole directory
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: logs-forbidden}
+      spec:
+        files: {deny: ["{{root}}/var/log/**"]}
+
+cases:
+  - {name: reading a state file is denied, policy: none, action: {tool: read, path: "~/.local/state/cyberboar/sessions/abc.json"}, expect: {decision: deny, rule: builtin.self}}
+  - {name: writing a new state file is denied, policy: none, action: {tool: write, path: "~/.local/state/cyberboar/sessions/new.json"}, expect: {decision: deny, rule: builtin.self}}
+  - {name: the state directory itself is denied, policy: none, action: {tool: read, path: "~/.local/state/cyberboar"}, expect: {decision: deny, rule: builtin.self}}
+  - {name: an allow rule doesn't reach the state, policy: open, action: {tool: read, path: "~/.local/state/cyberboar/sessions/abc.json"}, expect: {decision: deny, rule: builtin.self}}
+  - {name: a differently cased path is denied, policy: none, action: {tool: write, path: "~/.local/STATE/CyberBoar/sessions/abc.json"}, expect: {decision: deny, rule: builtin.self}}
+  - {name: a symlink into the state is denied, policy: none, action: {tool: write, path: "state-link/sessions/abc.json"}, expect: {decision: deny, rule: builtin.self}}
+  - {name: listing the parent's names is allowed, policy: none, action: {tool: list, path: "~/.local/state"}, expect: {decision: allow}}
+  - {name: a sibling directory is allowed, policy: none, action: {tool: read, path: "~/.local/share/notes.txt"}, expect: {decision: allow}}
+  - {name: rm in the state is denied, policy: none, action: {tool: shell, command: "rm -f ~/.local/state/cyberboar/sessions/*"}, expect: {decision: deny, rule: builtin.self}}
+  - {name: removing a directory that holds the state is denied, policy: none, action: {tool: shell, command: "rm -rf ~/.local"}, expect: {decision: deny, rule: builtin.self}}
+  - {name: archiving the home directory is denied, policy: none, action: {tool: shell, command: "tar czf /tmp/home.tgz ~"}, expect: {decision: deny, rule: builtin.self}}
+  - {name: redirecting into the state is denied, policy: none, action: {tool: shell, command: "echo '{}' > ~/.local/state/cyberboar/sessions/abc.json"}, expect: {decision: deny, rule: builtin.self}}
+  - {name: through a symlink in a scanned directory, policy: none, action: {tool: shell, command: "grep -r locked ."}, expect: {decision: deny, rule: builtin.self}}
+  - {name: a directory holding a link to a parent of the state is denied, policy: none, action: {tool: read, path: sub}, expect: {decision: deny, rule: builtin.self, reasonContains: sub/local}}
+  - {name: searching through a link to a parent of the state is denied, policy: none, action: {tool: shell, command: "grep -R x sub"}, expect: {decision: deny, rule: builtin.self}}
+  - {name: ls of a directory that holds the state is allowed, policy: none, action: {tool: shell, command: "ls -la ~/.local"}, expect: {decision: allow}}
+  - {name: a path only known at run time asks, policy: none, action: {tool: shell, command: "rm -rf \"$DIR\""}, expect: {decision: ask, rule: builtin.self}}
+  - {name: unrelated commands are allowed, policy: none, action: {tool: shell, command: "cat README.md"}, expect: {decision: allow}}
+  - {name: a relative protected directory is an invalid action, policy: none, action: {tool: read, path: README.md, protected: [state]}, expect: {decision: deny, rule: error.invalidAction}}
+
+  # The audit log: the file itself is protected, not its directory, so an audit log
+  # in /var/log doesn't put all of /var/log off limits; a policy can forbid the whole directory
+  - {name: the audit log is denied, policy: none, action: {tool: read, path: "{{root}}/var/log/cyberboar.jsonl", protected: ["{{root}}/var/log/cyberboar.jsonl"]}, expect: {decision: deny, rule: builtin.self}}
+  - {name: emptying the audit log is denied, policy: none, action: {tool: shell, command: ": > {{root}}/var/log/cyberboar.jsonl", protected: ["{{root}}/var/log/cyberboar.jsonl"]}, expect: {decision: deny, rule: builtin.self}}
+  - {name: removing the log's directory is denied, policy: none, action: {tool: shell, command: "rm -rf {{root}}/var/log", protected: ["{{root}}/var/log/cyberboar.jsonl"]}, expect: {decision: deny, rule: builtin.self}}
+  - {name: a log next to the audit log is allowed, policy: none, action: {tool: read, path: "{{root}}/var/log/syslog", protected: ["{{root}}/var/log/cyberboar.jsonl"]}, expect: {decision: allow}}
+  - {name: a policy can forbid the log directory, policy: logs-forbidden, action: {tool: read, path: "{{root}}/var/log/syslog", protected: ["{{root}}/var/log/cyberboar.jsonl"]}, expect: {decision: deny, rule: "files.deny[0]"}}

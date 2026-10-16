@@ -1,0 +1,49 @@
+{
+  "endpoint": {
+    "id": "3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24",
+    "hostname": "dev-laptop-17",
+    "version": "v1.0.0-rc.1"
+  },
+  "events": [
+    {
+      "time": "2026-09-29T08:15:09Z",
+      "agent": "codex",
+      "version": "v1.0.0-rc.1",
+      "tool": "Read",
+      "actions": [
+        {
+          "tool": "read",
+          "path": "/home/dev/app/src/main.go"
+        }
+      ],
+      "decision": "allow",
+      "rule": "default",
+      "reason": "no rule matched",
+      "policyName": "baseline",
+      "durationMs": 0.4
+    },
+    {
+      "time": "2026-09-29T08:15:02.418Z",
+      "agent": "claude-code",
+      "version": "v1.0.0-rc.1",
+      "session": "c0ffee00-0000-4000-8000-000000000001",
+      "toolUseId": "toolu_01",
+      "permissionMode": "default",
+      "cwd": "/home/dev/app",
+      "project": "/home/dev/app",
+      "tool": "Bash",
+      "actions": [
+        {
+          "tool": "shell",
+          "command": "cat .env"
+        }
+      ],
+      "decision": "block",
+      "rule": "files.deny",
+      "reason": "reads .env, which matches files.deny \"**/.env*\"",
+      "policyName": "baseline",
+      "policySha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "durationMs": 1.7
+    }
+  ]
+}

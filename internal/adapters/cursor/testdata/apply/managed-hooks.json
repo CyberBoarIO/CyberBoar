@@ -1,0 +1,46 @@
+{
+  "hooks": {
+    "beforeMCPExecution": [
+      {
+        "command": "'/usr/local/bin/cyberboar' 'hook' '--agent' 'cursor' '--policy' '/etc/cyberboar/policy.yaml' '--audit' '/var/log/cyberboar/audit.jsonl' '--pubkey' '/etc/cyberboar/policy.pub' '--deadline' '5s'",
+        "failClosed": true,
+        "timeout": 15
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": "'/usr/local/bin/cyberboar' 'hook' '--agent' 'cursor' '--policy' '/etc/cyberboar/policy.yaml' '--audit' '/var/log/cyberboar/audit.jsonl' '--pubkey' '/etc/cyberboar/policy.pub' '--deadline' '5s'",
+        "failClosed": true,
+        "timeout": 15
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "'/usr/local/bin/cyberboar' 'hook' '--agent' 'cursor' '--policy' '/etc/cyberboar/policy.yaml' '--audit' '/var/log/cyberboar/audit.jsonl' '--pubkey' '/etc/cyberboar/policy.pub' '--deadline' '5s'",
+        "failClosed": true,
+        "timeout": 15
+      }
+    ],
+    "beforeTabFileRead": [
+      {
+        "command": "'/usr/local/bin/cyberboar' 'hook' '--agent' 'cursor' '--policy' '/etc/cyberboar/policy.yaml' '--audit' '/var/log/cyberboar/audit.jsonl' '--pubkey' '/etc/cyberboar/policy.pub' '--deadline' '5s'",
+        "failClosed": true,
+        "timeout": 15
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "'/usr/local/bin/cyberboar' 'hook' '--agent' 'cursor' '--policy' '/etc/cyberboar/policy.yaml' '--audit' '/var/log/cyberboar/audit.jsonl' '--pubkey' '/etc/cyberboar/policy.pub' '--deadline' '5s'",
+        "failClosed": true,
+        "timeout": 15
+      }
+    ],
+    "sessionStart": [
+      {
+        "command": "'/usr/local/bin/cyberboar' 'brief' '--agent' 'cursor' '--policy' '/etc/cyberboar/policy.yaml' '--pubkey' '/etc/cyberboar/policy.pub'",
+        "timeout": 15
+      }
+    ]
+  },
+  "version": 1
+}

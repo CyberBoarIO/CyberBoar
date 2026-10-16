@@ -1,0 +1,20 @@
+# Deterministic checks using an explicit POSIX test workspace
+tests:
+  - name: Block env file
+    action:
+      read: .env
+      cwd: /work/repo
+      home: /home/dev
+      workspace: /work/repo
+    expect: deny
+  - name: Require push approval
+    action:
+      command: git push origin main
+      cwd: /work/repo
+      home: /home/dev
+      workspace: /work/repo
+    expect: ask
+  - name: Block other MCP servers
+    action:
+      mcp: slack/post
+    expect: deny

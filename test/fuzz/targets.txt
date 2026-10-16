@@ -1,0 +1,26 @@
+# Every Go fuzz target, as "package function" with the package relative to
+# the module. scripts/quality-checks.sh --full runs each for a minute, OSS-Fuzz builds
+# each (test/fuzz/oss-fuzz-build.sh), and scripts/quality-checks.sh fails when a Fuzz
+# function in the tree is missing here
+
+internal/engine/shell FuzzAnalyze
+internal/engine/shell FuzzLiterals
+internal/engine/shell FuzzFeedGraph
+internal/engine FuzzEvaluateShell
+internal/engine FuzzEvaluatePath
+internal/engine/shell/pwsh FuzzParsePowerShell
+internal/adapters/edits FuzzPatch
+internal/adapters/edits FuzzStrings
+internal/adapters FuzzPatchPaths
+internal/adapters FuzzSplitMCP
+internal/adapters FuzzToolInputObject
+internal/secrets FuzzScan
+internal/fold FuzzString
+internal/semver FuzzAtLeast
+internal/adapters/codex FuzzCallFromScript
+internal/endpoint/ship FuzzReadBatch
+internal/endpoint/keystore FuzzLoad
+pkg/audit FuzzParseLine
+pkg/endpointauth FuzzVerifyRequest
+pkg/endpointauth FuzzVerifyResponse
+pkg/sign FuzzParse

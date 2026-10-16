@@ -1,0 +1,23 @@
+# Gitleaks configuration used by scripts/quality-checks.sh
+# Exceptions cover intentionally public test keys and fixture values,
+# RFC 6238's test secret, and bundled Gitleaks detection rules
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test keys; each file name says insecure"
+paths = ['''^testdata/protocol/(auth/)?insecure-[a-z]+\.key$''']
+
+[[allowlists]]
+description = "The secret scanner's rules: gitleaks' own patterns, some of them literal"
+paths = ['''^internal/secrets/(gitleaks\.toml|rules_gen\.go)$''']
+
+[[allowlists]]
+description = "Values in the protocol golden files and RFC 6238's test secret"
+regexTarget = "match"
+regexes = [
+  '''cyberboar_enroll_ess4Aob-xcAxsXboV4iZoce8QM70kCcMY_fBPN3nlss''',
+  '''MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE/1/iC7PmlAo8jFfi7E\+p9wo14hoVIX6kdHElC1sz24r\+ivRttdbUMq9Lsbx3beo1L48iq0mpvOAl7VZND90y2Q==''',
+  '''GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ''',
+]

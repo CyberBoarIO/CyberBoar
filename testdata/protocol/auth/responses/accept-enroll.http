@@ -1,0 +1,8 @@
+HTTP/1.1 201 Created
+Content-Type: application/json
+Content-Length: 919
+Content-Digest: sha-256=:P7X5+ZJA3fig2sEhWv2HcWO2PXuU5mvd+C7UeJ/Psjo=:
+Signature-Input: cyberboar=("@status" "content-digest" "signature";req;key="cyberboar");created=1790856000;keyid="61870fc6173d2425b03442ec6f9708c85d750d10e7ff42747861acb93c0fa07c";alg="ecdsa-p256-sha256";tag="cyberboar.dev/console/v1"
+Signature: cyberboar=:CslYNEt0Xld4js/qdcCEkthmeZpKzb9rVEq5YLkh5agSCQLnKpLHO+SggO87quP+bfjWGpgzaE3pMku/z0jTMw==:
+
+{"endpointId":"3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24","policy":"baseline","certificate":"-----BEGIN CERTIFICATE-----\nMIIBxjCCAWygAwIBAgIBAjAKBggqhkjOPQQDAjAkMSIwIAYDVQQDExlpbnNlY3Vy\nZSB0ZXN0IGVuZHBvaW50IENBMB4XDTI2MTAwMTExMDAwMFoXDTI2MTAzMTEyMDAw\nMFowLzEtMCsGA1UEAxMkM2YxYzZhNTItOGQ0ZS00YjdhLTljMjEtNWUwZjdkOWEx\nYjI0MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1tm3vHaKVK8SoLk65hsdOy+3\n9nkiuytJcv3NXGeX0buHC0FQNBlQ+DBjyq3pAJHQynH9gIH1+WZ9ZJr8EFtDg6OB\ngzCBgDAOBgNVHQ8BAf8EBAMCB4AwEwYDVR0lBAwwCgYIKwYBBQUHAwIwHwYDVR0j\nBBgwFoAUp6Acwfye6oXeWG3Td3XKSxRo0JwwOAYDVR0RBDEwL4YtdXJuOnV1aWQ6\nM2YxYzZhNTItOGQ0ZS00YjdhLTljMjEtNWUwZjdkOWExYjI0MAoGCCqGSM49BAMC\nA0gAMEUCIFuAiIsg8Ewr+KEMYAs+ZNof3mTDMZkIOctq+qZejBcLAiEA3yn87bff\npV3AG8uHl5PTTnlwmB1QhJ47J0zLvm5nMEY=\n-----END CERTIFICATE-----\n","consoleKey":"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE/1/iC7PmlAo8jFfi7E+p9wo14hoVIX6kdHElC1sz24r+ivRttdbUMq9Lsbx3beo1L48iq0mpvOAl7VZND90y2Q=="}

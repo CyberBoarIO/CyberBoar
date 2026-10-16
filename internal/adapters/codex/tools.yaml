@@ -1,0 +1,52 @@
+# How Codex CLI's tools touch the machine, for the PreToolUse hook.
+#
+# A tool not listed here is denied: new tools are never trusted until someone
+# has read their input and classified them. MCP tools (mcp__<server>__<tool>)
+# are handled by name.
+#
+# Per tool, one or more of:
+#   shell:             input field holding a command line. Codex doesn't tell the hook
+#                      which directory it starts in or which shell runs it, so both
+#                      are read from the call in the session transcript.
+#   patch:             input field holding an apply_patch document; every file it
+#                      adds, deletes, updates or moves to is a write
+#   read, write, list: input fields holding paths (as for Claude Code)
+#   mcpResource:       input field naming the MCP server the tool reads resources from
+#   forbid:            fields that must be absent or null; environment_id sends the call
+#                      to another machine whose files the hook can't see
+#   required:          fields that must be present
+#   passthrough:       the tool touches no local file and runs no command
+#
+# Sources: Codex hooks docs, the tool handlers of codex-rs and inputs captured
+# from Codex 0.155.
+
+version: 1
+tools:
+  # Shell commands and unified exec both arrive as Bash with tool_input.command
+  Bash: {shell: command, required: [command]}
+  apply_patch: {patch: command, required: [command]}
+  view_image: {read: [path], required: [path], forbid: [environment_id]}
+
+  # MCP resources: governed like a call to the server they name
+  read_mcp_resource: {mcpResource: server, required: [server]}
+  list_mcp_resources: {mcpResource: server, required: [server]}
+  list_mcp_resource_templates: {mcpResource: server, required: [server]}
+
+  # No local file access, no commands. Subagents' own tool calls are hooked
+  update_plan: {passthrough: true}
+  update_goal: {passthrough: true}       # seen in a real 0.155 run (code mode)
+  get_goal: {passthrough: true}          # offered by 0.155
+  create_goal: {passthrough: true}       # offered by 0.155
+  request_user_input: {passthrough: true}
+  spawn_agent: {passthrough: true}
+  send_input: {passthrough: true}
+  send_message: {passthrough: true}
+  followup_task: {passthrough: true}
+  wait_agent: {passthrough: true}
+  list_agents: {passthrough: true}
+  close_agent: {passthrough: true}
+  interrupt_agent: {passthrough: true}
+  resume_agent: {passthrough: true}
+  tool_search: {passthrough: true}
+  get_context_remaining: {passthrough: true}
+  new_context: {passthrough: true}

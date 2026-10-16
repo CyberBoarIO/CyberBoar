@@ -1,0 +1,80 @@
+# How GitHub Copilot CLI's tools touch the machine, for the preToolUse hook
+#
+# A tool not listed here is denied: new tools are never trusted
+# until someone has read their input schema and classified them. A name with
+# a "-" that isn't listed is an MCP tool, <server>-<tool> (built-in tools use
+# underscores only)
+#
+# Per tool, one or more of:
+#   shell:           toolArgs field holding a bash command line. Each call starts in
+#                    the session directory (the hook input's cwd), except that a
+#                    reused shellId keeps the directory its shell was created in,
+#                    which the hook isn't told: with shellUnknownCwd set, the command
+#                    is then analysed with an unknown starting directory
+#   shellUnknownCwd: the field that, when present, makes the directory unknown
+#   powershell:      toolArgs field holding a PowerShell command (foreign code)
+#   read, write, list: toolArgs fields holding paths (as for Claude Code)
+#   content, edit:   toolArgs fields holding text a write adds, and
+#                    its text edits (as for Claude Code)
+#   editor:          the write follows str_replace_editor's command (create, str_replace,
+#                    insert)
+#   view:            fields holding paths that are read if they are files and listed
+#                    (names only) if they are directories
+#   patch:           toolArgs is itself an apply_patch document (a string)
+#   sql:             toolArgs field holding a query Copilot runs itself: sqlite or
+#                    duckdb; file access from SQL is refused
+#   required:        fields that must be present
+#   defaultCwd:      with none of its path fields present, the tool acts on cwd
+#   passthrough:     the tool touches no local file and runs no command
+#
+# Field paths: "a", "a[]" (as for Claude Code). Relative paths resolve against
+# the hook input's cwd
+#
+# Sources: tool schemas Copilot CLI 1.0.91 offers the model (with
+# str_replace-style and apply_patch-style models) and hook inputs captured
+# from it; the PowerShell tools are named in the binary and offered on
+# Windows, where the hook denies every call anyway
+
+version: 1
+tools:
+  # --- Commands -------------------------------------------------------------------
+  bash: {shell: command, shellUnknownCwd: shellId, required: [command]}
+  powershell: {powershell: command, required: [command]}
+  # Output of, and control over, commands already checked. write_bash and
+  # write_powershell (input typed into a running command) are left out on
+  # purpose: the analyser never sees that input
+  read_bash: {passthrough: true}
+  stop_bash: {passthrough: true}
+  list_bash: {passthrough: true}
+  read_powershell: {passthrough: true}
+  stop_powershell: {passthrough: true}
+  list_powershell: {passthrough: true}
+
+  # --- Files ----------------------------------------------------------------------
+  view: {view: [path], required: [path]}
+  create: {write: [path], content: [file_text], required: [path]}
+  edit: {write: [path], edit: {old: old_str, new: new_str}, required: [path]}
+  str_replace_editor: {write: [path], editor: true, required: [path]}   # its view command too: stricter
+  apply_patch: {patch: true}
+  grep: {read: [paths, "paths[]"], defaultCwd: true}      # searches contents
+  rg: {read: [paths, "paths[]"], defaultCwd: true}
+  glob: {list: [paths, "paths[]"], defaultCwd: true}      # returns names
+
+  # --- Queries Copilot runs itself --------------------------------------------------
+  sql: {sql: sqlite, required: [query]}                   # the session's SQLite database
+  session_store_sql: {sql: duckdb, required: [query]}     # past sessions: DuckDB or SQLite
+
+  # --- No local file access, no commands ------------------------------------------
+  # Subagents' own tool calls go through this hook too (seen in 1.0.91)
+  task: {passthrough: true}
+  read_agent: {passthrough: true}
+  list_agents: {passthrough: true}
+  write_agent: {passthrough: true}
+  skill: {passthrough: true}
+  fetch_copilot_cli_documentation: {passthrough: true}
+  ask_user: {passthrough: true}
+  exit_plan_mode: {passthrough: true}
+  update_todo: {passthrough: true}
+  store_memory: {passthrough: true}
+  # Network access is not governed (see the README's "What it does not do")
+  web_fetch: {passthrough: true}

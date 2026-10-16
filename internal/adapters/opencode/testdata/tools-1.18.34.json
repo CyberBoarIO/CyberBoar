@@ -1,0 +1,25 @@
+{
+  "agent": "opencode 1.18.34",
+  "source": "tools offered to the model in `opencode run` (headless) runs against a scripted OpenAI-compatible provider with model IDs scripted (edit and write) and gpt-5-scripted (apply_patch), with OPENCODE_ENABLE_EXA, OPENCODE_EXPERIMENTAL_LSP_TOOL, OPENCODE_ENABLE_QUESTION_TOOL and OPENCODE_EXPERIMENTAL_PLAN_MODE set and a local MCP server with resources, Linux x64. MCP tools (<server>_<tool>) are left out; invalid is opencode's stand-in for a call to a tool that doesn't exist, which reaches plugins too",
+  "tools": [
+    "apply_patch",
+    "bash",
+    "edit",
+    "glob",
+    "grep",
+    "invalid",
+    "list_mcp_resource_templates",
+    "list_mcp_resources",
+    "read",
+    "read_mcp_resource",
+    "skill",
+    "task",
+    "todowrite",
+    "webfetch",
+    "websearch",
+    "write"
+  ],
+  "denied": [
+    "lsp"
+  ]
+}

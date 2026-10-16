@@ -1,0 +1,41 @@
+{
+  "hooks": {
+    "preToolUse": [
+      {
+        "args": [
+          "hook",
+          "--agent",
+          "copilot-cli",
+          "--policy",
+          "/etc/cyberboar/policy.yaml",
+          "--audit",
+          "/var/log/cyberboar/audit.jsonl",
+          "--pubkey",
+          "/etc/cyberboar/policy.pub",
+          "--deadline",
+          "5s"
+        ],
+        "exec": "/usr/local/bin/cyberboar",
+        "timeoutSec": 15,
+        "type": "command"
+      }
+    ],
+    "sessionStart": [
+      {
+        "args": [
+          "brief",
+          "--agent",
+          "copilot-cli",
+          "--policy",
+          "/etc/cyberboar/policy.yaml",
+          "--pubkey",
+          "/etc/cyberboar/policy.pub"
+        ],
+        "exec": "/usr/local/bin/cyberboar",
+        "timeoutSec": 15,
+        "type": "command"
+      }
+    ]
+  },
+  "version": 1
+}

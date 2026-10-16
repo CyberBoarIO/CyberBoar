@@ -1,0 +1,20 @@
+CyberBoar enforces the policy "advanced-baseline" on every tool call in this session, including subagents.
+
+Denied:
+- files: **/.env*, **/*.pem, **/*.key, **/*.p12, **/*.pfx, **/*.jks, **/*.keystore, **/id_rsa*, **/id_ecdsa*, **/id_ed25519*, **/*.tfstate, **/*.tfstate.backup, ~/.ssh/**, ~/.gnupg/**, ~/.password-store/** and 16 more
+- commands: terraform apply, terraform destroy, tofu apply, tofu destroy, pulumi up, pulumi destroy, kubectl delete, kubectl drain, helm uninstall, aws iam, aws s3 rm, aws s3 rb, gcloud projects delete, az group delete, git push --force* and 9 more
+- inline code: sh -c, bash -c, eval, python -c, node -e and other interpreters given code on the command line or stdin
+- directories that contain a denied file, for commands that read or change what's inside (grep -r, tar, cp -r)
+
+Need the user's confirmation:
+- files: **/.git/hooks/**
+- commands: git push, npm publish, cargo publish, twine upload, gem push, docker push, kubectl apply, helm install, helm upgrade, gh pr merge, gh release create
+
+Allowed only when on the allow list (for these kinds):
+- MCP servers and tools: github, internal-docs/search
+
+If a tool call is denied, do not try another way to do the same thing: no other tool, command, spelling, encoding, path, script or subagent. Stop, tell the user what you needed and why, and let them decide; only they can change the policy.
+After 3 denied calls in this session, CyberBoar locks the session and blocks every tool call until the user starts a new one or unlocks it.
+
+From the policy's authors:
+Questions about this policy go to the platform security team.

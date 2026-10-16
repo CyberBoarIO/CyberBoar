@@ -1,0 +1,40 @@
+{
+  "hooks": {
+    "beforeMCPExecution": [
+      {
+        "command": "'cyberboar' 'hook' '--agent' 'cursor' '--policy' '.cyberboar/policy.yaml' '--deadline' '5s'",
+        "failClosed": true,
+        "timeout": 15
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": "'cyberboar' 'hook' '--agent' 'cursor' '--policy' '.cyberboar/policy.yaml' '--deadline' '5s'",
+        "failClosed": true,
+        "timeout": 15
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "'cyberboar' 'hook' '--agent' 'cursor' '--policy' '.cyberboar/policy.yaml' '--deadline' '5s'",
+        "failClosed": true,
+        "timeout": 15
+      }
+    ],
+    "beforeTabFileRead": [
+      {
+        "command": "'cyberboar' 'hook' '--agent' 'cursor' '--policy' '.cyberboar/policy.yaml' '--deadline' '5s'",
+        "failClosed": true,
+        "timeout": 15
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "'cyberboar' 'hook' '--agent' 'cursor' '--policy' '.cyberboar/policy.yaml' '--deadline' '5s'",
+        "failClosed": true,
+        "timeout": 15
+      }
+    ]
+  },
+  "version": 1
+}

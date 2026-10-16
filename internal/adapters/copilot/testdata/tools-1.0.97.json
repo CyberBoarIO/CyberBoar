@@ -1,0 +1,26 @@
+{
+  "agent": "Copilot CLI 1.0.97",
+  "source": "tools offered to the model in `copilot -p` (non-interactive) runs against a scripted OpenAI-compatible provider with model IDs claude-sonnet-4.5 (str_replace style) and gpt-5.4 (apply_patch style), no MCP servers, Linux x64",
+  "tools": [
+    "apply_patch",
+    "bash",
+    "create",
+    "edit",
+    "fetch_copilot_cli_documentation",
+    "glob",
+    "grep",
+    "list_agents",
+    "list_bash",
+    "read_agent",
+    "read_bash",
+    "rg",
+    "session_store_sql",
+    "skill",
+    "sql",
+    "stop_bash",
+    "task",
+    "view",
+    "web_fetch",
+    "write_agent"
+  ]
+}

@@ -1,0 +1,9 @@
+POST /api/v1/endpoint/certificate HTTP/1.1
+Host: console.example
+Content-Type: application/json
+Content-Length: 3
+Content-Digest: sha-256=:yj0WO6sFU4GCciYUBWjzvvfqrBh869doeOC2Pp5EI1Y=:
+Signature-Input: cyberboar=("@method" "@path" "@query" "content-digest");created=1790855995;keyid="3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24";nonce="Ww4Rb82VNmornd-oFnbOLA";alg="ecdsa-p256-sha256";tag="cyberboar.dev/endpoint/v1"
+Signature: cyberboar=:Fihi4OGTlPyD8A6A07i6GWCh5CVFKV0+5SmK/+07vG9rVP1h/E6iWquhcTXqbrbdUgPF7GYM1ntt7pL45EUpPQ==:
+
+{}

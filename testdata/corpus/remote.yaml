@@ -1,0 +1,115 @@
+# Commands run somewhere else: what ssh runs on the remote host, and what docker,
+# podman and kubectl run in a container, is checked like a local command
+# Command rules apply as written
+# File rules apply to the paths it names: a remote command starts in the
+# home directory (so the local ~ stands in for the remote one), a container
+# command's words are checked like any argument. That is the strict choice:
+# `ssh h cat .env` is denied though that .env is on another machine, and a
+# bare `ssh host` is a shell reading stdin, denied under denyInterpreters.
+# Not covered: an image's own entrypoint, the remote user's shell and
+# ~/.ssh/config.
+#
+# Fixture and policy as in adversarial.yaml
+
+fs:
+  - {path: home/dev/.ssh/id_rsa, file: "k"}
+  - {path: home/dev/.aws/credentials, file: "c"}
+  - {path: home/dev/repo/.env, file: "s"}
+  - {path: home/dev/repo/README.md, file: "r"}
+
+defaults:
+  action:
+    tool: shell
+    cwd: "{{root}}/home/dev/repo"
+    home: "{{root}}/home/dev"
+    workspaces: ["{{root}}/home/dev/repo"]
+
+policies:
+  baseline: {file: ../../examples/baseline.yaml}
+
+cases:
+  # ssh: the remote command is a shell command line (ssh joins its words)
+  - {name: ssh runs a denied command, policy: baseline, action: {command: "ssh prod terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ssh with the command quoted, policy: baseline, action: {command: "ssh prod 'terraform apply'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ssh options before the destination, policy: baseline, action: {command: "ssh -p 2222 -i ./key -o BatchMode=yes prod terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ssh options after the destination, policy: baseline, action: {command: "ssh prod -p 2222 terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ssh with a user and --, policy: baseline, action: {command: "ssh -l ops -- prod kubectl delete pod web"}, expect: {decision: deny, rule: "commands.deny[1]"}}
+  - {name: ssh through ssh, policy: baseline, action: {command: "ssh bastion ssh prod terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: SSH in capitals, policy: baseline, action: {command: "SSH prod terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: slogin, policy: baseline, action: {command: "slogin prod terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ssh RemoteCommand option, policy: baseline, action: {command: "ssh -o 'RemoteCommand=terraform apply' prod"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ssh RemoteCommand with a space, policy: baseline, action: {command: "ssh -o 'RemoteCommand terraform apply' prod"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ssh remote command starts in the home directory, policy: baseline, action: {command: "ssh prod cat .ssh/id_rsa"}, expect: {decision: deny, rule: "files.deny[2]"}}
+  - {name: ssh remote command reads a secret by name, policy: baseline, action: {command: "ssh prod cat /srv/app/.env"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: ssh remote command with a tilde inside quotes, policy: baseline, action: {command: "ssh prod 'cat ~/.aws/credentials'"}, expect: {decision: deny, rule: "files.deny[3]"}}
+  - {name: ssh remote command after cd, policy: baseline, action: {command: "ssh prod cd .aws '&&' cat credentials"}, expect: {decision: deny}}
+  - {name: ssh remote git push asks, policy: baseline, action: {command: "ssh prod git push"}, expect: {decision: ask, rule: "commands.ask[0]"}}
+  - {name: ssh remote shell code is inline code, policy: baseline, action: {command: "ssh prod 'uptime && df -h'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: ssh remote command known only at run time, policy: baseline, action: {command: "ssh prod \"$CMD\""}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: ssh reading commands from a pipe, policy: baseline, action: {command: "echo 'terraform apply' | ssh prod"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: ssh reading commands from a heredoc, policy: baseline, action: {command: "ssh prod <<'EOF'\nterraform apply\nEOF"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ssh destination known only at run time, policy: baseline, action: {command: "ssh \"$HOST\" terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ssh option known only at run time, policy: baseline, action: {command: "ssh $OPTS prod terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ssh runs a harmless command, policy: baseline, action: {command: "ssh prod uptime"}, expect: {decision: allow}}
+  - {name: ssh runs a command with options, policy: baseline, action: {command: "ssh -p 2222 prod systemctl status nginx"}, expect: {decision: allow}}
+  - {name: ssh port forward runs no command, policy: baseline, action: {command: "ssh -N -L 8080:localhost:80 prod"}, expect: {decision: allow}}
+  - {name: ssh subsystem is no shell command, policy: baseline, action: {command: "ssh -s prod sftp"}, expect: {decision: allow}}
+  - {name: rsync --rsync-path runs a remote command, policy: baseline, action: {command: "rsync --rsync-path='terraform apply' README.md prod:/tmp/"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: rsync --rsync-path as a separate word, policy: baseline, action: {command: "rsync --rsync-path 'terraform apply' README.md prod:/tmp/"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: rsync --rsync-path with sudo, policy: baseline, action: {command: "rsync --rsync-path='sudo rsync' README.md prod:/tmp/"}, expect: {decision: allow}}
+
+  # Containers: the command is an argv, like env or sudo
+  - {name: docker exec runs a denied command, policy: baseline, action: {command: "docker exec web terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: docker exec with options, policy: baseline, action: {command: "docker exec -it -u root -w /app -e A=1 web terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: docker exec with joined and long options, policy: baseline, action: {command: "docker exec -ti --user=root --env-file .envfile --workdir /app web kubectl delete ns x"}, expect: {decision: deny, rule: "commands.deny[1]"}}
+  - {name: docker exec sh -c, policy: baseline, action: {command: "docker exec web sh -c 'terraform apply'"}, expect: {decision: deny}}
+  - {name: docker global options, policy: baseline, action: {command: "docker --context prod -H ssh://x exec web terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: docker container exec, policy: baseline, action: {command: "docker container exec web terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: docker compose exec, policy: baseline, action: {command: "docker compose -f x.yaml exec -T web terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: docker-compose exec, policy: baseline, action: {command: "docker-compose exec web terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: podman exec, policy: baseline, action: {command: "podman exec web terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: podman exec --latest has no container name, policy: baseline, action: {command: "podman exec -l terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: docker exec reads a secret by name, policy: baseline, action: {command: "docker exec web cat /app/.env"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: docker exec with an unknown option, policy: baseline, action: {command: "docker exec --new-flag x web terraform apply"}, expect: {decision: ask}}
+  - {name: docker exec with a run-time option, policy: baseline, action: {command: "docker exec $OPTS web terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: docker exec with a run-time container name, policy: baseline, action: {command: "docker exec \"$C\" terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: kubectl exec with a run-time pod, policy: baseline, action: {command: "kubectl exec \"$POD\" terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ssh login shell reads stdin, policy: baseline, action: {command: "ssh prod"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: ssh -n reads no stdin, policy: baseline, action: {command: "ssh -n -f prod"}, expect: {decision: allow}}
+  - {name: ssh with no destination runs nothing itself, policy: baseline, action: {command: "GIT_SSH_COMMAND='ssh -i ./deploy' git fetch"}, expect: {decision: allow}}
+  - {name: docker exec runs a harmless command, policy: baseline, action: {command: "docker exec -it web ls /app"}, expect: {decision: allow}}
+  - {name: docker ps is not exec, policy: baseline, action: {command: "docker ps -a"}, expect: {decision: allow}}
+  - {name: kubectl exec runs a denied command, policy: baseline, action: {command: "kubectl exec web -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: kubectl exec with options, policy: baseline, action: {command: "kubectl exec -it -n prod -c app deploy/web -- kubectl delete ns x"}, expect: {decision: deny, rule: "commands.deny[1]"}}
+  - {name: kubectl global options before exec, policy: baseline, action: {command: "kubectl --context prod -n x exec web -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: kubectl exec without --, policy: baseline, action: {command: "kubectl exec web terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: kubectl exec sh -c, policy: baseline, action: {command: "kubectl exec web -- sh -c 'terraform apply'"}, expect: {decision: deny}}
+  - {name: oc exec, policy: baseline, action: {command: "oc exec web -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: kubectl exec runs a harmless command, policy: baseline, action: {command: "kubectl exec -n prod web -- ls /"}, expect: {decision: allow}}
+  - {name: kubectl get is not exec, policy: baseline, action: {command: "kubectl get pods -n prod"}, expect: {decision: allow}}
+
+  # docker/podman run and create: the command after the image (the image's
+  # entrypoint may come first, which isn't seen), --entrypoint, and bind
+  # mounts: a mounted host directory is read by the container like any
+  # directory a command reads
+  - {name: docker run with a command, policy: baseline, action: {command: "docker run --rm -it alpine terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: docker run with options, policy: baseline, action: {command: "docker run --rm --name x -e A=1 -p 8080:80 --network host -w /app alpine kubectl delete ns x"}, expect: {decision: deny, rule: "commands.deny[1]"}}
+  - {name: docker run --entrypoint, policy: baseline, action: {command: "docker run --entrypoint terraform hashicorp/terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: docker run --entrypoint= form, policy: baseline, action: {command: "docker run --entrypoint=terraform img apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: docker container run, policy: baseline, action: {command: "docker container run alpine terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: podman run, policy: baseline, action: {command: "podman run --rm alpine terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: docker run mounts the ssh directory, policy: baseline, action: {command: "docker run -v ~/.ssh:/k alpine cat /k/id_rsa"}, expect: {decision: deny, rule: "files.deny[2]"}}
+  - {name: docker run mounts it read-only, policy: baseline, action: {command: "docker run --volume ~/.ssh:/k:ro alpine ls /k"}, expect: {decision: deny, rule: "files.deny[2]"}}
+  - {name: docker run mounts a directory holding credentials, policy: baseline, action: {command: "docker run -v ~/.aws:/root/.aws amazon/aws-cli s3 ls"}, expect: {decision: deny, rule: "files.deny[3]"}}
+  - {name: docker run --mount bind, policy: baseline, action: {command: "docker run --mount type=bind,source={{root}}/home/dev/.ssh,target=/k alpine ls /k"}, expect: {decision: deny, rule: "files.deny[2]"}}
+  - {name: docker run --mount with src and the type last, policy: baseline, action: {command: "docker run --mount src={{root}}/home/dev/.ssh,dst=/k,type=bind alpine ls"}, expect: {decision: deny, rule: "files.deny[2]"}}
+  - {name: docker run mounts the project with its .env, policy: baseline, action: {command: "docker run -v ./:/app node npm test"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: docker create mounts the ssh directory, policy: baseline, action: {command: "docker create -v ~/.ssh:/k alpine"}, expect: {decision: deny, rule: "files.deny[2]"}}
+  - {name: docker run with a run-time mount, policy: baseline, action: {command: "docker run -v \"$SRC\":/k alpine ls /k"}, expect: {decision: ask}}
+  - {name: docker run with a named volume, policy: baseline, action: {command: "docker run -v pgdata:/var/lib/postgresql/data postgres"}, expect: {decision: allow}}
+  - {name: docker run mounting a harmless directory, policy: baseline, action: {command: "docker run -v /tmp/build:/out alpine ls /out"}, expect: {decision: allow}}
+  - {name: options of the container's command are not docker's, policy: baseline, action: {command: "docker run --rm alpine grep -v root /etc/passwd"}, expect: {decision: allow}}
+  - {name: docker run with no command, policy: baseline, action: {command: "docker run --rm -d -p 5432:5432 postgres:17"}, expect: {decision: allow}}
+  - {name: docker run with an unknown option, policy: baseline, action: {command: "docker run --new-flag x alpine terraform apply"}, expect: {decision: ask}}
+  - {name: kubectl run with a command, policy: baseline, action: {command: "kubectl run tmp --image=busybox --restart=Never -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: kubectl debug with a command, policy: baseline, action: {command: "kubectl debug node/n1 -it --image=busybox -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}

@@ -1,0 +1,27 @@
+# Review server IDs against your configured agent
+# This is a deny-listed example
+apiVersion: cyberboar.dev/v1
+kind: Policy
+metadata:
+  name: mcp-tool-restrictions
+  description: Review risky tool calls from configured MCP services
+spec:
+  defaults:
+    posture: deny-listed
+  files:
+    deny:
+      - "**/.env*"
+      - "~/.ssh/**"
+  commands:
+    ask:
+      - "git push"
+    deny:
+      - "kubectl delete"
+      - "terraform apply"
+  mcp:
+  # Names only: MCP arguments are not evaluated by these rules.
+    deny:
+      - "github/delete_repository"
+      - "github/update_repository"
+    ask:
+      - "github/create_repository"

@@ -1,0 +1,147 @@
+# MCP rules. Patterns are "server" (every tool of it) or
+# "server/tool"; each part is a glob. Deny and ask rules ignore case, allow
+# rules don't. A non-empty allow list makes MCP allow-listed whatever the
+# global posture: only listed servers and tools may be called.
+
+defaults:
+  action: {tool: mcp}
+
+policies:
+  listed:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: listed}
+      spec:
+        mcp:
+          allow: ["github", "internal-docs/search", "team-*"]   # [0] [1] [2]
+          ask: ["github/delete_*"]                              # [0]
+          deny: ["filesystem"]                                  # [0]
+  deny-only:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: deny-only}
+      spec:
+        mcp:
+          deny: ["filesystem/write_*", "*/exec*"]               # [0] [1]
+  rewritten:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: rewritten}
+      spec:
+        mcp:
+          deny: ["fs/write.file", "fs/[.x]y"]                  # [0] [1]
+          ask: ["fs/get.*"]                                    # [0]
+  rewritten-listed:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: rewritten-listed}
+      spec:
+        mcp:
+          allow: ["fs/read.file", "docs/read_page"]             # [0] [1]
+  copilot-names:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: copilot-names}
+      spec:
+        mcp:
+          deny: ["fs.srv/write.file", "srv.é/nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"]   # [0] [1]
+  codex-names:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: codex-names}
+      spec:
+        mcp:
+          deny: ["fs.srv/write.file", "github-mcp"]    # [0] [1]
+  copilot-listed:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: copilot-listed}
+      spec:
+        mcp:
+          allow: ["fs.srv", "docs-srv"]             # [0] [1]
+  brackets:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: brackets}
+      spec:
+        mcp:
+          deny: ["prod[A-z]db"]       # [0] A-z also holds [ \ ] ^ _ and `
+          ask: ["*/[^e]xport*"]       # [0]
+
+cases:
+  # Allow list under the default deny-listed posture
+  - {name: listed server, policy: listed, action: {mcp: {server: github, tool: create_issue}}, expect: {decision: allow, rule: "mcp.allow[0]"}}
+  - {name: listed tool, policy: listed, action: {mcp: {server: internal-docs, tool: search}}, expect: {decision: allow, rule: "mcp.allow[1]"}}
+  - {name: globbed server, policy: listed, action: {mcp: {server: team-wiki, tool: read}}, expect: {decision: allow, rule: "mcp.allow[2]"}}
+  - {name: other tool of a tool-listed server, policy: listed, action: {mcp: {server: internal-docs, tool: delete_page}}, expect: {decision: deny, rule: posture.allow-listed, reasonContains: "allow list"}}
+  - {name: unlisted server, policy: listed, action: {mcp: {server: slack, tool: post_message}}, expect: {decision: deny, rule: posture.allow-listed}}
+  - {name: ask beats allow, policy: listed, action: {mcp: {server: github, tool: delete_repo}}, expect: {decision: ask, rule: "mcp.ask[0]"}}
+  - {name: deny rule, policy: listed, action: {mcp: {server: filesystem, tool: read_file}}, expect: {decision: deny, rule: "mcp.deny[0]", reasonContains: "do not"}}
+  - {name: deny ignores case, policy: listed, action: {mcp: {server: FileSystem, tool: read_file}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: allow is case-sensitive, policy: listed, action: {mcp: {server: GitHub, tool: create_issue}}, expect: {decision: deny, rule: posture.allow-listed}}
+
+  # Deny rules only: the posture decides the rest
+  - {name: unmatched call is allowed, policy: deny-only, action: {mcp: {server: slack, tool: post_message}}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: denied tool glob, policy: deny-only, action: {mcp: {server: filesystem, tool: write_file}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: other tool of the same server, policy: deny-only, action: {mcp: {server: filesystem, tool: read_file}}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: server wildcard, policy: deny-only, action: {mcp: {server: anything, tool: execute}}, expect: {decision: deny, rule: "mcp.deny[1]"}}
+
+  # Folding a bracket expression changes what it holds: [A-z] becomes [a-z],
+  # which loses the punctuation between Z and a, and [^e] then excludes E as well
+  # Deny and ask rules also match as written, so folding never makes them match less
+  - {name: deny matches a bracket range as written, policy: brackets, action: {mcp: {server: prod_db, tool: query}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: deny matches a bracket range folded, policy: brackets, action: {mcp: {server: PRODXDB, tool: query}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: ask matches a negated bracket as written, policy: brackets, action: {mcp: {server: crm, tool: Export_contacts}}, expect: {decision: ask, rule: "mcp.ask[0]"}}
+  - {name: a negated bracket still excludes its own letter, policy: brackets, action: {mcp: {server: crm, tool: export_contacts}}, expect: {decision: allow, rule: posture.deny-listed}}
+
+  # opencode reports a tool name with every character outside [A-Za-z0-9_-] replaced by "_"
+  # Deny and ask rules also match in that form
+  # Allow rules match the name as reported
+  - {name: deny covers a rewritten tool name, policy: rewritten, action: {mcp: {server: fs, tool: write_file, names: opencode}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: rewritten matching ignores case, policy: rewritten, action: {mcp: {server: fs, tool: Write_File, names: opencode}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: a bracket that holds a rewritten character, policy: rewritten, action: {mcp: {server: fs, tool: _y, names: opencode}}, expect: {decision: deny, rule: "mcp.deny[1]"}}
+  - {name: ask covers a rewritten tool name, policy: rewritten, action: {mcp: {server: fs, tool: get_secret, names: opencode}}, expect: {decision: ask, rule: "mcp.ask[0]"}}
+  - {name: other rewritten tools are left to the posture, policy: rewritten, action: {mcp: {server: fs, tool: read_file, names: opencode}}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: a name that isn't rewritten matches as written, policy: rewritten, action: {mcp: {server: fs, tool: write_file}}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: allow doesn't match a rewritten name, policy: rewritten-listed, action: {mcp: {server: fs, tool: read_file, names: opencode}}, expect: {decision: deny, rule: posture.allow-listed}}
+  - {name: allow matches the rewritten name as written, policy: rewritten-listed, action: {mcp: {server: docs, tool: read_page, names: opencode}}, expect: {decision: allow, rule: "mcp.allow[1]"}}
+
+  # Copilot CLI writes other punctuation as "-", non-ASCII parts in punycode
+  # (xn--…), and cuts server-tool at 64 characters. Deny and ask rules also
+  # match in that form; allow rules match the name as reported
+  - {name: deny covers Copilot's names, policy: copilot-names, action: {mcp: {server: fs-srv, tool: write-file, names: copilot}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: another split of Copilot's name, policy: copilot-names, action: {mcp: {server: fs, tool: srv-write-file, names: copilot}}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: other tools of a Copilot server, policy: copilot-names, action: {mcp: {server: fs-srv, tool: read-file, names: copilot}}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: a punycode server name, policy: copilot-names, action: {mcp: {server: srv-xn--9ca, tool: other, names: copilot}}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: a name cut at 64 characters may be any tool of its server, policy: copilot-names, action: {mcp: {server: srv-xn--9ca, tool: "nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", names: copilot}}, expect: {decision: deny, rule: "mcp.deny[1]"}}
+  - {name: allow doesn't match Copilot's rewriting, policy: copilot-listed, action: {mcp: {server: fs-srv, tool: read-file, names: copilot}}, expect: {decision: deny, rule: posture.allow-listed}}
+  - {name: allow matches Copilot's name as written, policy: copilot-listed, action: {mcp: {server: docs-srv, tool: search, names: copilot}}, expect: {decision: allow, rule: "mcp.allow[1]"}}
+
+  # Codex writes both names with "_" for every character outside
+  # [A-Za-z0-9_], "-" among them, and adds "_" and 12 hex digits to a name that
+  # collides or is cut short
+  - {name: deny covers Codex's names, policy: codex-names, action: {mcp: {server: fs_srv, tool: write_file, names: codex}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: a dash in a server name, policy: codex-names, action: {mcp: {server: github_mcp, tool: create_issue, names: codex}}, expect: {decision: deny, rule: "mcp.deny[1]"}}
+  - {name: other tools of a Codex server, policy: codex-names, action: {mcp: {server: fs_srv, tool: read_file, names: codex}}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: a hashed tool name may be any tool of its server, policy: codex-names, action: {mcp: {server: fs_srv, tool: read_file_0123456789ab, names: codex}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: a hashed server name, policy: codex-names, action: {mcp: {server: github_mcp_0123456789ab, tool: create_issue, names: codex}}, expect: {decision: deny, rule: "mcp.deny[1]"}}
+  - {name: Codex's names as configured don't need rewriting, policy: codex-names, action: {mcp: {server: github-mcp, tool: x}}, expect: {decision: deny, rule: "mcp.deny[1]"}}
+
+  # Claude Code writes the server in mcp__<server>__<tool> with "_" for every
+  # character outside [A-Za-z0-9_-], and the tool part is matched the same way
+  - {name: deny covers Claude Code's names, policy: codex-names, action: {mcp: {server: fs_srv, tool: write_file, names: claude-code}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: a server named in the hook input, policy: codex-names, action: {mcp: {server: fs.srv, tool: write_file, names: claude-code}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: Claude Code keeps dashes, policy: codex-names, action: {mcp: {server: github-mcp, tool: create_issue, names: claude-code}}, expect: {decision: deny, rule: "mcp.deny[1]"}}
+  - {name: other tools of a Claude Code server, policy: codex-names, action: {mcp: {server: fs_srv, tool: read_file, names: claude-code}}, expect: {decision: allow, rule: posture.deny-listed}}
+
+  # Names the patterns can't express are rejected
+  - {name: slash in a server name, policy: deny-only, action: {mcp: {server: "any/thing", tool: execute}}, expect: {decision: deny, rule: error.invalidAction}}
+  - {name: slash in a tool name, policy: deny-only, action: {mcp: {server: x, tool: "exec/ute"}}, expect: {decision: deny, rule: error.invalidAction}}

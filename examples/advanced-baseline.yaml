@@ -1,0 +1,120 @@
+# Deny-listed posture: anything not matched is allowed, so agents stay useful.
+# What it adds over baseline.yaml:
+# - the usual credential stores of cloud CLIs, package registries, git and
+#   GPG, and private keys wherever they sit in a repository;
+# - destructive or irreversible infrastructure and cloud commands denied,
+#   publishing and deploying behind the user's confirmation;
+# - the tripwire: three denied calls lock the session until the user runs
+#   `cyberboar unlock` or starts a new session. An agent that keeps hitting
+#   the policy is looking for a way around it.
+apiVersion: cyberboar.dev/v1
+kind: Policy
+metadata:
+  name: advanced-baseline
+  description: Organisation-wide guard rails for coding agents on developer machines.
+  labels:
+    tier: advanced
+spec:
+  defaults:
+    posture: deny-listed
+  files:
+    deny:
+      # Secrets in the repository.
+      - "**/.env*"
+      - "**/*.pem"
+      - "**/*.key"
+      - "**/*.p12"
+      - "**/*.pfx"
+      - "**/*.jks"
+      - "**/*.keystore"
+      - "**/id_rsa*"
+      - "**/id_ecdsa*"
+      - "**/id_ed25519*"
+      - "**/*.tfstate"
+      - "**/*.tfstate.backup"
+      # Keys and credential stores in the home directory.
+      - "~/.ssh/**"
+      - "~/.gnupg/**"
+      - "~/.password-store/**"
+      - "~/.aws/credentials"
+      - "~/.aws/sso/cache/**"
+      - "~/.aws/cli/cache/**"
+      - "~/.config/gcloud/**"
+      - "~/.azure/**"
+      - "~/.kube/config"
+      - "~/.docker/config.json"
+      - "~/.netrc"
+      - "~/.git-credentials"
+      - "~/.config/gh/hosts.yml"
+      - "~/.npmrc"
+      - "~/.pypirc"
+      - "~/.gem/credentials"
+      - "~/.cargo/credentials*"
+      - "~/.terraform.d/credentials.tfrc.json"
+      - "~/.vault-token"
+    ask:
+      # Git hooks run on the next commit, outside any agent session.
+      - "**/.git/hooks/**"
+    # A directory that holds a denied file counts as that file for commands
+    # that read or change what's inside (grep -r, tar, cp -r).
+    containing: deny
+  commands:
+    deny:
+      # Irreversible infrastructure changes go through CI, not an agent.
+      - "terraform apply"
+      - "terraform destroy"
+      - "tofu apply"
+      - "tofu destroy"
+      - "pulumi up"
+      - "pulumi destroy"
+      - "kubectl delete"
+      - "kubectl drain"
+      - "helm uninstall"
+      - "aws iam"
+      - "aws s3 rm"
+      - "aws s3 rb"
+      - "gcloud projects delete"
+      - "az group delete"
+      # Rewriting shared history, in the usual spellings (any other push still asks, below)
+      - "git push --force*"
+      - "git push -f"
+      - "git push +*"
+      - "git push * --force*"
+      - "git push * -f"
+      - "git push * +*"
+      - "git push * * --force*"
+      - "git push * * -f"
+      # Running code straight from the network
+      - "curl | sh"
+      - "wget | sh"
+    ask:
+      - "git push"
+      - "npm publish"
+      - "cargo publish"
+      - "twine upload"
+      - "gem push"
+      - "docker push"
+      - "kubectl apply"
+      - "helm install"
+      - "helm upgrade"
+      - "gh pr merge"
+      - "gh release create"
+    # sh -c, python -c, eval and other code given on the command line or stdin
+    denyInterpreters: true
+  mcp:
+    # MCP servers and tools not listed here are denied
+    allow:
+      - "github"
+      - "internal-docs/search"
+  audit:
+    sink: "https://cyberboar.internal/api/v1/events"
+  # Enable after enrolling with a compatible console and starting the services
+  # sync:
+  #   shipEvery: 5s
+  #   pullEvery: 4h
+  session:
+    tripwire:
+      maxDenials: 3 # whole session; set window below (e.g. 1h) to count only recent denials
+      # window: 1h
+    briefing:
+      message: "Questions about this policy go to the platform security team."

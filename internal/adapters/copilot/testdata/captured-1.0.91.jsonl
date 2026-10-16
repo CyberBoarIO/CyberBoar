@@ -1,0 +1,17 @@
+{"sessionId":"c38b7d32-da99-4fb7-9125-d9bd8e3d0555","timestamp":1790882187989,"cwd":"{{root}}","toolName":"bash","toolArgs":{"command":"cat .env","description":"read env"}}
+{"sessionId":"c38b7d32-da99-4fb7-9125-d9bd8e3d0555","timestamp":1790882188235,"cwd":"{{root}}","toolName":"bash","toolArgs":{"command":"sleep 1; echo hi","description":"async","mode":"async","shellId":"s1"}}
+{"sessionId":"c38b7d32-da99-4fb7-9125-d9bd8e3d0555","timestamp":1790882188292,"cwd":"{{root}}","toolName":"read_bash","toolArgs":{"shellId":"s1","delay":2}}
+{"sessionId":"c38b7d32-da99-4fb7-9125-d9bd8e3d0555","timestamp":1790882189300,"cwd":"{{root}}","toolName":"view","toolArgs":{"path":"{{root}}/README.md"}}
+{"sessionId":"c38b7d32-da99-4fb7-9125-d9bd8e3d0555","timestamp":1790882189349,"cwd":"{{root}}","toolName":"create","toolArgs":{"path":"{{root}}/src/new.txt","file_text":"x\n"}}
+{"sessionId":"c38b7d32-da99-4fb7-9125-d9bd8e3d0555","timestamp":1790882189397,"cwd":"{{root}}","toolName":"edit","toolArgs":{"path":"{{root}}/src/new.txt","old_str":"x","new_str":"y"}}
+{"sessionId":"c38b7d32-da99-4fb7-9125-d9bd8e3d0555","timestamp":1790882189449,"cwd":"{{root}}","toolName":"grep","toolArgs":{"pattern":"hi","paths":["src","{{root}}"]}}
+{"sessionId":"c38b7d32-da99-4fb7-9125-d9bd8e3d0555","timestamp":1790882189503,"cwd":"{{root}}","toolName":"glob","toolArgs":{"pattern":"**/*.txt"}}
+{"sessionId":"c38b7d32-da99-4fb7-9125-d9bd8e3d0555","timestamp":1790882189550,"cwd":"{{root}}","toolName":"web_fetch","toolArgs":{"url":"http://127.0.0.1:1/"}}
+{"sessionId":"c38b7d32-da99-4fb7-9125-d9bd8e3d0555","timestamp":1790882189603,"cwd":"{{root}}","toolName":"sql","toolArgs":{"description":"q","query":"select 1"}}
+{"sessionId":"c38b7d32-da99-4fb7-9125-d9bd8e3d0555","timestamp":1790882189655,"cwd":"{{root}}","toolName":"skill","toolArgs":{"skill":"nonexistent"}}
+{"sessionId":"c38b7d32-da99-4fb7-9125-d9bd8e3d0555","timestamp":1790882189709,"cwd":"{{root}}","toolName":"list_bash","toolArgs":{}}
+{"sessionId":"c38b7d32-da99-4fb7-9125-d9bd8e3d0555","timestamp":1790882189752,"cwd":"{{root}}","toolName":"task","toolArgs":{"name":"sub","prompt":"look","agent_type":"explore","description":"explore"}}
+{"sessionId":"4abb19c0-eb61-4156-851a-881b7f140337","timestamp":1790882189821,"cwd":"{{root}}","toolName":"view","toolArgs":{"path":"{{root}}/README.md"}}
+{"sessionId":"644fcec2-aa06-462a-9acf-fe4afdcbff28","timestamp":1790882476781,"cwd":"{{root}}","toolName":"apply_patch","toolArgs":"*** Begin Patch\n*** Add File: {{root}}/added.txt\n+hello\n*** Update File: ../outside.txt\n@@\n-a\n+b\n*** Delete File: gone.txt\n*** End Patch\n"}
+{"sessionId":"4f027327-366b-405e-9722-bde4c64f5a79","timestamp":1790882459661,"cwd":"{{root}}","toolName":"my-srv-do_thing","toolArgs":{"a":"x"}}
+{"sessionId":"4f027327-366b-405e-9722-bde4c64f5a79","timestamp":1790882459753,"cwd":"{{root}}","toolName":"a__b-two__parts","toolArgs":{}}

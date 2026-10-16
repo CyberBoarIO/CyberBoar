@@ -1,0 +1,16 @@
+CyberBoar enforces the policy "baseline" on every tool call in this session, including subagents.
+
+Denied:
+- files: **/.env*, **/*.pem, ~/.ssh/**, ~/.aws/credentials
+- commands: terraform apply, kubectl delete, curl | sh
+- inline code: sh -c, bash -c, eval, python -c, node -e and other interpreters given code on the command line or stdin
+- directories that contain a denied file, for commands that read or change what's inside (grep -r, tar, cp -r)
+
+Need the user's confirmation:
+- files: **/terraform.tfstate
+- commands: git push
+
+Allowed only when on the allow list (for these kinds):
+- MCP servers and tools: github, internal-docs/search
+
+If a tool call is denied, do not try another way to do the same thing: no other tool, command, spelling, encoding, path, script or subagent. Stop, tell the user what you needed and why, and let them decide; only they can change the policy.

@@ -1,0 +1,50 @@
+name: Renovate
+
+on:
+  schedule:
+    - cron: "30 4 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths: [".github/renovate.json5", ".github/workflows/renovate.yml"]
+
+permissions: {}
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Create GitHub App token
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.RENOVATE_APP_ID || secrets.RENOVATE_APP_ID }}
+          private-key: ${{ secrets.RENOVATE_APP_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+          permission-workflows: write
+      - name: Look up bot identity
+        id: bot
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+        run: echo "id=$(gh api "/users/${SLUG}%5Bbot%5D" --jq .id)" >> "$GITHUB_OUTPUT"
+      - name: Run Renovate
+        uses: docker://ghcr.io/renovatebot/renovate:44.164.10@sha256:a1a928e6680df73474a2408620374bfd397a38b7adbc74d4d5ffe4c7a03e3c2b
+        env:
+          RENOVATE_TOKEN: ${{ steps.app.outputs.token }}
+          RENOVATE_PLATFORM: github
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          RENOVATE_ONBOARDING: "false"
+          RENOVATE_REQUIRE_CONFIG: ${{ github.event_name == 'pull_request' && 'optional' || 'required' }}
+          RENOVATE_DRY_RUN: ${{ github.event_name == 'pull_request' && 'lookup' || 'null' }}
+          RENOVATE_PLATFORM_COMMIT: enabled
+          RENOVATE_USERNAME: ${{ steps.app.outputs.app-slug }}[bot]
+          RENOVATE_GIT_AUTHOR: "${{ steps.app.outputs.app-slug }}[bot] <${{ steps.bot.outputs.id }}+${{ steps.app.outputs.app-slug }}[bot]@users.noreply.github.com>"
+          LOG_LEVEL: info

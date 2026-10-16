@@ -1,0 +1,592 @@
+# Policy loading: parsing, apiVersion/kind dispatch, schema and pattern validation
+#
+# A case without an `action` only loads its policy. `expect.loadError` names the
+# error code the load must fail with (empty = must load). `expect.errorPath` is the
+# document path of the offending node ("" = document root)
+#
+# Error codes: tooLarge, syntax, empty, multipleDocuments, yamlFeature,
+#              apiVersion, kind, schema, pattern
+#
+# Policy sources: `file` (relative to this file), `inline` (a YAML mapping) or
+# `raw` (exact bytes; used for input that isn't valid as an inline mapping)
+
+policies:
+  baseline: {file: ../../examples/baseline.yaml}
+  allow-listed: {file: ../../examples/allow-listed.yaml}
+
+  minimal:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: minimal}
+      spec: {}
+
+  empty: {raw: ""}
+  comments-only:
+    raw: |
+      # nothing here
+      # still nothing
+  invalid-yaml:
+    raw: |
+      apiVersion: cyberboar.dev/v1
+      kind: [Policy
+  multiple-documents:
+    raw: |
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: first}
+      spec: {}
+      ---
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: second}
+      spec: {}
+  top-level-list:
+    raw: |
+      - apiVersion: cyberboar.dev/v1
+        kind: Policy
+  duplicate-key:
+    # A second `deny:` silently replacing the first would drop rules
+    raw: |
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: dup}
+      spec:
+        files:
+          deny: ["**/.env*"]
+          deny: ["**/*.pem"]
+  anchors-and-aliases:
+    # Rejected outright: no value for policy data, and aliases enable expansion bombs
+    raw: |
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: aliases}
+      spec:
+        files:
+          deny: &secrets ["**/.env*"]
+          ask: *secrets
+
+  missing-api-version:
+    inline:
+      kind: Policy
+      metadata: {name: x}
+      spec: {}
+  api-version-not-a-string:
+    inline:
+      apiVersion: 1
+      kind: Policy
+      metadata: {name: x}
+      spec: {}
+  unsupported-api-version:
+    inline:
+      apiVersion: cyberboar.dev/v2
+      kind: Policy
+      metadata: {name: x}
+      spec: {}
+  invalid-api-version:
+    inline:
+      apiVersion: cyberboar.dev/not-a-version
+      kind: Policy
+      metadata: {name: x}
+      spec: {}
+  foreign-api-group:
+    inline:
+      apiVersion: example.com/v1
+      kind: Policy
+      metadata: {name: x}
+      spec: {}
+  missing-kind:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      metadata: {name: x}
+      spec: {}
+  wrong-kind:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: PolicyBundle
+      metadata: {name: x}
+      spec: {}
+
+  unknown-top-level-field:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec: {}
+      status: {}
+  typo-in-rule-list:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files:
+          denny: ["**/.env*"]
+  missing-metadata-name:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {}
+      spec: {}
+  invalid-metadata-name:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: "Base Line"}
+      spec: {}
+  missing-spec:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+  null-spec:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec: null
+  invalid-posture:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        defaults: {posture: permissive}
+  deny-interpreters-as-string:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        commands: {denyInterpreters: "yes"}
+  rule-list-as-string:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files: {deny: "**/.env*"}
+  empty-pattern:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files: {deny: [""]}
+  invalid-mcp-entry:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        mcp: {allow: ["github/issues/create"]}
+  bad-glob:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files:
+          deny: ["**/.env*", "**/[.env"]
+  unsupported-home-form:
+    # Only "~/" (the current user's home) is supported, not "~otheruser/"
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files:
+          ask: ["~root/.bashrc"]
+
+  invalid-containing:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files: {containing: sometimes}
+  bad-mcp-glob:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        mcp: {deny: ["git[hub"]}
+
+  # Patterns that would load but could never match (paths are cleaned before
+  # matching), i.e. rules that silently do nothing
+  dot-dot-segment:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files:
+          deny: ["secrets/../keys/**"]
+  trailing-slash:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files:
+          deny: ["~/.ssh/"]
+  double-slash:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files:
+          allow: ["src//**"]
+  # Outside a drive path, "\" escapes the next character, so a Windows
+  # separator there makes a different pattern: "**\.env*" is "**.env*", a name
+  # at the workspace root, and "secrets\**" names a literal "secrets*"
+  backslash-separator:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files:
+          deny: ['**\.env*']
+  backslash-before-globstar:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files:
+          deny: ['secrets\**']
+  backslash-before-star:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files:
+          ask: ['config\*.json']
+  backslash-in-brackets:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files:
+          deny: ['**/[*\]]*', '**/x[\\]y']
+  # A pattern is anchored by how it starts, so one that starts with "{" is
+  # relative to the workspace, and so is every alternative in it
+  brace-home:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files:
+          deny: ["{~/.ssh/**,~/.aws/**}"]
+  brace-absolute:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files:
+          allow: ["**"]
+          deny: ["{/etc/shadow,/etc/sudoers}"]
+  brace-anywhere:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files:
+          ask: ["{secrets/**,{**/*.pem,**/*.key}}"]
+  brace-drive:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files:
+          deny: ['{C:/ProgramData/**,D:/keys/**}']
+  braces-load:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec:
+        files:
+          deny: ["~/{.ssh,.aws}/**", "/etc/{shadow,sudoers}", "**/{.env*,*.pem}", "{secrets,keys}/**", "**/{~$*,*.tmp}"]
+
+  # Command patterns: one simple command or a | pipeline, literal words and globs only
+  cmd-redirect:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec: {commands: {deny: ["terraform apply > out"]}}
+  cmd-list:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec: {commands: {deny: ["ls", "terraform init && terraform apply"]}}
+  cmd-expansion:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec: {commands: {ask: ["$TOOL apply"]}}
+  cmd-path:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec: {commands: {deny: ["/usr/bin/terraform apply"]}}
+  cmd-unparseable:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec: {commands: {deny: ["echo 'unterminated"]}}
+  cmd-bad-glob:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec: {commands: {deny: ["terraform [apply"]}}
+  cmd-allow-pipeline:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: x}
+      spec: {commands: {allow: ["curl | jq"]}}
+  cmd-quoted-and-globs:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: cmd-ok}
+      spec: {commands: {deny: ["git commit -m '*'", "kubectl delete ns*", "curl | tee | sh"]}}
+
+  # Session protections: the tripwire is on only with a tripwire block, the briefing unless turned off
+  session-full:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: session-full}
+      spec:
+        session:
+          tripwire: {enabled: true, maxDenials: 5, window: 30m}
+          briefing: {enabled: true, message: "Ask #platform-security before touching infra/."}
+  session-off:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: session-off}
+      spec:
+        session:
+          tripwire: {enabled: false}
+          briefing: {enabled: false}
+  tripwire-zero:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: tripwire-zero}
+      spec: {session: {tripwire: {maxDenials: 0}}}
+  tripwire-string-limit:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: tripwire-string-limit}
+      spec: {session: {tripwire: {maxDenials: "3"}}}
+  # The policy is YAML read as JSON
+  # JSON Schema counts 1.0 as an integer, and JSON has no way to write YAML's .inf and .nan
+  tripwire-decimal-limit:
+    raw: |
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: tripwire-decimal-limit}
+      spec: {session: {tripwire: {maxDenials: 1.0}}}
+  tripwire-infinite-limit:
+    raw: |
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: tripwire-infinite-limit}
+      spec: {session: {tripwire: {maxDenials: .inf}}}
+  tripwire-nan-window:
+    raw: |
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: tripwire-nan-window}
+      spec: {session: {tripwire: {window: [.nan]}}}
+  tripwire-bad-window:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: tripwire-bad-window}
+      spec: {session: {tripwire: {window: 10 minutes}}}
+  tripwire-short-window:
+    # A window under a minute would reset the count between two quick retries
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: tripwire-short-window}
+      spec: {session: {tripwire: {window: 30s}}}
+  tripwire-unknown-field:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: tripwire-unknown-field}
+      spec: {session: {tripwire: {maxDenial: 3}}}
+  briefing-empty-message:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: briefing-empty-message}
+      spec: {session: {briefing: {message: ""}}}
+
+  # The oldest CyberBoar release that may enforce the policy: a semantic
+  # version, as release tags spell it with or without the "v"
+  minimum-version:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: minimum-version}
+      spec: {minimumVersion: "1.4.2"}
+  minimum-version-v:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: minimum-version-v}
+      spec: {minimumVersion: "v1.4.2"}
+  minimum-version-prerelease:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: minimum-version-prerelease}
+      spec: {minimumVersion: "1.0.0-rc.2"}
+  minimum-version-partial:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: minimum-version-partial}
+      spec: {minimumVersion: "1.4"}
+  minimum-version-number:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: minimum-version-number}
+      spec: {minimumVersion: 1.4}
+  minimum-version-leading-zero:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: minimum-version-leading-zero}
+      spec: {minimumVersion: "1.04.2"}
+  minimum-version-build-metadata:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: minimum-version-build-metadata}
+      spec: {minimumVersion: "1.4.2+abc"}
+  minimum-version-empty:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: minimum-version-empty}
+      spec: {minimumVersion: ""}
+  minimum-version-range:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: minimum-version-range}
+      spec: {minimumVersion: ">=1.4.2"}
+
+cases:
+  # Valid policies
+  - {name: baseline example loads, policy: baseline, expect: {}}
+  - {name: allow-listed example loads, policy: allow-listed, expect: {}}
+  - {name: minimal policy with empty spec loads, policy: minimal, expect: {}}
+
+  # Document-level failures
+  - {name: empty file is rejected, policy: empty, expect: {loadError: empty}}
+  - {name: comments-only file is rejected, policy: comments-only, expect: {loadError: empty}}
+  - {name: invalid YAML is rejected, policy: invalid-yaml, expect: {loadError: syntax}}
+  - {name: multiple YAML documents are rejected, policy: multiple-documents, expect: {loadError: multipleDocuments}}
+  - {name: duplicate mapping key is rejected, policy: duplicate-key, expect: {loadError: syntax}}
+  - {name: anchors and aliases are rejected, policy: anchors-and-aliases, expect: {loadError: yamlFeature}}
+  - {name: top-level list is rejected, policy: top-level-list, expect: {loadError: schema, errorPath: ""}}
+
+  # apiVersion/kind dispatch
+  - {name: missing apiVersion is rejected, policy: missing-api-version, expect: {loadError: apiVersion, errorPath: apiVersion}}
+  - {name: non-string apiVersion is rejected, policy: api-version-not-a-string, expect: {loadError: apiVersion, errorPath: apiVersion}}
+  - {name: unsupported apiVersion is rejected, policy: unsupported-api-version, expect: {loadError: apiVersion, errorPath: apiVersion}}
+  - {name: invalid apiVersion is rejected, policy: invalid-api-version, expect: {loadError: apiVersion, errorPath: apiVersion}}
+  - {name: foreign API group is rejected, policy: foreign-api-group, expect: {loadError: apiVersion, errorPath: apiVersion}}
+  - {name: missing kind is rejected, policy: missing-kind, expect: {loadError: kind, errorPath: kind}}
+  - {name: wrong kind is rejected, policy: wrong-kind, expect: {loadError: kind, errorPath: kind}}
+
+  # Schema
+  - {name: unknown top-level field is rejected, policy: unknown-top-level-field, expect: {loadError: schema, errorPath: status}}
+  - {name: typo in rule list name is rejected, policy: typo-in-rule-list, expect: {loadError: schema, errorPath: spec.files.denny}}
+  - {name: missing metadata.name is rejected, policy: missing-metadata-name, expect: {loadError: schema, errorPath: metadata.name}}
+  - {name: invalid metadata.name is rejected, policy: invalid-metadata-name, expect: {loadError: schema, errorPath: metadata.name}}
+  - {name: missing spec is rejected, policy: missing-spec, expect: {loadError: schema, errorPath: spec}}
+  - {name: null spec is rejected, policy: null-spec, expect: {loadError: schema, errorPath: spec}}
+  - {name: unknown posture is rejected, policy: invalid-posture, expect: {loadError: schema, errorPath: spec.defaults.posture}}
+  - {name: string for boolean is rejected, policy: deny-interpreters-as-string, expect: {loadError: schema, errorPath: spec.commands.denyInterpreters}}
+  - {name: string for rule list is rejected, policy: rule-list-as-string, expect: {loadError: schema, errorPath: spec.files.deny}}
+  - {name: empty pattern is rejected, policy: empty-pattern, expect: {loadError: schema, errorPath: "spec.files.deny[0]"}}
+  - {name: MCP entry with more than server/tool is rejected, policy: invalid-mcp-entry, expect: {loadError: schema, errorPath: "spec.mcp.allow[0]"}}
+
+  # Pattern semantics
+  - {name: malformed glob is rejected, policy: bad-glob, expect: {loadError: pattern, errorPath: "spec.files.deny[1]"}}
+  - {name: other-user home pattern is rejected, policy: unsupported-home-form, expect: {loadError: pattern, errorPath: "spec.files.ask[0]"}}
+  - {name: unknown containing mode is rejected, policy: invalid-containing, expect: {loadError: schema, errorPath: spec.files.containing}}
+  - {name: malformed MCP glob is rejected, policy: bad-mcp-glob, expect: {loadError: pattern, errorPath: "spec.mcp.deny[0]"}}
+  - {name: dot-dot segment is rejected, policy: dot-dot-segment, expect: {loadError: pattern, errorPath: "spec.files.deny[0]"}}
+  - {name: trailing slash is rejected, policy: trailing-slash, expect: {loadError: pattern, errorPath: "spec.files.deny[0]"}}
+  - {name: empty path segment is rejected, policy: double-slash, expect: {loadError: pattern, errorPath: "spec.files.allow[0]"}}
+  - {name: a backslash as a separator is rejected, policy: backslash-separator, expect: {loadError: pattern, errorPath: "spec.files.deny[0]"}}
+  - {name: a backslash before a globstar is rejected, policy: backslash-before-globstar, expect: {loadError: pattern, errorPath: "spec.files.deny[0]"}}
+  - {name: a backslash before a star is rejected, policy: backslash-before-star, expect: {loadError: pattern, errorPath: "spec.files.ask[0]"}}
+  - {name: a backslash in brackets loads, policy: backslash-in-brackets, expect: {}}
+  - {name: a home alternative in a leading brace is rejected, policy: brace-home, expect: {loadError: pattern, errorPath: "spec.files.deny[0]"}}
+  - {name: an absolute alternative in a leading brace is rejected, policy: brace-absolute, expect: {loadError: pattern, errorPath: "spec.files.deny[0]"}}
+  - {name: an anywhere alternative in a nested leading brace is rejected, policy: brace-anywhere, expect: {loadError: pattern, errorPath: "spec.files.ask[0]"}}
+  - {name: a drive alternative in a leading brace is rejected, policy: brace-drive, expect: {loadError: pattern, errorPath: "spec.files.deny[0]"}}
+  - {name: braces after the anchor load, policy: braces-load, expect: {}}
+
+  # Command patterns
+  - {name: redirect in command pattern is rejected, policy: cmd-redirect, expect: {loadError: pattern, errorPath: "spec.commands.deny[0]"}}
+  - {name: command list in pattern is rejected, policy: cmd-list, expect: {loadError: pattern, errorPath: "spec.commands.deny[1]"}}
+  - {name: expansion in command pattern is rejected, policy: cmd-expansion, expect: {loadError: pattern, errorPath: "spec.commands.ask[0]"}}
+  - {name: command path in pattern is rejected, policy: cmd-path, expect: {loadError: pattern, errorPath: "spec.commands.deny[0]"}}
+  - {name: unparseable command pattern is rejected, policy: cmd-unparseable, expect: {loadError: pattern, errorPath: "spec.commands.deny[0]"}}
+  - {name: malformed glob in command pattern is rejected, policy: cmd-bad-glob, expect: {loadError: pattern, errorPath: "spec.commands.deny[0]"}}
+  - {name: pipeline in allow list is rejected, policy: cmd-allow-pipeline, expect: {loadError: pattern, errorPath: "spec.commands.allow[0]"}}
+  - {name: quoted words globs and pipelines load, policy: cmd-quoted-and-globs, expect: {}}
+
+  # Session protections
+  - {name: tripwire and briefing settings load, policy: session-full, expect: {}}
+  - {name: tripwire and briefing can be turned off, policy: session-off, expect: {}}
+  - {name: a denial limit of zero is rejected, policy: tripwire-zero, expect: {loadError: schema, errorPath: "spec.session.tripwire.maxDenials"}}
+  - {name: a denial limit must be a number, policy: tripwire-string-limit, expect: {loadError: schema, errorPath: "spec.session.tripwire.maxDenials"}}
+  - {name: a denial limit with a decimal point is rejected, policy: tripwire-decimal-limit, expect: {loadError: schema, errorPath: "spec.session.tripwire.maxDenials"}}
+  - {name: an infinite denial limit is rejected, policy: tripwire-infinite-limit, expect: {loadError: schema, errorPath: "spec.session.tripwire.maxDenials"}}
+  - {name: a NaN anywhere is rejected, policy: tripwire-nan-window, expect: {loadError: schema, errorPath: "spec.session.tripwire.window[0]"}}
+  - {name: an unparseable window is rejected, policy: tripwire-bad-window, expect: {loadError: schema, errorPath: "spec.session.tripwire.window"}}
+  - {name: a window under a minute is rejected, policy: tripwire-short-window, expect: {loadError: pattern, errorPath: "spec.session.tripwire.window"}}
+  - {name: unknown tripwire field is rejected, policy: tripwire-unknown-field, expect: {loadError: schema, errorPath: "spec.session.tripwire.maxDenial"}}
+  - {name: an empty briefing message is rejected, policy: briefing-empty-message, expect: {loadError: schema, errorPath: "spec.session.briefing.message"}}
+
+  # Minimum version
+  - {name: a minimum version loads, policy: minimum-version, expect: {}}
+  - {name: a minimum version may start with v, policy: minimum-version-v, expect: {}}
+  - {name: a pre-release minimum version loads, policy: minimum-version-prerelease, expect: {}}
+  - {name: a minimum version needs three numbers, policy: minimum-version-partial, expect: {loadError: schema, errorPath: spec.minimumVersion}}
+  - {name: a minimum version must be a string, policy: minimum-version-number, expect: {loadError: schema, errorPath: spec.minimumVersion}}
+  - {name: leading zeros in a minimum version are rejected, policy: minimum-version-leading-zero, expect: {loadError: schema, errorPath: spec.minimumVersion}}
+  - {name: build metadata in a minimum version is rejected, policy: minimum-version-build-metadata, expect: {loadError: schema, errorPath: spec.minimumVersion}}
+  - {name: an empty minimum version is rejected, policy: minimum-version-empty, expect: {loadError: schema, errorPath: spec.minimumVersion}}
+  - {name: a version range is rejected, policy: minimum-version-range, expect: {loadError: schema, errorPath: spec.minimumVersion}}

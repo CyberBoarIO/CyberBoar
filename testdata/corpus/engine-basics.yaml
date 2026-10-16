@@ -1,0 +1,215 @@
+# Default posture decisions and rejection of invalid policies or actions
+#
+# `defaults.action` is merged into every case's action; a case can override a
+# field, including with "" to leave it unset
+#
+# Actions:
+#   {tool: read|write, path, cwd, home, workspaces}
+#   {tool: shell, command, cwd, home, workspaces}
+#   {tool: shell, command, cwd: "", cwdUnknown: true, home, workspaces}
+#   {tool: mcp, mcp: {server, tool}}
+#
+# Expectations: `decision` (allow|ask|deny), `rule` (the rule or built-in ID that
+# decided), `reasonContains` (substring of the user/agent-facing reason)
+#
+# Built-in rule IDs:
+#   posture.deny-listed      |   no rule matched; posture decided
+#   posture.allow-listed     |   no rule matched; posture decided
+#   error.noPolicy           |   policy failed to load (expect.loadError is set and an action is supplied)
+#   error.invalidAction      |   the action is malformed or ambiguous
+
+defaults:
+  action: {cwd: /work/repo, home: /home/dev, workspaces: [/work/repo]}
+
+policies:
+  empty-deny-listed:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: empty-deny-listed}
+      spec: {}
+  empty-allow-listed:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: empty-allow-listed}
+      spec:
+        defaults: {posture: allow-listed}
+  broken:
+    raw: "apiVersion: [broken"
+  files-allow-list:
+    # Deny-listed posture, but an allow list makes file access allow-listed
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: files-allow-list}
+      spec:
+        files:
+          allow: ["src/**"]
+  commands-allow-list:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: commands-allow-list}
+      spec:
+        commands:
+          allow: ["git status", "ls"]
+
+cases:
+  # Posture decides when no rule matches
+  - name: deny-listed allows an unmatched read
+    policy: empty-deny-listed
+    action: {tool: read, path: README.md}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: deny-listed allows an unmatched write
+    policy: empty-deny-listed
+    action: {tool: write, path: /work/repo/main.go}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: deny-listed allows an unmatched MCP call
+    policy: empty-deny-listed
+    action: {tool: mcp, mcp: {server: github, tool: create_issue}}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: allow-listed denies an unmatched read
+    policy: empty-allow-listed
+    action: {tool: read, path: README.md}
+    expect: {decision: deny, rule: posture.allow-listed, reasonContains: "not on the allow list"}
+  - name: allow-listed denies an unmatched MCP call
+    policy: empty-allow-listed
+    action: {tool: mcp, mcp: {server: github, tool: create_issue}}
+    expect: {decision: deny, rule: posture.allow-listed}
+
+  # No policy: everything is denied
+  - name: policy that fails to load denies every action
+    policy: broken
+    action: {tool: read, path: README.md}
+    expect: {loadError: syntax, decision: deny, rule: error.noPolicy}
+
+  # Malformed actions are denied, never guessed at
+  - name: missing tool is denied
+    policy: empty-deny-listed
+    action: {path: README.md}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: unknown tool is denied
+    policy: empty-deny-listed
+    action: {tool: browse, path: README.md}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: read without path is denied
+    policy: empty-deny-listed
+    action: {tool: read}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: write without path is denied
+    policy: empty-deny-listed
+    action: {tool: write, path: ""}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: shell without command is denied
+    policy: empty-deny-listed
+    action: {tool: shell}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: MCP call without server is denied
+    policy: empty-deny-listed
+    action: {tool: mcp, mcp: {tool: create_issue}}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: MCP call without tool is denied
+    policy: empty-deny-listed
+    action: {tool: mcp, mcp: {server: github}}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: an unknown start directory together with a cwd is ambiguous
+    policy: empty-deny-listed
+    action: {tool: shell, command: ls, cwdUnknown: true}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: an unknown start directory is for shell actions only
+    policy: empty-deny-listed
+    action: {tool: read, path: README.md, cwd: "", cwdUnknown: true}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: read without cwd is denied
+    policy: empty-deny-listed
+    action: {tool: read, path: /work/repo/README.md, cwd: ""}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: relative cwd is denied
+    policy: empty-deny-listed
+    action: {tool: read, path: README.md, cwd: work/repo}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: read without home is denied
+    policy: empty-deny-listed
+    action: {tool: read, path: README.md, home: ""}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: relative home is denied
+    policy: empty-deny-listed
+    action: {tool: read, path: README.md, home: home/dev}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: NUL byte in path is denied
+    policy: empty-deny-listed
+    action: {tool: read, path: "README.md\0.env"}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: read carrying a command is ambiguous and denied
+    policy: empty-deny-listed
+    action: {tool: read, path: README.md, command: "cat .env"}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: shell carrying a path is ambiguous and denied
+    policy: empty-deny-listed
+    action: {tool: shell, command: ls, path: .env}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: MCP call carrying a path is ambiguous and denied
+    policy: empty-deny-listed
+    action: {tool: mcp, mcp: {server: github, tool: get_file}, path: .env}
+    expect: {decision: deny, rule: error.invalidAction}
+
+  # Workspace roots come from the harness, never from cwd
+  - name: read without workspace roots is denied
+    policy: empty-deny-listed
+    action: {tool: read, path: README.md, workspaces: []}
+    expect: {decision: deny, rule: error.invalidAction, reasonContains: workspace}
+  - name: relative workspace root is denied
+    policy: empty-deny-listed
+    action: {tool: read, path: README.md, workspaces: [work/repo]}
+    expect: {decision: deny, rule: error.invalidAction, reasonContains: workspace}
+  - name: filesystem root as workspace is denied
+    policy: empty-deny-listed
+    action: {tool: read, path: README.md, workspaces: [/]}
+    expect: {decision: deny, rule: error.invalidAction, reasonContains: workspace}
+  - name: home directory as workspace is denied
+    policy: empty-deny-listed
+    action: {tool: read, path: README.md, workspaces: [/home/dev]}
+    expect: {decision: deny, rule: error.invalidAction, reasonContains: workspace}
+  - name: ancestor of home as workspace is denied
+    policy: empty-deny-listed
+    action: {tool: read, path: README.md, workspaces: [/home]}
+    expect: {decision: deny, rule: error.invalidAction, reasonContains: workspace}
+  - name: one bad root among good ones is denied
+    policy: empty-deny-listed
+    action: {tool: read, path: README.md, workspaces: [/work/repo, /]}
+    expect: {decision: deny, rule: error.invalidAction, reasonContains: workspace}
+  - name: unclean home-equivalent root is denied
+    policy: empty-deny-listed
+    action: {tool: read, path: README.md, workspaces: [/home/dev/repo/..]}
+    expect: {decision: deny, rule: error.invalidAction, reasonContains: workspace}
+  - name: other-user tilde path is denied
+    policy: empty-deny-listed
+    action: {tool: read, path: "~root/.bashrc"}
+    expect: {decision: deny, rule: error.invalidAction}
+  - name: MCP call needs no workspace
+    policy: empty-deny-listed
+    action: {tool: mcp, mcp: {server: github, tool: create_issue}, workspaces: []}
+    expect: {decision: allow, rule: posture.deny-listed}
+
+  # An allow list makes its kind allow-listed, whatever the global posture
+  - name: file on the allow list
+    policy: files-allow-list
+    action: {tool: read, path: src/main.go}
+    expect: {decision: allow, rule: "files.allow[0]"}
+  - name: file off the allow list under deny-listed posture
+    policy: files-allow-list
+    action: {tool: read, path: README.md}
+    expect: {decision: deny, rule: posture.allow-listed}
+  - name: commands are unaffected by a files allow list
+    policy: files-allow-list
+    action: {tool: shell, command: "true"}
+    expect: {decision: allow, rule: posture.deny-listed}
+  - name: command on the allow list
+    policy: commands-allow-list
+    action: {tool: shell, command: "git status"}
+    expect: {decision: allow, rule: "commands.allow[0]"}
+  - name: command off the allow list under deny-listed posture
+    policy: commands-allow-list
+    action: {tool: shell, command: "rm -rf build"}
+    expect: {decision: deny, rule: posture.allow-listed}

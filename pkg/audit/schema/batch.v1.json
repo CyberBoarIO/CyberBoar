@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberboar.dev/schemas/audit/batch/v1.json",
+  "title": "Audit event batch",
+  "description": "The body of POST /api/v1/events (docs/protocol; package audit, Batch). Beyond this schema: the body is at most 4 MiB, each event at most 65536 bytes, and hostname and version at most 255 bytes of valid UTF-8; no object has the same key twice (even in different case), and the batch nests at most 32 levels around its events (audit.CheckKeys).",
+  "type": "object",
+  "required": ["endpoint", "events"],
+  "additionalProperties": false,
+  "properties": {
+    "endpoint": {
+      "type": "object",
+      "required": ["id", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "description": "The endpoint's identity, a lowercase UUID."},
+        "hostname": {"$ref": "#/$defs/label"},
+        "version": {"$ref": "#/$defs/label", "minLength": 1}
+      }
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 1000,
+      "description": "Audit lines as written; an empty list is a heartbeat.",
+      "items": {"$ref": "../event/v1.json"}
+    }
+  },
+  "$defs": {
+    "label": {"type": "string", "maxLength": 255, "pattern": "^[^\\x00-\\x1f\\x7f-\\x9f]*$"}
+  }
+}

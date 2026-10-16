@@ -1,0 +1,78 @@
+version: 2
+
+project_name: cyberboar
+
+before:
+  hooks:
+    - go mod verify
+
+builds:
+  - id: cyberboar
+    main: ./cmd/cyberboar
+    binary: cyberboar
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags: ["-s -w -X main.version={{ .Version }}"]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: cyberboar
+    ids: [cyberboar]
+    formats: [tar.gz]
+    name_template: "cyberboar_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    builds_info:
+      owner: root
+      group: root
+      mtime: "{{ .CommitDate }}"
+    files:
+      - {src: LICENSE, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: THIRD_PARTY_NOTICES.txt, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: README.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: SECURITY.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/getting-started.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/quick-demos.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/editor-integrations.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/system-requirements.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/capability-matrix.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/policy.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/policy-tests.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/agents.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/security-model.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/operations.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/troubleshooting.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/cli.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/deploy-mdm.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/protocol/README.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/powershell.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/latency.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: docs/cla/*.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: CONTRIBUTING.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: CHANGELOG.md, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: examples/*.yaml, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+      - {src: testdata/policy-cases/*.yaml, info: {owner: root, group: root, mtime: "{{ .CommitDate }}"}}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+sboms:
+  - artifacts: archive
+
+signs:
+  # The signature binds the checksums to the CI workflow identity
+  - cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args: ["sign-blob", "--bundle=${signature}", "--yes", "${artifact}"]
+    artifacts: checksum
+
+changelog:
+  disable: true
+
+release:
+  draft: true
+  prerelease: auto

@@ -1,0 +1,67 @@
+# Each directory alias is a path the reader can use, even when another name
+# for its target was already walked. Both name orders must enforce the policy
+fs:
+  - {path: home/dev/repo/real-first/a-real/private/key.txt, file: ""}
+  - {path: home/dev/repo/real-first/z-link, symlink: a-real}
+  - {path: home/dev/repo/link-first/z-real/private/key.txt, file: ""}
+  - {path: home/dev/repo/link-first/a-link, symlink: z-real}
+
+defaults:
+  action:
+    cwd: "{{root}}/home/dev/repo"
+    home: "{{root}}/home/dev"
+    workspaces: ["{{root}}/home/dev/repo"]
+
+policies:
+  clean:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: clean}
+      spec:
+        files:
+          deny: ["**/.env*"]
+  deny-alias:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: deny-alias}
+      spec:
+        files:
+          deny: ["real-first/z-link/private/key.txt", "link-first/a-link/private/key.txt"]
+  ask-alias:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: ask-alias}
+      spec:
+        files:
+          ask: ["real-first/z-link/private/key.txt", "link-first/a-link/private/key.txt"]
+  containing-ask:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: containing-ask}
+      spec:
+        files:
+          deny: ["real-first/z-link/private/key.txt", "link-first/a-link/private/key.txt"]
+          containing: ask
+  allow-real:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: allow-real}
+      spec:
+        files:
+          allow: ["real-first", "real-first/a-real/**", "real-first/z-link", "link-first", "link-first/z-real/**", "link-first/a-link"]
+
+cases:
+  - {name: clean aliases remain readable, policy: clean, action: {tool: read, path: real-first}, expect: {decision: allow}}
+  - {name: deny checks an alias after its target, policy: deny-alias, action: {tool: read, path: real-first}, expect: {decision: deny, rule: "files.deny[0]", reasonContains: z-link/private/key.txt}}
+  - {name: deny checks an alias before its target, policy: deny-alias, action: {tool: read, path: link-first}, expect: {decision: deny, rule: "files.deny[1]", reasonContains: a-link/private/key.txt}}
+  - {name: recursive search checks an alias after its target, policy: deny-alias, action: {tool: shell, command: "grep -R KEY real-first"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: recursive search checks an alias before its target, policy: deny-alias, action: {tool: shell, command: "grep -R KEY link-first"}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: ask checks an alias after its target, policy: ask-alias, action: {tool: read, path: real-first}, expect: {decision: ask, rule: "files.ask[0]"}}
+  - {name: ask checks an alias before its target, policy: ask-alias, action: {tool: read, path: link-first}, expect: {decision: ask, rule: "files.ask[1]"}}
+  - {name: containing ask checks an alias after its target, policy: containing-ask, action: {tool: read, path: real-first}, expect: {decision: ask, rule: "files.deny[0]"}}
+  - {name: every alias descendant needs an allow rule, policy: allow-real, action: {tool: read, path: real-first}, expect: {decision: deny, rule: posture.allow-listed}}

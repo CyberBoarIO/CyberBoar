@@ -1,0 +1,8 @@
+homepage: "https://cyberboar.dev"
+main_repo: "https://github.com/CyberBoarIO/CyberBoar"
+language: go
+primary_contact: "security@cyberboar.io"
+fuzzing_engines:
+  - libfuzzer
+sanitizers:
+  - address

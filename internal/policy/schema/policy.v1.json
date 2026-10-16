@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberboar.dev/schemas/policy/v1.json",
+  "title": "Policy",
+  "description": "Runtime policy for coding agents. This schema checks the structure; patterns are validated when the policy is loaded.",
+  "type": "object",
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {"const": "cyberboar.dev/v1"},
+    "kind": {"const": "Policy"},
+    "metadata": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "description": {"type": "string"},
+        "labels": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        }
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "minimumVersion": {
+          "description": "The oldest release that may enforce this policy, e.g. 1.4.2. An older hook binary, or one without a release version, blocks every tool call.",
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?$"
+        },
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "posture": {"enum": ["deny-listed", "allow-listed"]}
+          }
+        },
+        "files": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allow": {"$ref": "#/$defs/patterns"},
+            "ask": {"$ref": "#/$defs/patterns"},
+            "deny": {"$ref": "#/$defs/patterns"},
+            "containing": {"enum": ["deny", "ask", "ignore"]}
+          }
+        },
+        "commands": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allow": {"$ref": "#/$defs/patterns"},
+            "ask": {"$ref": "#/$defs/patterns"},
+            "deny": {"$ref": "#/$defs/patterns"},
+            "denyInterpreters": {"type": "boolean"}
+          }
+        },
+        "mcp": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allow": {"$ref": "#/$defs/mcpPatterns"},
+            "ask": {"$ref": "#/$defs/mcpPatterns"},
+            "deny": {"$ref": "#/$defs/mcpPatterns"}
+          }
+        },
+        "audit": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sink": {"type": "string", "minLength": 1}
+          }
+        },
+        "sync": {
+          "description": "Intervals used by ship and pull when --every is omitted. The command must be started by the operator or a service; this block does not start processes.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "shipEvery": {"description": "Go duration, at least 1s, or 0s for one run.", "type": "string", "minLength": 1, "maxLength": 128},
+            "pullEvery": {"description": "Go duration, at least 10s, or 0s for one run.", "type": "string", "minLength": 1, "maxLength": 128}
+          }
+        },
+        "secrets": {
+          "description": "Credentials in what the agent writes or runs: files it writes or edits, and shell commands. On (deny) unless turned off.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "action": {"enum": ["deny", "ask", "off"]},
+            "ignore": {
+              "description": "Rule ids not to act on, e.g. jwt; `cyberboar check` lists them.",
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"}
+            }
+          }
+        },
+        "session": {
+          "description": "Protections that span a whole agent session. The tripwire is on only when its block is present; the briefing is on unless turned off.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tripwire": {
+              "description": "Lock the session after maxDenials denied calls (within window, else the whole session).",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "maxDenials": {"type": "integer", "minimum": 1, "maximum": 1000},
+                "window": {"type": "string", "pattern": "^[0-9]{1,4}(s|m|h)$"}
+              }
+            },
+            "briefing": {
+              "description": "Tell the agent the rules when a session starts.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "message": {"type": "string", "minLength": 1, "maxLength": 2000}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "patterns": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    },
+    "mcpPatterns": {
+      "description": "\"server\" or \"server/tool\".",
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[^/\\s]+(/[^/\\s]+)?$"}
+    }
+  }
+}

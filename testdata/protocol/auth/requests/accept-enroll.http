@@ -1,0 +1,9 @@
+POST /api/v1/enroll HTTP/1.1
+Host: console.example
+Content-Type: application/json
+Content-Length: 320
+Content-Digest: sha-256=:eMTTVBaiudZKKc+HUQevQXDWCUxYGsAChKbg6jVxqPg=:
+Signature-Input: cyberboar=("@method" "@path" "@query" "content-digest");created=1790855940;keyid="3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24";nonce="ADKF1hhrP-WTzZAKz78aWQ";alg="ecdsa-p256-sha256";tag="cyberboar.dev/endpoint/v1"
+Signature: cyberboar=:GdORqZo75Pam7nWFXUB5SMR/HgzvZVevOe/Aaeysbe8HowwWkXmst1+ThEwMfUtfZgcGULXbERnZ1n5LzbNeug==:
+
+{"token":"cyberboar_enroll_ess4Aob-xcAxsXboV4iZoce8QM70kCcMY_fBPN3nlss","endpoint":{"id":"3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24","hostname":"dev-laptop-17","version":"v1.0.0-rc.1"},"publicKey":"MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1tm3vHaKVK8SoLk65hsdOy+39nkiuytJcv3NXGeX0buHC0FQNBlQ+DBjyq3pAJHQynH9gIH1+WZ9ZJr8EFtDgw=="}

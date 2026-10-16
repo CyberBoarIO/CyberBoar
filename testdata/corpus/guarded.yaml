@@ -1,0 +1,145 @@
+# How CyberBoar is installed (builtin.guarded):
+# the adapters and the hook pass the files that switch the hook on or off
+# (the agent's settings files, the policy, its signature and key, the hook
+# binary, the audit log) as guarded. An agent may read them with its file
+# tools, but not write them, not touch them through the shell (which can't
+# tell reading from writing), and not delete, move or replace a directory
+# that holds one. The audit log is also protected by builtin.self, which
+# denies reads as well
+# Not covered: git commands that check out committed content (switching
+# branches, pull, merge, rebase), programs the agent starts, and hard links
+# made before the session; managed settings, which the agent can't write,
+# are the real lock
+
+fs:
+  - {path: home/dev/.claude/settings.json, file: "{}"}
+  - {path: home/dev/repo/.claude/settings.json, file: "{}"}
+  - {path: home/dev/repo/.claude/settings.local.json, file: "{}"}
+  - {path: home/dev/repo/.claude/commands/review.md, file: ""}
+  - {path: home/dev/repo/.cyberboar/policy.yaml, file: ""}
+  - {path: home/dev/repo/.git/HEAD, file: "ref: refs/heads/main\n"}
+  - {path: home/dev/repo/.env, file: "TOKEN=x"}
+  - {path: home/dev/repo/README.md, file: ""}
+  - {path: home/dev/repo/src/main.go, file: ""}
+  - {path: home/dev/repo/evil/.claude/settings.local.json, file: "{}"}
+  - {path: home/dev/repo/cfg, symlink: .claude}
+  - {path: home/dev/tmp/notes.txt, file: ""}
+  # The unrelated directory must have its own repository boundary even when
+  # TMPDIR itself is inside a checkout used by a developer or CI runner
+  - {path: home/dev/tmp/.git/HEAD, file: "ref: refs/heads/main\n"}
+
+defaults:
+  action:
+    cwd: "{{root}}/home/dev/repo"
+    home: "{{root}}/home/dev"
+    workspaces: ["{{root}}/home/dev/repo"]
+    guarded:
+      - "{{root}}/home/dev/.claude/settings.json"
+      - "{{root}}/home/dev/.claude/settings.local.json"
+      - "{{root}}/home/dev/repo/.claude/settings.json"
+      - "{{root}}/home/dev/repo/.claude/settings.local.json"
+      - "{{root}}/home/dev/repo/.cyberboar/policy.yaml"
+      - "{{root}}/home/dev/.codex/hooks.json"
+
+policies:
+  none:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: none}
+      spec:
+        files: {containing: ignore}
+        commands: {denyInterpreters: false}
+  open:
+    # Everything in the workspace is allowed; guarded files still are not
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: open}
+      spec:
+        defaults: {posture: allow-listed}
+        files: {allow: ["**"]}
+        commands: {allow: ["*"], denyInterpreters: false}
+  baseline:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: baseline}
+      spec:
+        files: {deny: ["**/.env*"]}
+
+cases:
+  # The agent's file tools
+  - {name: editing the local settings is denied, policy: none, action: {tool: write, path: .claude/settings.local.json}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: editing the project settings is denied, policy: none, action: {tool: write, path: .claude/settings.json}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: editing the user settings is denied, policy: none, action: {tool: write, path: "~/.claude/settings.json"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: creating a missing settings file is denied, policy: none, action: {tool: write, path: "~/.claude/settings.local.json"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: editing the policy is denied, policy: none, action: {tool: write, path: .cyberboar/policy.yaml}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: an allow rule doesn't reach a guarded file, policy: open, action: {tool: write, path: .claude/settings.local.json}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: a differently cased path is denied, policy: none, action: {tool: write, path: .Claude/Settings.Local.JSON}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: a symlink to the settings directory is denied, policy: none, action: {tool: write, path: cfg/settings.local.json}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: an absolute path with dot-dot is denied, policy: none, action: {tool: write, path: "{{root}}/home/dev/repo/src/../.claude/settings.json"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: reading the settings is allowed, policy: none, action: {tool: read, path: .claude/settings.local.json}, expect: {decision: allow}}
+  - {name: reading the policy is allowed, policy: none, action: {tool: read, path: .cyberboar/policy.yaml}, expect: {decision: allow}}
+  - {name: listing the settings directory is allowed, policy: none, action: {tool: list, path: .claude}, expect: {decision: allow}}
+  - {name: other files in .claude may be written, policy: none, action: {tool: write, path: .claude/commands/review.md}, expect: {decision: allow}}
+  - {name: a settings file elsewhere may be written, policy: none, action: {tool: write, path: evil/.claude/settings.local.json}, expect: {decision: allow}}
+
+  # The shell: the file itself
+  - {name: a redirection into the settings is denied, policy: none, action: {tool: shell, command: "echo '{}' > .claude/settings.local.json"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: sed -i on the settings is denied, policy: none, action: {tool: shell, command: "sed -i 's/hook/x/' .claude/settings.local.json"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: reading the settings through the shell is denied, policy: none, action: {tool: shell, command: "cat .claude/settings.json"}, expect: {decision: deny, rule: builtin.guarded, reasonContains: "file tool"}}
+  - {name: copying over the settings is denied, policy: none, action: {tool: shell, command: "cp evil/.claude/settings.local.json .claude/"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: moving a file over the policy is denied, policy: none, action: {tool: shell, command: "mv ../tmp/notes.txt .cyberboar/policy.yaml"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: a symlink over the settings is denied, policy: none, action: {tool: shell, command: "ln -sf ../evil/.claude/settings.local.json .claude/settings.local.json"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: printing the settings path is allowed, policy: none, action: {tool: shell, command: "echo .claude/settings.local.json"}, expect: {decision: allow}}
+  - {name: a path only known at run time asks, policy: none, action: {tool: shell, command: "rm -f \"$F\""}, expect: {decision: ask, rule: builtin.guarded}}
+
+  # The shell: a directory that holds a guarded file
+  - {name: removing the settings directory is denied, policy: none, action: {tool: shell, command: "rm -rf .claude"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: removing the user config directory is denied, policy: none, action: {tool: shell, command: "rm -rf ~/.claude"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: removing the project is denied, policy: none, action: {tool: shell, command: "cd .. && rm -r repo"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: moving the settings directory is denied, policy: none, action: {tool: shell, command: "mv .claude .claude.bak"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: copying a settings directory over it is denied, policy: none, action: {tool: shell, command: "cp -r evil/.claude ."}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: copying a directory's contents over it is denied, policy: none, action: {tool: shell, command: "rsync -a evil/ ."}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: cp with a target directory is denied, policy: none, action: {tool: shell, command: "cp -r -t . evil/.claude"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: find -delete over the project is denied, policy: none, action: {tool: shell, command: "find . -name '*.json' -delete"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: find -exec rm over the project is denied, policy: none, action: {tool: shell, command: "find . -name '*.json' -exec rm {} +"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: find -exec rm before a harmless -exec is denied, policy: none, action: {tool: shell, command: "find . -exec rm {} \\; -exec true {} \\;"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: find -exec sed -i over the project is denied, policy: none, action: {tool: shell, command: "find . -name '*.json' -exec sed -i s/a/b/ {} +"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: git clean of ignored files is denied, policy: none, action: {tool: shell, command: "git clean -fdX"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: git stash from a subdirectory is denied, policy: none, action: {tool: shell, command: "cd src && git stash -u"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: git -C with a whole-tree reset is denied, policy: none, action: {tool: shell, command: "git -C {{root}}/home/dev/repo reset --hard", cwd: "{{root}}/home/dev/tmp"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: git checkout of the whole tree is denied, policy: none, action: {tool: shell, command: "git checkout -- ."}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: git apply is denied, policy: none, action: {tool: shell, command: "git apply ../tmp/fix.diff"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: patch in the project is denied, policy: none, action: {tool: shell, command: "patch -p1 < ../tmp/fix.diff"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: extracting an archive into the project is denied, policy: none, action: {tool: shell, command: "tar xzf ../tmp/backup.tgz"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: unzip into the project is denied, policy: none, action: {tool: shell, command: "unzip ../tmp/a.zip"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: copying to a new directory that would hold a guarded file is denied, policy: none, action: {tool: shell, command: "cp -r evil/.claude ~/.codex"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: a link named after its target in the working directory is denied, policy: none, action: {tool: shell, command: "ln -sf evil/.claude"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: git stash in a directory only known at run time asks, policy: none, action: {tool: shell, command: "git stash", cwd: "", cwdUnknown: true}, expect: {decision: ask, rule: builtin.guarded}}
+  - {name: rm of files only known at run time asks, policy: none, action: {tool: shell, command: "ls | xargs rm -rf"}, expect: {decision: ask, rule: builtin.guarded}}
+
+  # What stays allowed
+  - {name: a recursive grep is allowed, policy: none, action: {tool: shell, command: "grep -r hook ."}, expect: {decision: allow}}
+  - {name: find -exec grep is allowed, policy: none, action: {tool: shell, command: "find . -name '*.go' -exec grep -l main {} +"}, expect: {decision: allow}}
+  - {name: listing the settings directory in the shell is allowed, policy: none, action: {tool: shell, command: "ls -la .claude"}, expect: {decision: allow}}
+  - {name: copying a file into the project is allowed, policy: none, action: {tool: shell, command: "cp ../tmp/notes.txt ."}, expect: {decision: allow}}
+  - {name: copying the project elsewhere is allowed, policy: none, action: {tool: shell, command: "cp -r . ../tmp/backup"}, expect: {decision: allow}}
+  - {name: removing a sibling is allowed, policy: none, action: {tool: shell, command: "rm -rf src"}, expect: {decision: allow}}
+  - {name: removing another file in .claude is allowed, policy: none, action: {tool: shell, command: "rm .claude/commands/review.md"}, expect: {decision: allow}}
+  - {name: git status is allowed, policy: none, action: {tool: shell, command: "git status && git diff"}, expect: {decision: allow}}
+  - {name: git checkout of a branch is allowed, policy: none, action: {tool: shell, command: "git checkout -b feature"}, expect: {decision: allow}}
+  - {name: git checkout of one file is allowed, policy: none, action: {tool: shell, command: "git checkout -- src/main.go"}, expect: {decision: allow}}
+  - {name: a soft git reset is allowed, policy: none, action: {tool: shell, command: "git reset HEAD~1"}, expect: {decision: allow}}
+  - {name: git stash list is allowed, policy: none, action: {tool: shell, command: "git stash list"}, expect: {decision: allow}}
+  - {name: creating an archive is allowed, policy: none, action: {tool: shell, command: "tar czf ../tmp/src.tgz src"}, expect: {decision: allow}}
+  - {name: extracting elsewhere is allowed, policy: none, action: {tool: shell, command: "tar xzf ../tmp/backup.tgz -C ../tmp"}, expect: {decision: allow}}
+  - {name: unzip elsewhere is allowed, policy: none, action: {tool: shell, command: "unzip ../tmp/a.zip -d ../tmp/out"}, expect: {decision: allow}}
+  - {name: git clean outside the project is allowed, policy: none, action: {tool: shell, command: "git clean -fdx", cwd: "{{root}}/home/dev/tmp"}, expect: {decision: allow}}
+
+  # Policy rules still apply to the new destination checks
+  - {name: copying a secret into the project is denied by policy, policy: baseline, action: {tool: shell, command: "cp ../tmp/notes.txt .env"}, expect: {decision: deny, rule: "files.deny[0]"}}
+
+  - {name: a relative guarded path is an invalid action, policy: none, action: {tool: read, path: README.md, guarded: [.claude/settings.json]}, expect: {decision: deny, rule: error.invalidAction}}
+  - {name: a guarded path with a NUL byte is an invalid action, policy: none, action: {tool: read, path: README.md, guarded: ["{{root}}/a\u0000b"]}, expect: {decision: deny, rule: error.invalidAction}}

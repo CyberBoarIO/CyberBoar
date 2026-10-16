@@ -1,0 +1,6 @@
+GET /api/v1/bundles/permissive HTTP/1.1
+Host: console.example
+Content-Digest: sha-256=:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=:
+Signature-Input: cyberboar=("@method" "@path" "@query" "content-digest");created=1790856000;keyid="3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24";nonce="LcKdSKnINRIz07voX-eXlw";alg="ecdsa-p256-sha256";tag="cyberboar.dev/endpoint/v1"
+Signature: cyberboar=:U73Dv2vn0qI2XAX5YAGvP8hEcpcPpni+z4J4w9KmhMSj9w5KInwXW8XEidr/LzR1Dmw4crFo0f0vRWCd6/WCRA==:
+

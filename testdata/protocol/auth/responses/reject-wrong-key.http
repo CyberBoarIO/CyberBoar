@@ -1,0 +1,8 @@
+HTTP/1.1 202 Accepted
+Content-Type: application/json
+Content-Length: 15
+Content-Digest: sha-256=:Z4vsbpYJPKqfFMt/1mUgW/Dyq6WLfFU9TLBokSiC8o8=:
+Signature-Input: cyberboar=("@status" "content-digest" "signature";req;key="cyberboar");created=1790856000;keyid="94b80d5074d02d73df46fd94c149282313336cd3a8ff71f74a7049d70ade433a";alg="ecdsa-p256-sha256";tag="cyberboar.dev/console/v1"
+Signature: cyberboar=:YZrASt5GUX8miAryZcUTwy4Vvha5ZlZPP9haTrol3QgUmqy98PVD9ohbCZzUHkkYIPvLIkaBBww0cKrx5RHWvA==:
+
+{"accepted":3}

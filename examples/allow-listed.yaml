@@ -1,0 +1,43 @@
+# Strict example: allow-listed posture
+# Only listed files and commands are allowed
+# Deny and ask rules still take precedence over allow
+apiVersion: cyberboar.dev/v1
+kind: Policy
+metadata:
+  name: allow-listed
+  description: Only the workspace and a small set of read-mostly commands.
+  labels:
+    tier: strict
+spec:
+  defaults:
+    posture: allow-listed
+  files:
+    allow:
+      - "**" # workspace-relative: everything inside the workspace
+    deny:
+      - "**/.env*"
+      - "**/*.pem"
+      - "~/.ssh/**"
+  commands:
+    allow:
+      # Every simple command must be listed, shell builtins included.
+      - "cd"
+      - "pwd"
+      - "echo"
+      - "ls"
+      - "cat"
+      - "grep"
+      - "rg"
+      - "git status"
+      - "git diff"
+      - "git log"
+      - "go build"
+      - "go test"
+      - "go vet"
+    ask:
+      - "git commit"
+      - "git push"
+    denyInterpreters: true
+  mcp:
+    allow:
+      - "github"

@@ -1,0 +1,26 @@
+{
+  "agent": "Copilot CLI 1.0.91",
+  "source": "tools offered to the model in `copilot -p` (non-interactive) runs with model IDs claude-sonnet-4.5, claude-opus-4.6, gemini-3-pro (str_replace style) and gpt-5.4, gpt-5.3-codex (apply_patch style), Linux x64",
+  "tools": [
+    "apply_patch",
+    "bash",
+    "create",
+    "edit",
+    "fetch_copilot_cli_documentation",
+    "glob",
+    "grep",
+    "list_agents",
+    "list_bash",
+    "read_agent",
+    "read_bash",
+    "rg",
+    "session_store_sql",
+    "skill",
+    "sql",
+    "stop_bash",
+    "task",
+    "view",
+    "web_fetch",
+    "write_agent"
+  ]
+}

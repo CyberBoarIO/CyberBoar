@@ -1,0 +1,31 @@
+{
+  "endpoint": {
+    "id": "3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24",
+    "hostname": "dev-laptop-17",
+    "version": "v1.0.0-rc.1"
+  },
+  "events": [
+    {
+      "time": "2026-09-29T08:16:40.051Z",
+      "agent": "codex",
+      "version": "v1.0.0-rc.1",
+      "session": "c0ffee00-0000-4000-8000-000000000002",
+      "tool": "apply_patch",
+      "actions": [
+        {
+          "tool": "write",
+          "path": "/home/dev/app/a.go"
+        },
+        {
+          "tool": "write",
+          "path": "/home/dev/app/.env"
+        }
+      ],
+      "decision": "deny",
+      "rule": "files.deny",
+      "reason": "writes .env, which matches files.deny \"**/.env*\"",
+      "durationMs": 3.2,
+      "actionsOmitted": 4998
+    }
+  ]
+}

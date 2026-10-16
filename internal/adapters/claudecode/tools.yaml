@@ -1,0 +1,91 @@
+# How Claude Code's tools touch the machine, for the PreToolUse hook.
+#
+# A tool not listed here is denied: new tools are never trusted until someone
+# has read their input schema and classified them.
+#
+# Per tool, one or more of:
+#   shell:       input field holding a bash command line
+#   powershell:  input field holding a PowerShell command (analysed as foreign code)
+#   read:        input fields holding paths the tool reads (contents; directories are
+#                checked with what they contain)
+#   write:       input fields holding paths the tool creates or changes
+#   list:        input fields holding paths whose names the tool lists (not contents)
+#   listPattern: input field holding a glob pattern. When the pattern is absolute,
+#                the tool lists the pattern's base directory and ignores its list fields.
+#   content:     input fields holding text a write tool puts in its file (checked for secrets)
+#   edit:        where the input holds text edits (old, new, all; list: a field holding
+#                several), which the secrets check applies to the file to see what it
+#                will hold
+#   required:    fields that must be present (a call without them is malformed: deny)
+#   defaultCwd:  with none of its path fields present, the tool acts on cwd
+#   passthrough: the tool touches no local file and runs no command; CyberBoar adds nothing
+#
+# Field paths: "a" a field, "a[]" every element of an array, "a.*" every value of
+# an object, combinable ("files.*.from"). Values that aren't strings are ignored.
+# Relative paths resolve against the hook input's cwd
+#
+# Sources: Claude Code hooks reference (tool_input tables), the tool schemas of
+# Claude Code 2.1.220, and hook inputs captured from that version
+
+version: 1
+tools:
+  # --- Commands -----------------------------------------------------------------
+  Bash: {shell: command, required: [command]}
+  Monitor: {shell: command}                 # a monitor with only `ws` runs no command
+  PowerShell: {powershell: command, required: [command]}
+
+  # --- Files --------------------------------------------------------------------
+  Read: {read: [file_path], required: [file_path]}
+  Write: {write: [file_path], content: [content], required: [file_path]}
+  Edit: {write: [file_path], edit: {old: old_string, new: new_string, all: replace_all}, required: [file_path]}
+  MultiEdit: {write: [file_path], edit: {list: edits, old: old_string, new: new_string, all: replace_all}, required: [file_path]}
+  NotebookEdit: {write: [notebook_path], content: [new_source], required: [notebook_path]}
+  Grep: {read: [path], defaultCwd: true}    # searches contents
+  Glob: {list: [path], listPattern: pattern, defaultCwd: true}   # returns names
+  LS: {list: [path], defaultCwd: true}
+
+  # --- Tools that send local files elsewhere --------------------------------------
+  Artifact:                                 # publishes local files to a web page
+    read: [file_path, "file_paths[]", "files.*", "files.*.from", root]
+    write: [out_dir]
+  ArtifactData:                             # sends a local JSON file; saves reads to out_dir
+    read: [file_path, "writes[].file_path"]
+    write: [out_dir]
+  DesignSync: {read: [localDir], defaultCwd: true}   # uploads files under localDir (default cwd)
+  SendUserFile: {read: ["files[]"], required: [files]}
+
+  # --- No local file access, no commands ---------------------------------------------
+  # Subagents' own tool calls go through this hook too.
+  Agent: {passthrough: true}
+  Task: {passthrough: true}
+  TaskOutput: {passthrough: true}
+  TaskStop: {passthrough: true}
+  SendMessage: {passthrough: true}
+  ListAgents: {passthrough: true}
+  AskUserQuestion: {passthrough: true}
+  EnterPlanMode: {passthrough: true}
+  ExitPlanMode: {passthrough: true}         # plan text only; the plan file is Claude Code's own
+  TodoWrite: {passthrough: true}
+  TaskCreate: {passthrough: true}           # the session's task list
+  TaskGet: {passthrough: true}
+  TaskList: {passthrough: true}
+  TaskUpdate: {passthrough: true}
+  SendFeedback: {passthrough: true}         # drafts feedback locally; sent only with the user's approval
+  EndConversation: {passthrough: true}
+  ToolSearch: {passthrough: true}
+  Skill: {passthrough: true}
+  ScheduleWakeup: {passthrough: true}
+  CronCreate: {passthrough: true}           # schedules a prompt; its tool calls are hooked when they run
+  CronDelete: {passthrough: true}
+  CronList: {passthrough: true}
+  PushNotification: {passthrough: true}
+  ReportFindings: {passthrough: true}
+  RemoteTrigger: {passthrough: true}        # remote API; no local files
+  ArtifactComments: {passthrough: true}
+  FetchInboxMessage: {passthrough: true}
+  ReadNotifications: {passthrough: true}
+  EnterWorktree: {passthrough: true}        # git worktrees under .claude/worktrees
+  ExitWorktree: {passthrough: true}
+  # Network access is not governed (see the README's "What it does not do")
+  WebFetch: {passthrough: true}
+  WebSearch: {passthrough: true}

@@ -1,0 +1,74 @@
+POST /api/v1/events HTTP/1.1
+Host: console.example
+Content-Type: application/json
+Content-Length: 1680
+Content-Digest: sha-256=:Uk8ssMSSH6WK2oW/eI2DUf5fMWPFUCieurIDvCwqads=:
+Signature-Input: cyberboar=("@method" "@path" "@query" "content-digest");created=1790856000;keyid="3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24";nonce="aUQHX5c5Ji8SINVeIy0OEA";alg="ecdsa-p256-sha256";tag="cyberboar.dev/endpoint/v1"
+Signature: cyberboar=:FzT+R6lk3tYBh7qwQI8qGMuXkTyV8mHrBlm70qSUPtS4cbt4dCbId7rWls5kCzkzeoiPT10OmAoLrZLjZeP5pg==:
+
+{
+  "endpoint": {
+    "id": "3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24",
+    "hostname": "dev-laptop-17",
+    "version": "v1.0.0-rc.1"
+  },
+  "events": [
+    {
+      "time": "2026-09-29T08:15:02.418Z",
+      "agent": "claude-code",
+      "version": "v1.0.0-rc.1",
+      "session": "c0ffee00-0000-4000-8000-000000000001",
+      "toolUseId": "toolu_01",
+      "permissionMode": "default",
+      "cwd": "/home/dev/app",
+      "project": "/home/dev/app",
+      "tool": "Bash",
+      "actions": [
+        {
+          "tool": "shell",
+          "command": "cat .env"
+        }
+      ],
+      "decision": "allow",
+      "rule": "files.deny",
+      "reason": "reads .env, which matches files.deny \"**/.env*\"",
+      "policyName": "baseline",
+      "policySha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "durationMs": 1.7
+    },
+    {
+      "time": "2026-09-29T08:15:09Z",
+      "agent": "codex",
+      "version": "v1.0.0-rc.1",
+      "tool": "Read",
+      "actions": [
+        {
+          "tool": "read",
+          "path": "/home/dev/app/src/main.go"
+        }
+      ],
+      "decision": "allow",
+      "rule": "default",
+      "reason": "no rule matched",
+      "policyName": "baseline",
+      "durationMs": 0.4
+    },
+    {
+      "time": "2026-09-29T08:16:00+02:00",
+      "agent": "claude-code",
+      "version": "v1.0.0-rc.1",
+      "tool": "mcp__github__create_issue",
+      "actions": [
+        {
+          "tool": "mcp",
+          "mcpServer": "github",
+          "mcpTool": "create_issue"
+        }
+      ],
+      "decision": "ask",
+      "rule": "mcp.ask",
+      "reason": "github/create_issue needs approval",
+      "durationMs": 0.9
+    }
+  ]
+}

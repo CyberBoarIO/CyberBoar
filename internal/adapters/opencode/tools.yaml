@@ -1,0 +1,79 @@
+# How opencode's tools touch the machine, for the plugin shim's
+# tool.execute.before check
+#
+# A tool not listed here is denied: new tools are never trusted
+# until someone has read their input schema and classified them. A name that
+# isn't listed is an MCP tool only when it starts with the name of an MCP
+# server opencode has configured, sanitized the way opencode does it, and an
+# underscore: <server>_<tool>. Built-in tools, MCP tools and custom tools
+# (plugins, .opencode/tool/) are otherwise indistinguishable by name, so a name
+# that matches no configured server is denied
+#
+# Per tool, one or more of:
+#   shell:             args field holding a command line, run by the shell opencode
+#                      picks: the config's shell, else $SHELL, else bash; fish and nu
+#                      are skipped. Anything but bash, sh, dash or zsh is foreign code
+#   workdir:           args field holding the directory the command starts in;
+#                      relative paths resolve against the session directory
+#   read, write, list: args fields holding paths (as for Claude Code)
+#   content, edit:     args fields holding text a write adds, and its text edits (as for
+#                      Claude Code); match: opencode follows how opencode's edit tool
+#                      finds the old text
+#   view:              fields holding paths that are read if they are files and listed
+#                      (names only) if they are directories
+#   patch:             args field holding an apply_patch document
+#   mcpResource:       args field naming the MCP server whose resources the tool
+#                      reads; without it, every configured server
+#   required:          fields that must be present
+#   requirePath:       at least one of the path fields must be present
+#   defaultCwd:        with none of its path fields present, the tool acts on the
+#                      session directory
+#   passthrough:       the tool touches no local file and runs no command
+#
+# Field paths: "a", "a[]" (as for Claude Code). Relative paths resolve against
+# the session directory (the plugin's directory). Both filePath (the tools
+# opencode 1.18.34 offers) and path (its newer tool definitions, also in the
+# binary) are read, so either spelling is checked
+#
+# Sources: tool schemas opencode 1.18.34 offers the model (with
+# str_replace-style and apply_patch-style models, the question, lsp and
+# web search tools switched on, and a local MCP server) and inputs captured
+# from it; the tool registry in the binary
+
+version: 1
+tools:
+  # --- Commands -------------------------------------------------------------------
+  bash: {shell: command, workdir: workdir, required: [command]}
+
+  # --- Files ----------------------------------------------------------------------
+  read: {view: [filePath, path], requirePath: true}
+  write: {write: [filePath, path], content: [content], requirePath: true}
+  edit: {write: [filePath, path], edit: {old: oldString, new: newString, all: replaceAll, match: opencode}, requirePath: true}
+  apply_patch: {patch: patchText, required: [patchText]}
+  grep: {read: [path], defaultCwd: true}                  # searches contents
+  glob: {list: [path], defaultCwd: true}                  # returns names
+
+  # --- MCP resources: governed like a call to the server they name ----------------
+  read_mcp_resource: {mcpResource: server, required: [server]}
+  list_mcp_resources: {mcpResource: server}
+  list_mcp_resource_templates: {mcpResource: server}
+
+  # --- No local file access, no commands ------------------------------------------
+  # Subagents' own tool calls go through the plugin too (seen in 1.18.34)
+  task: {passthrough: true}
+  todowrite: {passthrough: true}
+  skill: {passthrough: true}
+  question: {passthrough: true}
+  plan_enter: {passthrough: true}
+  plan_exit: {passthrough: true}
+  # opencode's stand-in for a call to a tool that doesn't exist: it only
+  # reports the error back to the model
+  invalid: {passthrough: true}
+  # Network access is not governed (see the README's "What it does not do")
+  webfetch: {passthrough: true}
+  websearch: {passthrough: true}
+
+  # Left out on purpose, so denied: lsp (experimental; its workspaceSymbol and
+  # references operations reach files the call doesn't name) and execute
+  # (experimental code mode: a script that calls MCP tools; each call it makes
+  # reaches the plugin as an MCP tool, but the script itself isn't analysed)

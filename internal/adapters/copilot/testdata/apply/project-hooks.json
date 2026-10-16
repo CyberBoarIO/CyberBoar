@@ -1,0 +1,21 @@
+{
+  "hooks": {
+    "preToolUse": [
+      {
+        "args": [
+          "hook",
+          "--agent",
+          "copilot-cli",
+          "--policy",
+          ".cyberboar/policy.yaml",
+          "--deadline",
+          "5s"
+        ],
+        "exec": "cyberboar",
+        "timeoutSec": 15,
+        "type": "command"
+      }
+    ]
+  },
+  "version": 1
+}

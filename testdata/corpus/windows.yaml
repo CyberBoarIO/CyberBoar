@@ -1,0 +1,224 @@
+# Native Windows
+#
+# Actions with `platform: windows` carry Windows paths. `drives` maps drive
+# letters to fixture directories, so these cases read the same way on every
+# OS; the engine never asks the OS to interpret a Windows path, only to stat
+# the directories the mapping names. Link targets are written as Windows
+# stores them (backslashes, drive letters)
+
+fs:
+  - {path: c/Users/dev/.ssh/id_rsa, file: ""}
+  - {path: c/Users/dev/AppData/Local/cyberboar/state, file: ""}
+  - {path: c/Users/dev/other/deep/placeholder, file: ""}
+  - {path: c/Users/dev/repo/README.md, file: ""}
+  - {path: c/Users/dev/repo/.env, file: ""}
+  - {path: c/Users/dev/repo/src/main.go, file: ""}
+  - {path: c/Users/dev/repo/infra/terraform.tfstate, file: ""}
+  - {path: c/ProgramData/secrets/token, file: ""}
+  - {path: d/work/proj/app.go, file: ""}
+  # A relative file link, a directory link with a drive path (what a
+  # junction's target looks like), and one whose ".." reads differently in
+  # Win32 (lexically first) and POSIX (after the link) order
+  - {path: c/Users/dev/repo/keylink, symlink: '..\.ssh\id_rsa'}
+  - {path: c/Users/dev/repo/sshdir, symlink: 'C:\Users\dev\.ssh'}
+  - {path: c/Users/dev/repo/vault, symlink: 'C:\ProgramData\secrets'}
+  - {path: c/Users/dev/repo/up, symlink: 'C:\Users\dev\other\deep'}
+  - {path: c/Users/dev/repo/rooted, symlink: '\ProgramData\secrets'}
+  - {path: c/Users/dev/repo/volume, symlink: '\\?\Volume{0b1c2d3e-0000-0000-0000-100000000000}\secrets'}
+  - {path: c/Users/dev/repo/unc, symlink: '\\localhost\c$\ProgramData\secrets'}
+  - {path: c/Users/dev/repo/tolong, symlink: '\\?\C:\ProgramData\secrets'}
+  - {path: d/work/proj/tokens, symlink: 'C:\ProgramData\secrets'}
+  - {path: c/Users/dev/repo/aliases/a-real/private/key.txt, file: ""}
+  - {path: c/Users/dev/repo/aliases/z-link, symlink: 'C:\Users\dev\repo\aliases\a-real'}
+
+defaults:
+  action:
+    platform: windows
+    drives: {c: "{{root}}/c", d: "{{root}}/d"}
+    cwd: 'C:\Users\dev\repo'
+    home: 'C:\Users\dev'
+    workspaces: ['C:\Users\dev\repo']
+
+policies:
+  secrets:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: secrets}
+      spec:
+        files:
+          deny:
+            - "**/.env*"                  # [0]
+            - "~/.ssh/**"                 # [1]
+            - "/c/ProgramData/secrets/**" # [2]
+          ask:
+            - "**/terraform.tfstate"      # [0]
+  allowlisted:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: allowlisted}
+      spec:
+        defaults: {posture: allow-listed}
+        files:
+          allow: ["src/**", "README.md"]
+  none:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: none}
+      spec: {}
+  directory-alias:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: directory-alias}
+      spec:
+        files:
+          deny: ["aliases/z-link/private/key.txt"]
+  drive-patterns:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: drive-patterns}
+      spec:
+        files:
+          deny:
+            - 'C:\ProgramData\secrets\**'        # [0] backslashes
+            - "c:/Users/dev/.ssh/**"             # [1] slashes, lower-case drive
+            - 'C:\Users\dev\repo\*.go'           # [2] a glob after the drive
+          ask:
+            - 'D:\work\**'                       # [0]
+  drive-allow:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: drive-allow}
+      spec:
+        defaults: {posture: allow-listed}
+        files:
+          allow: ['C:\Users\dev\repo\src\**']
+  drive-trailing-separator:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: drive-trailing-separator}
+      spec:
+        files:
+          deny: ['C:\ProgramData\secrets\']
+  drive-relative-pattern:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: drive-relative-pattern}
+      spec:
+        files:
+          deny: ['C:secrets\**']
+  unc-pattern:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: unc-pattern}
+      spec:
+        files:
+          deny: ['\\fileserver\share\**']
+
+cases:
+  - {name: a Windows contents walk checks every directory alias, policy: directory-alias, action: {tool: read, path: aliases}, expect: {decision: deny, rule: "files.deny[0]", reasonContains: 'z-link\private\key.txt'}}
+  # --- Policies name Windows locations as C:\..., C:/..., /c/..., ~/... or **/... ---
+  - {name: a drive pattern with backslashes applies, policy: drive-patterns, action: {tool: read, path: 'C:\ProgramData\secrets\token'}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: a drive pattern with backslashes applies through a link, policy: drive-patterns, action: {tool: read, path: 'vault\token'}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: a drive pattern with slashes applies, policy: drive-patterns, action: {tool: read, path: '~\.ssh\id_rsa'}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: a glob after the drive applies, policy: drive-patterns, action: {tool: read, path: 'C:\Users\dev\repo\main.go'}, expect: {decision: deny, rule: "files.deny[2]"}}
+  - {name: a drive pattern on another drive applies, policy: drive-patterns, action: {tool: read, path: 'D:\work\proj\app.go'}, expect: {decision: ask, rule: "files.ask[0]"}}
+  - {name: a drive pattern leaves other paths alone, policy: drive-patterns, action: {tool: read, path: README.md}, expect: {decision: allow}}
+  - {name: a drive allow rule applies, policy: drive-allow, action: {tool: read, path: 'src\main.go'}, expect: {decision: allow, rule: "files.allow[0]"}}
+  - {name: a drive allow rule allows nothing else, policy: drive-allow, action: {tool: read, path: README.md}, expect: {decision: deny, rule: posture.allow-listed}}
+  - {name: a drive pattern with a trailing separator is a load error, policy: drive-trailing-separator, expect: {loadError: pattern, errorPath: "spec.files.deny[0]"}}
+  - {name: a drive-relative pattern is a load error, policy: drive-relative-pattern, expect: {loadError: pattern, errorPath: "spec.files.deny[0]"}}
+  - {name: a UNC pattern is a load error, policy: unc-pattern, expect: {loadError: pattern, errorPath: "spec.files.deny[0]"}}
+
+  # --- Drive paths --------------------------------------------------------------
+  - {name: relative dotenv is denied, policy: secrets, action: {tool: read, path: .env}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: absolute backslash path is allowed, policy: secrets, action: {tool: read, path: 'C:\Users\dev\repo\README.md'}, expect: {decision: allow}}
+  - {name: absolute forward-slash path is allowed, policy: secrets, action: {tool: read, path: 'C:/Users/dev/repo/README.md'}, expect: {decision: allow}}
+  - {name: mixed separators reach the ssh key, policy: secrets, action: {tool: read, path: 'C:\Users/dev\.ssh/id_rsa'}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: lower-case drive and other case reach the ssh key, policy: secrets, action: {tool: read, path: 'c:\users\DEV\.SSH\id_rsa'}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: relative backslash path is allowed, policy: secrets, action: {tool: read, path: 'src\main.go'}, expect: {decision: allow}}
+  - {name: dot-dot backslash path reaches the ssh key, policy: secrets, action: {tool: read, path: '..\.ssh\id_rsa'}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: dot-dot inside an absolute path is cleaned, policy: secrets, action: {tool: read, path: 'C:\Users\dev\repo\..\.ssh\id_rsa'}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: dot-dot above the drive root stays on the drive, policy: secrets, action: {tool: read, path: 'C:\..\..\ProgramData\secrets\token'}, expect: {decision: deny, rule: "files.deny[2]"}}
+  - {name: tilde with a backslash is the home directory, policy: secrets, action: {tool: read, path: '~\.ssh\id_rsa'}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: tilde with a slash is the home directory, policy: secrets, action: {tool: read, path: '~/.ssh/id_rsa'}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: absolute rule matches from another drive, policy: secrets, action: {tool: read, path: 'C:\ProgramData\secrets\token', cwd: 'D:\work\proj', workspaces: ['D:\work\proj']}, expect: {decision: deny, rule: "files.deny[2]"}}
+  - {name: ask rule applies on Windows, policy: secrets, action: {tool: read, path: 'infra\terraform.tfstate'}, expect: {decision: ask, rule: "files.ask[0]"}}
+  - {name: a new file under the workspace can be written, policy: secrets, action: {tool: write, path: 'C:\Users\dev\repo\new\notes.txt'}, expect: {decision: allow}}
+  - {name: listing the workspace is allowed, policy: secrets, action: {tool: list, path: .}, expect: {decision: allow}}
+  - {name: reading the workspace finds the dotenv inside, policy: secrets, action: {tool: read, path: 'C:\Users\dev\repo'}, expect: {decision: deny, rule: "files.deny[0]"}}
+  # up links to C:\Users\dev\other\deep. Win32 reads up\.. as the workspace, while
+  # the link's own parent is C:\Users\dev\other: both directories are walked.
+  - {name: reading a link's dot-dot walks the workspace Win32 opens, policy: secrets, action: {tool: read, path: 'up\..'}, expect: {decision: deny, rule: "files.deny[0]"}}
+
+  # --- Names Win32 rewrites -------------------------------------------------------
+  - {name: a trailing dot is stripped, policy: secrets, action: {tool: read, path: .env.}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: trailing dots and spaces are stripped, policy: secrets, action: {tool: read, path: '.env. . '}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: a trailing space in a directory name is stripped, policy: secrets, action: {tool: read, path: 'C:\Users\dev\.ssh \id_rsa'}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: a trailing dot on a directory name is stripped, policy: secrets, action: {tool: read, path: 'C:\ProgramData.\secrets.\token'}, expect: {decision: deny, rule: "files.deny[2]"}}
+  - {name: upper-case dotenv is denied, policy: secrets, action: {tool: read, path: .ENV}, expect: {decision: deny, rule: "files.deny[0]"}}
+
+  # --- Paths the engine refuses (builtin.windowsPath) -----------------------------
+  - {name: the default data stream is refused, policy: none, action: {tool: read, path: '.env::$DATA'}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: a named stream is refused, policy: none, action: {tool: write, path: 'README.md:hidden'}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: a stream on a directory is refused, policy: none, action: {tool: read, path: 'C:\Users\dev\.ssh::$INDEX_ALLOCATION\id_rsa'}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: a UNC path to the local admin share is refused, policy: none, action: {tool: read, path: '\\localhost\c$\Users\dev\.ssh\id_rsa'}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: a UNC path with forward slashes is refused, policy: none, action: {tool: read, path: '//fileserver/share/notes.txt'}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: the long-path namespace is refused, policy: none, action: {tool: read, path: '\\?\C:\Users\dev\repo\README.md'}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: the device namespace is refused, policy: none, action: {tool: read, path: '\\.\C:\Users\dev\repo\README.md'}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: the NT object namespace is refused, policy: none, action: {tool: read, path: '\??\C:\Users\dev\repo\README.md'}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: a drive-relative path is refused, policy: none, action: {tool: read, path: 'C:README.md'}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: a rooted path without a drive is refused, policy: none, action: {tool: read, path: '\Users\dev\repo\README.md'}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: a Git Bash path given to a native tool is refused, policy: none, action: {tool: read, path: /c/Users/dev/repo/README.md}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: a drive that is not a letter is refused, policy: none, action: {tool: read, path: '1:\x'}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: the NUL device is refused, policy: none, action: {tool: write, path: NUL}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: a device name with an extension is refused, policy: none, action: {tool: write, path: 'logs\con.txt'}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: a device name with trailing spaces is refused, policy: none, action: {tool: read, path: 'aux .log'}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: a numbered port is refused, policy: none, action: {tool: write, path: COM1}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: a superscript port number is refused, policy: none, action: {tool: write, path: 'lpt¹.txt'}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: a longer name starting with a device name is a file, policy: none, action: {tool: write, path: console.txt}, expect: {decision: allow}}
+  - {name: port zero is refused too, policy: none, action: {tool: write, path: COM0}, expect: {decision: deny, rule: builtin.windowsPath}}
+  - {name: the console input device is refused, policy: none, action: {tool: read, path: 'CONIN$'}, expect: {decision: deny, rule: builtin.windowsPath}}
+
+  # --- Links and junctions --------------------------------------------------------
+  - {name: a relative file link to the ssh key is denied, policy: secrets, action: {tool: read, path: keylink}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: a directory link with a drive target is followed, policy: secrets, action: {tool: read, path: 'sshdir\id_rsa'}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: a junction to protected data is followed, policy: secrets, action: {tool: read, path: 'vault\token'}, expect: {decision: deny, rule: "files.deny[2]"}}
+  - {name: dot-dot is applied before links as Win32 does, policy: secrets, action: {tool: read, path: 'up\..\vault\token'}, expect: {decision: deny, rule: "files.deny[2]"}}
+  - {name: a rooted link target is on the link's drive, policy: secrets, action: {tool: read, path: 'rooted\token'}, expect: {decision: deny, rule: "files.deny[2]"}}
+  - {name: a long-path link target is followed, policy: secrets, action: {tool: read, path: 'tolong\token'}, expect: {decision: deny, rule: "files.deny[2]"}}
+  - {name: a link to a volume GUID is unresolvable, policy: none, action: {tool: read, path: 'volume\token'}, expect: {decision: deny, rule: error.unresolvablePath}}
+  - {name: a link to the local admin share is unresolvable, policy: none, action: {tool: read, path: 'unc\token'}, expect: {decision: deny, rule: error.unresolvablePath}}
+  - {name: a link on another drive is followed, policy: secrets, action: {tool: read, path: 'tokens\token', cwd: 'D:\work\proj', workspaces: ['D:\work\proj']}, expect: {decision: deny, rule: "files.deny[2]"}}
+
+  # --- The harness's directories --------------------------------------------------
+  - {name: a Git Bash cwd is an invalid action, policy: none, action: {tool: read, path: README.md, cwd: /c/Users/dev/repo}, expect: {decision: deny, rule: error.invalidAction}}
+  - {name: a UNC home is an invalid action, policy: none, action: {tool: read, path: README.md, home: '\\fileserver\home\dev'}, expect: {decision: deny, rule: error.invalidAction}}
+  - {name: a drive-relative workspace is an invalid action, policy: none, action: {tool: read, path: README.md, workspaces: ['C:repo']}, expect: {decision: deny, rule: error.invalidAction}}
+  - {name: a drive root is not a workspace, policy: none, action: {tool: read, path: 'D:\work\proj\app.go', workspaces: ['D:\']}, expect: {decision: deny, rule: error.invalidAction}}
+  - {name: an ancestor of home is not a workspace, policy: none, action: {tool: read, path: README.md, workspaces: ['C:\Users']}, expect: {decision: deny, rule: error.invalidAction}}
+  - {name: the home directory in other case is not a workspace, policy: none, action: {tool: read, path: README.md, workspaces: ['c:\users\DEV']}, expect: {decision: deny, rule: error.invalidAction}}
+  - {name: a drive with no mapping is unresolvable, policy: none, action: {tool: read, path: 'Q:\data.txt'}, expect: {decision: deny, rule: error.unresolvablePath}}
+  - {name: an unknown platform is an invalid action, policy: none, action: {tool: read, path: README.md, platform: plan9}, expect: {decision: deny, rule: error.invalidAction}}
+  - {name: CyberBoar's own state is protected on Windows, policy: none, action: {tool: read, path: 'C:\Users\dev\AppData\Local\CYBERBOAR\state', protected: ['C:\Users\dev\AppData\Local\cyberboar']}, expect: {decision: deny, rule: builtin.self}}
+  # Deny reasons use native Windows paths with backslash separators
+  - {name: a directory's protected file is named the Windows way, policy: secrets, action: {tool: read, path: 'C:\Users\dev\repo'}, expect: {decision: deny, rule: "files.deny[0]", reasonContains: 'the directory C:\Users\dev\repo contains C:\Users\dev\repo\.env,'}}
+  - {name: a path with forward slashes is shown with backslashes, policy: secrets, action: {tool: write, path: 'C:\Users\dev\repo/infra/.env.local'}, expect: {decision: deny, rule: "files.deny[0]", reasonContains: 'access to C:\Users\dev\repo\infra\.env.local is blocked'}}
+  - {name: the hook's settings are guarded on Windows, policy: none, action: {tool: write, path: 'C:/Users/dev/repo/.CLAUDE/settings.local.json.', guarded: ['C:\Users\dev\repo\.claude\settings.local.json']}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: a guarded file may be read on Windows, policy: none, action: {tool: read, path: '.claude\settings.local.json', guarded: ['C:\Users\dev\repo\.claude\settings.local.json']}, expect: {decision: allow}}
+  - {name: removing a directory holding a guarded file is denied on Windows, policy: none, action: {tool: shell, command: 'rm -rf /c/users/dev/REPO/.claude', guarded: ['C:\Users\dev\repo\.claude\settings.local.json']}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: a guarded path that isn't a Windows path is an invalid action, policy: none, action: {tool: read, path: README.md, guarded: ['\\server\share\settings.json']}, expect: {decision: deny, rule: error.invalidAction}}
+
+  # --- Allow-listed posture -------------------------------------------------------
+  - {name: an allowed path with backslashes is allowed, policy: allowlisted, action: {tool: read, path: 'src\main.go'}, expect: {decision: allow, rule: "files.allow[0]"}}
+  - {name: an allowed path given absolute is allowed, policy: allowlisted, action: {tool: read, path: 'C:\Users\dev\repo\README.md'}, expect: {decision: allow, rule: "files.allow[1]"}}
+  - {name: allow rules stay case-sensitive, policy: allowlisted, action: {tool: read, path: 'SRC\main.go'}, expect: {decision: deny, rule: posture.allow-listed}}
+  - {name: trailing dots are stripped before allow rules too, policy: allowlisted, action: {tool: read, path: 'src.\main.go'}, expect: {decision: allow, rule: "files.allow[0]"}}

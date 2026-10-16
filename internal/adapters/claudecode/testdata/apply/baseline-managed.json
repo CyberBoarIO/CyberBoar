@@ -1,0 +1,98 @@
+{
+  "notes": [
+    "command pattern \"curl | sh\" (pipeline, quoting or ?/[ ] wildcards) has no native equivalent; only the hook enforces it",
+    "denyInterpreters: native rules cover only common spellings (sh -c, bash -c, zsh -c and others); the hook covers the rest",
+    "allow lists and allow-listed posture are enforced only by the hook (native allow rules would skip permission prompts)",
+    "files.containing (directories that contain protected files) is enforced only by the hook",
+    "case-insensitive matching, wrappers beyond timeout/time/nice/nohup/stdbuf, and unclassified tools are enforced only by the hook"
+  ],
+  "settings": {
+    "allowManagedHooksOnly": true,
+    "disableAllHooks": false,
+    "hooks": {
+      "PreToolUse": [
+        {
+          "hooks": [
+            {
+              "args": [
+                "hook",
+                "--policy",
+                "/etc/cyberboar/policy.yaml",
+                "--audit",
+                "/var/log/cyberboar/audit.jsonl",
+                "--deadline",
+                "5s"
+              ],
+              "command": "/usr/local/bin/cyberboar",
+              "onFailure": "block",
+              "statusMessage": "cyberboar: checking policy",
+              "timeout": 10,
+              "type": "command"
+            }
+          ],
+          "matcher": "*"
+        }
+      ],
+      "SessionStart": [
+        {
+          "hooks": [
+            {
+              "args": [
+                "brief",
+                "--policy",
+                "/etc/cyberboar/policy.yaml"
+              ],
+              "command": "/usr/local/bin/cyberboar",
+              "statusMessage": "cyberboar: briefing",
+              "timeout": 10,
+              "type": "command"
+            }
+          ]
+        }
+      ]
+    },
+    "permissions": {
+      "ask": [
+        "Read(//**/terraform.tfstate)",
+        "Edit(//**/terraform.tfstate)",
+        "Bash(git push *)"
+      ],
+      "deny": [
+        "Read(//**/.env*)",
+        "Edit(//**/.env*)",
+        "Read(//**/*.pem)",
+        "Edit(//**/*.pem)",
+        "Read(~/.ssh/**)",
+        "Edit(~/.ssh/**)",
+        "Read(~/.aws/credentials)",
+        "Edit(~/.aws/credentials)",
+        "Bash(terraform apply *)",
+        "Bash(kubectl delete *)",
+        "Bash(sh -c *)",
+        "Bash(bash -c *)",
+        "Bash(zsh -c *)",
+        "Bash(dash -c *)",
+        "Bash(ksh -c *)",
+        "Bash(eval *)",
+        "Bash(python -c *)",
+        "Bash(python3 -c *)",
+        "Bash(node -e *)",
+        "Bash(node -p *)",
+        "Bash(perl -e *)",
+        "Bash(perl -E *)",
+        "Bash(ruby -e *)",
+        "Bash(php -r *)",
+        "Bash(pwsh -c *)",
+        "Bash(pwsh -Command *)",
+        "Bash(osascript -e *)",
+        "Edit(//**/.claude/settings.json)",
+        "Edit(//**/.claude/settings.local.json)",
+        "Edit(//etc/cyberboar/policy.yaml)",
+        "Edit(//etc/cyberboar/policy.yaml.sig)",
+        "Edit(//var/log/cyberboar/audit.jsonl)",
+        "Edit(//usr/local/bin/cyberboar)",
+        "PowerShell"
+      ]
+    }
+  }
+}

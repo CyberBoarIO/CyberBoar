@@ -1,0 +1,162 @@
+# Parser edge cases for TestBashDifferential (internal/engine/shell)
+# Command lines are separated by lines holding only "---"
+# Bash never runs them
+---
+echo $'a\'b' .env
+---
+cat .en\
+v
+---
+echo `echo a\`b\`` && cat .env
+---
+echo "$(echo ")")" .env
+---
+: ${x:=$(cat .env)}
+---
+a[$(cat .env)]=1
+---
+echo $((1 + $(cat .env | wc -l)))
+---
+x=$(case y in y) cat .env;; esac)
+---
+cat <<"E"OF
+$(rm -rf x)
+EOF
+---
+cat <<END
+$(cat .env)
+END
+---
+cat <<-'E' | sh
+	cat .env
+	E
+---
+time -p cat .env
+---
+function f { cat .env; }; f
+---
+coproc c { cat .env; }
+---
+select x in a; do cat .env; done
+---
+for ((i=0; i<1; i++)); do cat .env; done
+---
+[[ $(cat .env) =~ ^(a|b)$ ]]
+---
+echo ${x//\//a} .env
+---
+echo if then .env
+---
+ls |& cat .env
+---
+cat .env &> out
+---
+exec {fd}<.env
+---
+cat <<< $'a\nb' .env
+---
+echo a#b .env # c
+---
+echo {a..c} .env
+---
+x="${y:-"a b"}" cat .env
+---
+case .env in (*) cat .env;; esac
+---
+echo $"loc" .env
+---
+cat -- .e\nv
+---
+eval 'cat .env'
+---
+trap 'cat .env' EXIT
+---
+alias x='cat .env'
+---
+cat >| out .env
+---
+{ cat .env; } 2>&1
+---
+( cd src && cat ../.env )
+---
+! cat .env
+---
+cat .env; exit
+---
+if cat .env; then :; elif ls; then :; else :; fi
+---
+while read -r l; do echo "$l"; done < .env
+---
+declare -a arr=( .env "$(cat .env)" )
+---
+local x=$(cat .env)
+---
+export X=$(cat .env)
+---
+readonly R="$(cat .env)"
+---
+printf '%s' "$(<.env)"
+---
+cat $'.e\x6ev'
+---
+cat ".e"'n'v
+---
+{ cat .env
+}
+---
+cat .env&&ls
+---
+cat .env||ls
+---
+cat .env;ls
+---
+cat .env&ls
+---
+echo $(( $(cat .env) ))
+---
+[ -f .env ] && cat .env
+---
+cat .env # ; rm -rf /
+---
+cat \
+.env
+---
+x=1 y=2 cat .env
+---
+cat<.env
+---
+cat$IFS.env
+---
+{cat,.env}
+---
+cat ${x-.env}
+---
+cat "${x:-.env}"
+---
+echo $(echo $(cat .env))
+---
+(( x = $(cat .env) ))
+---
+cat <(cat .env) >(cat)
+---
+f() (cat .env); f
+---
+until cat .env; do :; done
+---
+cat .env |
+wc -l
+---
+cat .env &&
+ls
+---
+echo 'a
+b' .env
+---
+echo "a
+$(cat .env)"
+---
+cat $'\x2e\145nv' $'\a\b\e\E\f\n\r\t\v\\\'' $'\1\12\123\1234\177' $'\x7\x7f\x7F\x4aZ'
+---
+$'\164erraform' apply; $'\x74\x65rraform' apply
+---
+cat ~/.aws/credentials$'\x00junk' ~/.aws/credentials$'\0'

@@ -1,0 +1,57 @@
+# Repository-wide quality checks
+name: Quality checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0   # gitleaks scans every commit
+      - name: Check script syntax and permissions
+        run: |
+          for script in scripts/*.sh; do
+            test -x "$script"
+            bash -n "$script"
+          done
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Install software TPM
+        run: sudo apt-get update -q && sudo apt-get install -y --no-install-recommends swtpm
+      - name: Run quality checks
+        run: scripts/quality-checks.sh
+
+  full:
+    # Fuzzing and the real-bash differential
+    needs: checks
+    if: github.event_name == 'push'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Run fuzzing and Bash differential tests
+        run: bash scripts/extended-tests.sh

@@ -1,0 +1,212 @@
+# Project and environment runners:
+# package managers, toolchain managers, dev environments and secret injectors
+# that run a command given as an argv (`uv run`, `npx`, `bundle exec`,
+# `op run --`) or as a shell command line (`npx -c`, `nix-shell --run`). The
+# command is checked like any command. An option the analyser doesn't know
+# makes the command possibly-anything (ask when a rule could match).
+#
+# Fixture and policy as in adversarial.yaml.
+
+fs:
+  - {path: home/dev/.ssh/id_rsa, file: "k"}
+  - {path: home/dev/repo/.env, file: "s"}
+  - {path: home/dev/repo/README.md, file: "r"}
+
+defaults:
+  action:
+    tool: shell
+    cwd: "{{root}}/home/dev/repo"
+    home: "{{root}}/home/dev"
+    workspaces: ["{{root}}/home/dev/repo"]
+
+policies:
+  baseline: {file: ../../examples/baseline.yaml}
+
+cases:
+  # Python
+  - {name: uv run, policy: baseline, action: {command: "uv run terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: uv run with options, policy: baseline, action: {command: "uv --quiet run --with requests --no-sync --env-file .envrc -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: uvx, policy: baseline, action: {command: "uvx --from terraform-wrapper terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: uv tool run, policy: baseline, action: {command: "uv tool run terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: poetry run, policy: baseline, action: {command: "poetry run terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: poetry run with a directory, policy: baseline, action: {command: "poetry -C sub run kubectl delete ns x"}, expect: {decision: deny, rule: "commands.deny[1]"}}
+  - {name: pipenv run, policy: baseline, action: {command: "pipenv run terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: pdm run, policy: baseline, action: {command: "pdm run terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: hatch run, policy: baseline, action: {command: "hatch run terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: conda run, policy: baseline, action: {command: "conda run -n prod --no-capture-output terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: micromamba run, policy: baseline, action: {command: "micromamba run -n prod terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: "python -m runs a module, not a command", policy: baseline, action: {command: "python -m pytest -q"}, expect: {decision: allow}}
+  # JavaScript
+  - {name: npx, policy: baseline, action: {command: "npx terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: npx with options, policy: baseline, action: {command: "npx --yes -p some-pkg terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: npx -c runs a shell command line, policy: baseline, action: {command: "npx -c 'terraform apply'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: npm exec, policy: baseline, action: {command: "npm exec -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: npm x --call, policy: baseline, action: {command: "npm x --call='terraform apply'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: npm exec shell code, policy: baseline, action: {command: "npm exec -c 'ls && pwd'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: pnpm exec, policy: baseline, action: {command: "pnpm exec terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: pnpm dlx, policy: baseline, action: {command: "pnpm dlx terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: pnpm with a filter, policy: baseline, action: {command: "pnpm --filter web exec terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: yarn exec, policy: baseline, action: {command: "yarn exec terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: yarn dlx, policy: baseline, action: {command: "yarn dlx terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: bunx, policy: baseline, action: {command: "bunx terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: bun x, policy: baseline, action: {command: "bun x terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  # Other ecosystems and environments
+  - {name: bundle exec, policy: baseline, action: {command: "bundle exec terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: direnv exec, policy: baseline, action: {command: "direnv exec . terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: mise exec, policy: baseline, action: {command: "mise exec terraform@1.9 -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: mise x, policy: baseline, action: {command: "mise x -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: asdf exec, policy: baseline, action: {command: "asdf exec terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: nix-shell --run, policy: baseline, action: {command: "nix-shell -p terraform --run 'terraform apply'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: nix develop -c, policy: baseline, action: {command: "nix develop .#ci -c terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: nix shell --command, policy: baseline, action: {command: "nix shell nixpkgs#terraform --command terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: devbox run, policy: baseline, action: {command: "devbox run terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: nix-shell without --run is a shell reading stdin, policy: baseline, action: {command: "echo 'terraform apply' | nix-shell -p terraform"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: nix develop without -c is a shell reading stdin, policy: baseline, action: {command: "nix develop <<< 'terraform apply'"}, expect: {decision: deny}}
+  - {name: poetry shell reads stdin, policy: baseline, action: {command: "echo 'terraform apply' | poetry shell"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: devbox shell reads stdin, policy: baseline, action: {command: "echo 'terraform apply' | devbox shell --pure"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  # Process supervisors, privilege droppers and platform shims
+  - {name: unbuffer, policy: baseline, action: {command: "unbuffer -p terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: caffeinate, policy: baseline, action: {command: "caffeinate -i -t 60 terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: tini, policy: baseline, action: {command: "tini -s -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: dumb-init, policy: baseline, action: {command: "dumb-init --single-child terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: gosu, policy: baseline, action: {command: "gosu root terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: "gosu with -- inside the command", policy: baseline, action: {command: "gosu root terraform apply -- x"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: su-exec, policy: baseline, action: {command: "su-exec app:app terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: chpst, policy: baseline, action: {command: "chpst -u app -m 1000000 terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: arch, policy: baseline, action: {command: "arch -x86_64 terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: arch with an environment setting, policy: baseline, action: {command: "arch -arm64 -e A=1 terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: sandbox-exec, policy: baseline, action: {command: "sandbox-exec -p '(version 1)' terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: wsl runs a command line, policy: baseline, action: {command: "wsl -d Ubuntu terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: wsl --exec, policy: baseline, action: {command: "wsl --exec terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ssh-agent runs a command, policy: baseline, action: {command: "ssh-agent terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: dbus-run-session, policy: baseline, action: {command: "dbus-run-session -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: keyctl session, policy: baseline, action: {command: "keyctl session - terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: rr record, policy: baseline, action: {command: "rr record -n terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: chronic, policy: baseline, action: {command: "chronic -e terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ifne, policy: baseline, action: {command: "echo x | ifne terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: lckdo, policy: baseline, action: {command: "lckdo /tmp/l terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: with-lock-ex, policy: baseline, action: {command: "with-lock-ex -w /tmp/l terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: sem runs through a shell, policy: baseline, action: {command: "sem -j2 terraform apply"}, expect: {decision: ask}}
+  - {name: nq, policy: baseline, action: {command: "nq -q terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: launchctl submit, policy: baseline, action: {command: "launchctl submit -l x -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: start-stop-daemon, policy: baseline, action: {command: "start-stop-daemon --start --exec /usr/bin/terraform -- apply"}, expect: {decision: ask}}
+  - {name: daemonize, policy: baseline, action: {command: "daemonize -c / -p /tmp/p /usr/bin/terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: nsjail, policy: baseline, action: {command: "nsjail -Mo --chroot / -- /usr/bin/terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: proot, policy: baseline, action: {command: "proot -r / -b /tmp -w / terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: fakeroot, policy: baseline, action: {command: "fakeroot -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: fakechroot, policy: baseline, action: {command: "fakechroot terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: setarch, policy: baseline, action: {command: "setarch x86_64 -R terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: linux32, policy: baseline, action: {command: "linux32 terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: box64, policy: baseline, action: {command: "box64 terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: run0, policy: baseline, action: {command: "run0 -u root --chdir=/ terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: sudo-rs, policy: baseline, action: {command: "sudo-rs -u root terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: please, policy: baseline, action: {command: "please -u root terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: flatpak run --command, policy: baseline, action: {command: "flatpak run --command=terraform org.x.App apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: snap run, policy: baseline, action: {command: "snap run terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: just --command, policy: baseline, action: {command: "just --command terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: newgrp starts a shell reading stdin, policy: baseline, action: {command: "echo 'terraform apply' | newgrp docker"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: just runs a recipe, policy: baseline, action: {command: "just test"}, expect: {decision: allow}}
+  - {name: flatpak run without --command, policy: baseline, action: {command: "flatpak run org.x.App --help"}, expect: {decision: allow}}
+  # File watchers
+  - {name: watchexec runs a shell command line, policy: baseline, action: {command: "watchexec -e go -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: watchexec quoted, policy: baseline, action: {command: "watchexec -r 'terraform apply'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: nodemon --exec, policy: baseline, action: {command: "nodemon --watch src --exec 'terraform apply'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: nodemon -x, policy: baseline, action: {command: "nodemon -x 'terraform apply'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  # Remote shells of other tools
+  - {name: mosh, policy: baseline, action: {command: "mosh prod -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: mosh --ssh runs a local command, policy: baseline, action: {command: "mosh --ssh='terraform apply' prod"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: gh codespace ssh, policy: baseline, action: {command: "gh codespace ssh -c my-cs -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: gh cs ssh, policy: baseline, action: {command: "gh cs ssh -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: vagrant ssh -c, policy: baseline, action: {command: "vagrant ssh -c 'terraform apply'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: lxc exec, policy: baseline, action: {command: "lxc exec c1 -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: incus exec with options, policy: baseline, action: {command: "incus exec c1 --cwd /srv --env A=1 -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: machinectl shell, policy: baseline, action: {command: "machinectl shell root@c1 /usr/bin/terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: toolbox run, policy: baseline, action: {command: "toolbox run -c dev terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: distrobox enter, policy: baseline, action: {command: "distrobox enter dev -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: gcloud compute ssh --command, policy: baseline, action: {command: "gcloud compute ssh vm1 --zone europe-west1-b --command='terraform apply'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: fly ssh console -C, policy: baseline, action: {command: "fly ssh console -a app -C 'terraform apply'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: heroku run, policy: baseline, action: {command: "heroku run -a app terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: railway run, policy: baseline, action: {command: "railway run -s api terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: gh pr list is not ssh, policy: baseline, action: {command: "gh pr list --state open"}, expect: {decision: allow}}
+  - {name: vagrant up is not ssh, policy: baseline, action: {command: "vagrant up --provider virtualbox"}, expect: {decision: allow}}
+  - {name: heroku logs is not run, policy: baseline, action: {command: "heroku logs -a app --tail"}, expect: {decision: allow}}
+  - {name: gcloud compute instances list, policy: baseline, action: {command: "gcloud compute instances list --format json"}, expect: {decision: allow}}
+  # Secret injectors
+  - {name: op run, policy: baseline, action: {command: "op run --env-file=.env.tpl -- terraform apply"}, expect: {decision: deny}}
+  - {name: doppler run, policy: baseline, action: {command: "doppler run -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: aws-vault exec, policy: baseline, action: {command: "aws-vault exec prod -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: aws-vault exec with options after the profile, policy: baseline, action: {command: "aws-vault exec prod --duration 1h -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: infisical run, policy: baseline, action: {command: "infisical run --env=prod -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: dotenvx run, policy: baseline, action: {command: "dotenvx run -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: dotenv from python-dotenv, policy: baseline, action: {command: "dotenv run -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: chamber exec, policy: baseline, action: {command: "chamber exec prod/app -- terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: sops exec-env, policy: baseline, action: {command: "sops exec-env secrets.yaml 'terraform apply'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  # Run-time words and unknown options
+  - {name: uv run with an unknown option, policy: baseline, action: {command: "uv run --new-option x terraform apply"}, expect: {decision: ask}}
+  - {name: npx with a run-time option, policy: baseline, action: {command: "npx $OPTS terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: capitals, policy: baseline, action: {command: "UV run terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  # Everyday use stays allowed
+  - {name: uv run pytest, policy: baseline, action: {command: "uv run pytest -q"}, expect: {decision: allow}}
+  - {name: poetry run pytest, policy: baseline, action: {command: "poetry run pytest -x tests/"}, expect: {decision: allow}}
+  - {name: npx prettier, policy: baseline, action: {command: "npx prettier --check src"}, expect: {decision: allow}}
+  - {name: pnpm exec tsc, policy: baseline, action: {command: "pnpm exec tsc --noEmit"}, expect: {decision: allow}}
+  - {name: bundle exec rspec, policy: baseline, action: {command: "bundle exec rspec"}, expect: {decision: allow}}
+  - {name: npm install is not exec, policy: baseline, action: {command: "npm install --save-dev prettier"}, expect: {decision: allow}}
+  - {name: uv sync is not run, policy: baseline, action: {command: "uv sync --all-extras"}, expect: {decision: allow}}
+  - {name: nix build is not a shell, policy: baseline, action: {command: "nix build .#default"}, expect: {decision: allow}}
+
+  # More interpreters and shells: inline code is inline code (denyInterpreters);
+  # a script file is not analysed, as for python
+  - {name: julia -e, policy: baseline, action: {command: "julia -e 'run(`ls`)'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: julia --eval=, policy: baseline, action: {command: "julia --threads=4 --eval='1+1'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: octave --eval, policy: baseline, action: {command: "octave --eval 'disp(1)'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: gnuplot -e, policy: baseline, action: {command: "gnuplot -e 'print 1'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: ghc -e, policy: baseline, action: {command: "ghc -e 'print 1'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: ghci reads stdin, policy: baseline, action: {command: "echo 'print 1' | ghci"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: erl -eval, policy: baseline, action: {command: "erl -noshell -eval 'io:format(x)' -s init stop"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: elixir -e, policy: baseline, action: {command: "elixir -e 'IO.puts 1'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: iex reads stdin, policy: baseline, action: {command: "echo 1 | iex"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: scala -e, policy: baseline, action: {command: "scala -e 'println(1)'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: kotlinc -e, policy: baseline, action: {command: "kotlinc -e 'println(1)'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: groovy -e, policy: baseline, action: {command: "groovy -e 'println 1'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: clj -M -e, policy: baseline, action: {command: "clj -M -e '(println 1)'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: guile -c, policy: baseline, action: {command: "guile -c '(display 1)'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: racket -e, policy: baseline, action: {command: "racket -e '(display 1)'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: sbcl --eval, policy: baseline, action: {command: "sbcl --non-interactive --eval '(print 1)'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: raku -e, policy: baseline, action: {command: "raku -e 'say 1'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: qjs -e, policy: baseline, action: {command: "qjs -e 'print(1)'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: crystal eval, policy: baseline, action: {command: "crystal eval 'puts 1'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: csi -e, policy: baseline, action: {command: "csi -e '(print 1)'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: swipl -g, policy: baseline, action: {command: "swipl -g 'writeln(1)' -t halt"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: swift -e, policy: baseline, action: {command: "swift -e 'print(1)'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: cmd.exe /c, policy: baseline, action: {command: "cmd.exe /c dir"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: cmd.exe //c (Git Bash's escape), policy: baseline, action: {command: "cmd.exe //c dir"}, expect: {decision: deny, rule: commands.denyInterpreters, reasonContains: "(cmd.exe //c)"}}
+  - {name: cmd.exe with a glued /c switch, policy: baseline, action: {command: "cmd.exe /cdir"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: rc -c, policy: baseline, action: {command: "rc -c 'terraform apply'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: elvish -c, policy: baseline, action: {command: "elvish -c 'terraform apply'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: nu -c, policy: baseline, action: {command: "nu -c 'terraform apply'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: xonsh -c, policy: baseline, action: {command: "xonsh -c 'terraform apply'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: ion -c, policy: baseline, action: {command: "ion -c 'terraform apply'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: osh -c, policy: baseline, action: {command: "osh -c 'terraform apply'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: toybox sh -c, policy: baseline, action: {command: "toybox sh -c 'terraform apply'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ed reads commands from stdin, policy: baseline, action: {command: "echo '!terraform apply' | ed"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: nano --speller runs a program, policy: baseline, action: {command: "nano --speller='terraform apply' x"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: nano -s, policy: baseline, action: {command: "nano -s 'terraform apply' x"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: rview -c, policy: baseline, action: {command: "rview -c ':!terraform apply'"}, expect: {decision: deny}}
+  - {name: dynamic loader runs a program, policy: baseline, action: {command: "/lib64/ld-linux-x86-64.so.2 /usr/bin/terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ld.so with options, policy: baseline, action: {command: "ld.so --library-path /x --argv0 tf /usr/bin/terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ansible shell module, policy: baseline, action: {command: "ansible localhost -m shell -a 'terraform apply'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: ansible default command module, policy: baseline, action: {command: "ansible all -i hosts -a 'terraform apply'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: salt-call cmd.run, policy: baseline, action: {command: "salt-call cmd.run 'terraform apply'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: puppet apply -e, policy: baseline, action: {command: "puppet apply -e 'notify{x:}'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: chef-apply -e, policy: baseline, action: {command: "chef-apply -e 'log 1'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: ssh-keygen -D loads a library, policy: baseline, action: {command: "ssh-keygen -D ./x.so"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: ssh -I loads a library, policy: baseline, action: {command: "ssh -I ./x.so prod uptime"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: ssh -o PKCS11Provider loads a library, policy: baseline, action: {command: "ssh -o PKCS11Provider=./x.so prod uptime"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: gem exec, policy: baseline, action: {command: "gem exec terraform apply"}, expect: {decision: deny, rule: "commands.deny[0]"}}
+  - {name: julia runs a script file, policy: baseline, action: {command: "julia --threads 4 test/runtests.jl"}, expect: {decision: allow}}
+  - {name: swift build is not inline code, policy: baseline, action: {command: "swift build -c release"}, expect: {decision: allow}}
+  - {name: crystal run a file, policy: baseline, action: {command: "crystal run src/main.cr"}, expect: {decision: allow}}
+  - {name: ansible ping module, policy: baseline, action: {command: "ansible all -m ping"}, expect: {decision: allow}}
+  - {name: ssh-keygen makes a key, policy: baseline, action: {command: "ssh-keygen -t ed25519 -f ./deploy -N ''"}, expect: {decision: allow}}
+  - {name: gnuplot runs a script file, policy: baseline, action: {command: "gnuplot plot.gp"}, expect: {decision: allow}}
