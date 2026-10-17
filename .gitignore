@@ -35,3 +35,6 @@ __pycache__/
 /opencode.jsonc
 /hook-state/
 /audit*.jsonl
+
+# CyberBoar policy
+.cyberboar/
