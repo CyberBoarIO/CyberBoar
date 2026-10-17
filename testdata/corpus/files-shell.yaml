@@ -167,7 +167,7 @@ cases:
   - {name: a variable set on the same line is followed, policy: secrets, action: {command: "f=README.md; sed -n 1p \"$f\""}, expect: {decision: allow}}
   - {name: a variable set on the same line reaches a denied file, policy: secrets, action: {command: "f=.env; sed -n 1p \"$f\""}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: a variable directory set on the same line reaches a denied file, policy: secrets, action: {command: "C=secrets && wc -l $C/api.key"}, expect: {decision: deny, rule: "files.deny[2]"}}
-  - {name: a variable set after a command that may fail is not followed, policy: secrets, action: {command: "make && f=README.md; cat \"$f\""}, expect: {decision: ask, reasonContains: "`\"$f\"`, a path only known at run time"}}
+  - {name: a variable set after a command that may fail is not followed, policy: secrets, action: {command: "make && f=README.md; cat \"$f\""}, expect: {decision: ask, reasonContains: "in a statement that always runs (f=path; cmd \"$f\", not after && or ||)"}}
   - {name: a variable the line may set again is not followed, policy: secrets, action: {command: "f=README.md; read f; cat \"$f\""}, expect: {decision: ask, reasonContains: "`\"$f\"`"}}
   - {name: "persistent shell: a variable an earlier command could reassign is not followed", policy: secrets, action: {command: "f=README.md; cat \"$f\"", shellPersists: true}, expect: {decision: ask, reasonContains: "`\"$f\"`"}}
   - {name: a variable path says how to make it checkable, policy: secrets, action: {command: "cat \"$F\""}, expect: {decision: ask, reasonContains: "writing the path itself"}}

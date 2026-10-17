@@ -400,8 +400,8 @@ func variableHint(shown string) string {
 		return ""
 	}
 	// The analysis follows only an assignment on the same line (shell/vars.go)
-	return "; the hook follows a variable only when the command sets it to a plain value first (f=path; cmd \"$f\"), " +
-		"so doing that or writing the path itself lets it be checked"
+	return "; the hook follows a variable only when the command first sets it to a plain value in a statement that always runs " +
+		"(f=path; cmd \"$f\", not after && or ||) and nothing else on the line could change it, so writing the path itself lets it be checked"
 }
 
 // unlisted returns the first command layer that no allow rule certainly matches
