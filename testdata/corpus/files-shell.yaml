@@ -164,6 +164,8 @@ cases:
   - {name: unknown start directory with an absolute path, policy: secrets, action: {command: "cat {{root}}/home/dev/repo/README.md", cwd: "", cwdUnknown: true}, expect: {decision: allow, rule: posture.deny-listed}}
   - {name: unknown start directory then a literal cd, policy: secrets, action: {command: "cd ~ && cat .ssh/id_rsa", cwd: "", cwdUnknown: true}, expect: {decision: deny, rule: "files.deny[1]"}}
   - {name: unknown start directory says how to make paths checkable, policy: secrets, action: {command: "cat notes.txt", cwd: "", cwdUnknown: true}, expect: {decision: ask, reasonContains: "cd /absolute/directory &&"}}
+  - {name: a variable set on the same line is shown as written, policy: secrets, action: {command: "f=README.md; sed -n 1p \"$f\""}, expect: {decision: ask, reasonContains: "`\"$f\"`, a path only known at run time"}}
+  - {name: a variable path says how to make it checkable, policy: secrets, action: {command: "cat \"$F\""}, expect: {decision: ask, reasonContains: "writing the path itself"}}
 
   # A persistent shell (shellPersists: Cursor's agent shell) keeps what earlier
   # commands set, which the hook didn't see: HOME, CDPATH, glob options and

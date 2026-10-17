@@ -5,6 +5,17 @@ and enforcement. Stable releases follow [Semantic Versioning](https://semver.org
 starting with `v1.0.0`. The v1 compatibility contract covers the policy format, CLI,
 protocol, audit schema and public Go packages under `pkg/`.
 
+## [Unreleased]
+
+### Fixed
+
+- A shell word only known at run time is named as written (`"$f"`) in
+  decisions and `explain` output instead of `…`, with a hint that writing the
+  path itself lets it be checked.
+- A command-line word longer than a file name can be, such as a long `sed`
+  script, is checked as a missing path instead of being denied as unresolvable.
+- Draft releases take their notes from this changelog again.
+
 ## [v1.0.0-rc.1] - 2026-10-16
 
 First public release candidate for CyberBoar 1.0. The package includes the CLI,

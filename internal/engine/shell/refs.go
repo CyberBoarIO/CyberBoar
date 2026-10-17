@@ -412,7 +412,7 @@ func (a *analyzer) wordRefs(e Elem, d dir, glob globOpts, printing bool, add fun
 		add(FileRef{Display: e.Text, Rel: e.Text[2:], Shape: e.Shape})
 	default:
 		if !printing {
-			add(FileRef{Display: e.String(), Shape: e.Shape})
+			add(FileRef{Display: e.Shown(), Shape: e.Shape})
 		}
 	}
 }
@@ -487,7 +487,7 @@ func (a *analyzer) redirectRefs(st *syntax.Stmt, d dir) []FileRef {
 				ref.Accessed = true
 				refs = append(refs, ref)
 			} else {
-				refs = append(refs, FileRef{Display: e.String(), Accessed: true, Shape: e.Shape})
+				refs = append(refs, FileRef{Display: e.Shown(), Accessed: true, Shape: e.Shape})
 			}
 		}
 	}

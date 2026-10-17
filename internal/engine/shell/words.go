@@ -6,6 +6,7 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/syntax"
@@ -38,6 +39,8 @@ type Elem struct {
 	// /proc/$PPID/environ). The built-in rules check it, since its literal
 	// parts can pin it under /proc or /dev
 	Shape string
+	// Src is a run-time value's word as written ("$f"), for messages
+	Src string
 }
 
 // String returns the element as written in messages: a literal or glob
@@ -47,6 +50,35 @@ func (e Elem) String() string {
 		return e.Text // a literal, or a glob shape like *.go
 	}
 	return "…"
+}
+
+// Shown returns the element as written in messages, as String does, but
+// shows a value only known at run time as its word ("$f") where known
+func (e Elem) Shown() string {
+	if s := e.String(); s != "…" || e.Src == "" {
+		return s
+	}
+	return e.Src
+}
+
+// maxSrc bounds Elem.Src, so a long word doesn't flood a message
+const maxSrc = 80
+
+// wordSrc returns w as written, cut to maxSrc bytes
+func wordSrc(w *syntax.Word) string {
+	var b strings.Builder
+	if err := syntax.NewPrinter().Print(&b, w); err != nil {
+		return ""
+	}
+	s := b.String()
+	if len(s) > maxSrc {
+		cut := maxSrc
+		for cut > 0 && !utf8.RuneStart(s[cut]) {
+			cut--
+		}
+		s = s[:cut] + "…"
+	}
+	return s
 }
 
 // classify reports what a word expands to, without expanding it
@@ -139,18 +171,18 @@ func hasUnescapedMeta(s string) bool {
 func (a *analyzer) word(w *syntax.Word) []Elem {
 	switch a.classify(w) {
 	case One:
-		return []Elem{{Kind: One, Text: a.tildeShape(w), Shape: a.shape(w)}}
+		return []Elem{{Kind: One, Text: a.tildeShape(w), Shape: a.shape(w), Src: wordSrc(w)}}
 	case Many:
 		if !a.hasDynamicPart(w) {
 			if f, err := a.fields(w); err == nil && len(f) == 1 {
 				return []Elem{{Kind: Many, Text: f[0], Glob: true}} // a glob: its words all match the glob itself
 			}
 		}
-		return []Elem{{Kind: Many, Text: "*", Shape: a.shape(w)}}
+		return []Elem{{Kind: Many, Text: "*", Shape: a.shape(w), Src: wordSrc(w)}}
 	}
 	f, err := a.fields(w)
 	if err != nil {
-		return []Elem{{Kind: Many, Text: "*"}}
+		return []Elem{{Kind: Many, Text: "*", Src: wordSrc(w)}}
 	}
 	out := make([]Elem, len(f))
 	for i, v := range f {

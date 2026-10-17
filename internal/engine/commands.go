@@ -183,7 +183,7 @@ func matchRule(r cmdRule, an *shell.Analysis) (level, []shell.Elem) {
 func render(argv []shell.Elem) string {
 	parts := make([]string, len(argv))
 	for i, e := range argv {
-		parts[i] = e.String()
+		parts[i] = e.Shown()
 	}
 	return strings.Join(parts, " ")
 }
@@ -369,7 +369,7 @@ func possibleFile(b *boundRules, ref shell.FileRef) (Verdict, bool) {
 		return Verdict{}, false
 	}
 	switch {
-	case strings.HasPrefix(ref.Display, "*/"):
+	case ref.Rel != "" && strings.HasPrefix(ref.Display, "*/"):
 		// A tail under a directory only known at run time, such as ~ when HOME may have changed
 		return Verdict{Decision: Ask, Rule: rule, Reason: fmt.Sprintf("the command might access `…/%s`, a path in a directory only known at run time "+
 			"that could be any file, including files the policy protects (rule %s among them), so it needs confirmation", ref.Rel, rule)}, true
@@ -379,11 +379,16 @@ func possibleFile(b *boundRules, ref shell.FileRef) (Verdict, bool) {
 			"starting the command with `cd /absolute/directory &&` lets its paths be checked", ref.Display, rule)}, true
 	}
 	shown := ref.Display
-	if ref.Shape != "" {
+	if ref.Shape != "" && shown == "…" {
 		shown = shapeDisplay(ref.Shape)
 	}
+	hint := ""
+	if strings.Contains(shown, "$") {
+		// The analysis doesn't follow variables, not even one set earlier on the same line
+		hint = "; the hook doesn't follow shell variables, so writing the path itself lets it be checked"
+	}
 	return Verdict{Decision: Ask, Rule: rule, Reason: fmt.Sprintf("the command might access `%s`, a path only known at run time that could be any file, "+
-		"including files the policy protects (rule %s among them), so it needs confirmation", shown, rule)}, true
+		"including files the policy protects (rule %s among them), so it needs confirmation%s", shown, rule, hint)}, true
 }
 
 // unlisted returns the first command layer that no allow rule certainly matches
