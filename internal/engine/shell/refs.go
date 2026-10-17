@@ -47,6 +47,8 @@ type FileRef struct {
 	// Shape is the run-time word's Elem.Shape when Certain is false, so the
 	// built-in rules can check what its literal parts pin it to
 	Shape string
+	// Src is the word as written ("$C/x") when Display is its shape ("*/x"), for messages
+	Src string
 }
 
 // maxGlobMatches bounds glob expansion; beyond it the word counts as any path.
@@ -409,7 +411,7 @@ func (a *analyzer) wordRefs(e Elem, d dir, glob globOpts, printing bool, add fun
 	case e.Text == "{}": // find -exec placeholder: paths under find's own arguments
 	case e.Kind == One && strings.HasPrefix(e.Text, "*/"):
 		// A directory only known at run time plus a literal tail (~-/x).
-		add(FileRef{Display: e.Text, Rel: e.Text[2:], Shape: e.Shape})
+		add(FileRef{Display: e.Text, Rel: e.Text[2:], Shape: e.Shape, Src: e.Src})
 	default:
 		if !printing {
 			add(FileRef{Display: e.Shown(), Shape: e.Shape})

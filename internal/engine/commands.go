@@ -248,7 +248,11 @@ func (c *Compiled) evalShell(a Action) Verdict {
 				asks = append(asks, v)
 			}
 			if b.allowListed && ref.Accessed && notAllowed == nil {
-				v := deny(RulePostureAllowListed, fmt.Sprintf("the command may access `%s`, a path only known at run time, which the allow list can't cover; do not attempt alternative ways to perform it", ref.Display))
+				shown := ref.Display
+				if ref.Src != "" {
+					shown = ref.Src
+				}
+				v := deny(RulePostureAllowListed, fmt.Sprintf("the command may access `%s`, a path only known at run time, which the allow list can't cover; do not attempt alternative ways to perform it", shown))
 				notAllowed = &v
 			}
 			continue
@@ -371,8 +375,12 @@ func possibleFile(b *boundRules, ref shell.FileRef) (Verdict, bool) {
 	switch {
 	case ref.Rel != "" && strings.HasPrefix(ref.Display, "*/"):
 		// A tail under a directory only known at run time, such as ~ when HOME may have changed
-		return Verdict{Decision: Ask, Rule: rule, Reason: fmt.Sprintf("the command might access `…/%s`, a path in a directory only known at run time "+
-			"that could be any file, including files the policy protects (rule %s among them), so it needs confirmation", ref.Rel, rule)}, true
+		shown := "…/" + ref.Rel
+		if ref.Src != "" {
+			shown = ref.Src
+		}
+		return Verdict{Decision: Ask, Rule: rule, Reason: fmt.Sprintf("the command might access `%s`, a path in a directory only known at run time "+
+			"that could be any file, including files the policy protects (rule %s among them), so it needs confirmation%s", shown, rule, variableHint(shown))}, true
 	case ref.Rel != "":
 		return Verdict{Decision: Ask, Rule: rule, Reason: fmt.Sprintf("the command might access `%s` relative to a working directory the hook isn't told, "+
 			"so it could be any file, including files the policy protects (rule %s among them), so it needs confirmation; "+
@@ -382,13 +390,17 @@ func possibleFile(b *boundRules, ref shell.FileRef) (Verdict, bool) {
 	if ref.Shape != "" && shown == "…" {
 		shown = shapeDisplay(ref.Shape)
 	}
-	hint := ""
-	if strings.Contains(shown, "$") {
-		// The analysis doesn't follow variables, not even one set earlier on the same line
-		hint = "; the hook doesn't follow shell variables, so writing the path itself lets it be checked"
-	}
 	return Verdict{Decision: Ask, Rule: rule, Reason: fmt.Sprintf("the command might access `%s`, a path only known at run time that could be any file, "+
-		"including files the policy protects (rule %s among them), so it needs confirmation%s", shown, rule, hint)}, true
+		"including files the policy protects (rule %s among them), so it needs confirmation%s", shown, rule, variableHint(shown))}, true
+}
+
+// variableHint is the end of a reason about a word shown as written
+func variableHint(shown string) string {
+	if !strings.Contains(shown, "$") {
+		return ""
+	}
+	// The analysis doesn't follow variables, not even one set earlier on the same line
+	return "; the hook doesn't follow shell variables, so writing the path itself lets it be checked"
 }
 
 // unlisted returns the first command layer that no allow rule certainly matches

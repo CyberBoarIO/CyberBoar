@@ -166,11 +166,13 @@ cases:
   - {name: unknown start directory says how to make paths checkable, policy: secrets, action: {command: "cat notes.txt", cwd: "", cwdUnknown: true}, expect: {decision: ask, reasonContains: "cd /absolute/directory &&"}}
   - {name: a variable set on the same line is shown as written, policy: secrets, action: {command: "f=README.md; sed -n 1p \"$f\""}, expect: {decision: ask, reasonContains: "`\"$f\"`, a path only known at run time"}}
   - {name: a variable path says how to make it checkable, policy: secrets, action: {command: "cat \"$F\""}, expect: {decision: ask, reasonContains: "writing the path itself"}}
+  - {name: a variable directory is shown as written, policy: secrets, action: {command: "C=/x; wc -l $C/notes.txt"}, expect: {decision: ask, reasonContains: "`$C/notes.txt`, a path only known at run time"}}
+  - {name: a variable directory says how to make it checkable, policy: secrets, action: {command: "wc -l \"$C/notes.txt\""}, expect: {decision: ask, reasonContains: "writing the path itself"}}
 
   # A persistent shell (shellPersists: Cursor's agent shell) keeps what earlier
   # commands set, which the hook didn't see: HOME, CDPATH, glob options and
   # aliases may all have changed
-  - {name: "persistent shell: ~ may name another directory", policy: persistent, action: {command: "cat ~/id_rsa", shellPersists: true}, expect: {decision: ask, rule: "files.deny[0]", reasonContains: "…/id_rsa"}}
+  - {name: "persistent shell: ~ may name another directory", policy: persistent, action: {command: "cat ~/id_rsa", shellPersists: true}, expect: {decision: ask, rule: "files.deny[0]", reasonContains: "`~/id_rsa`, a path in a directory only known at run time"}}
   - {name: "fresh shell: ~ is the home directory", policy: persistent, action: {command: "cat ~/id_rsa"}, expect: {decision: allow, rule: posture.deny-listed}}
   - {name: "persistent shell: dotglob may be on", policy: persistent, action: {command: "ls {{root}}/home/dev/repo/config/*", shellPersists: true}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: "fresh shell: * skips dotfiles", policy: persistent, action: {command: "ls {{root}}/home/dev/repo/config/*"}, expect: {decision: allow, rule: posture.deny-listed}}
