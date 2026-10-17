@@ -114,7 +114,7 @@ func (a *analyzer) classify(w *syntax.Word) Kind {
 				case *syntax.Lit:
 				case *syntax.ParamExp:
 					switch {
-					case a.knownParam(ip):
+					case a.knownParam(ip, true):
 					case ip.Param != nil && (ip.Param.Value == "@" || ip.Index != nil),
 						ip.Excl && ip.Names != syntax.NamesPrefix:
 						// "$@", "${a[@]}" and "${!prefix@}" expand to any number
@@ -128,7 +128,7 @@ func (a *analyzer) classify(w *syntax.Word) Kind {
 				}
 			}
 		case *syntax.ParamExp:
-			if !a.knownParam(p) {
+			if !a.knownParam(p, false) {
 				raise(Many) // unquoted: field splitting and globbing
 			}
 		case *syntax.ProcSubst:
@@ -143,12 +143,20 @@ func (a *analyzer) classify(w *syntax.Word) Kind {
 	return kind
 }
 
-// knownParam reports a plain $HOME or ${HOME}: the only variable whose value
-// the engine knows (the action's home directory)
-func (a *analyzer) knownParam(p *syntax.ParamExp) bool {
-	return !a.homeUnsure && p.Param != nil && p.Param.Value == "HOME" && !p.Excl && !p.Length && !p.Width &&
-		!p.IsSet && p.Flags == nil && p.NestedParam == nil && p.Index == nil &&
-		len(p.Modifiers) == 0 && p.Slice == nil && p.Repl == nil && p.Names == 0 && p.Exp == nil
+// knownParam reports a plain $NAME or ${NAME} whose value the engine knows:
+// HOME (the action's home directory), or a variable the line set itself
+// (vars.go). Unquoted, the value must also come through field splitting and
+// globbing as it is
+func (a *analyzer) knownParam(p *syntax.ParamExp, quoted bool) bool {
+	if p.Param == nil || p.Excl || p.Length || p.Width || p.IsSet || p.Flags != nil || p.NestedParam != nil ||
+		p.Index != nil || len(p.Modifiers) > 0 || p.Slice != nil || p.Repl != nil || p.Names != 0 || p.Exp != nil {
+		return false
+	}
+	if p.Param.Value == "HOME" {
+		return !a.homeUnsure
+	}
+	v, ok := a.vars[p.Param.Value]
+	return ok && (quoted || !a.varsQuotedOnly && splitSafe(v))
 }
 
 func hasUnescapedMeta(s string) bool {
@@ -404,14 +412,14 @@ func (a *analyzer) shape(w *syntax.Word) string {
 		case *syntax.DblQuoted:
 			for _, in := range p.Parts {
 				pe, isParam := in.(*syntax.ParamExp)
-				if _, isLit := in.(*syntax.Lit); isLit || isParam && a.knownParam(pe) {
+				if _, isLit := in.(*syntax.Lit); isLit || isParam && a.knownParam(pe, true) {
 					lit = append(lit, &syntax.DblQuoted{Parts: []syntax.WordPart{in}})
 				} else if !dynamic() {
 					return ""
 				}
 			}
 		case *syntax.ParamExp:
-			if a.knownParam(p) {
+			if a.knownParam(p, false) {
 				lit = append(lit, p)
 			} else if !dynamic() {
 				return ""

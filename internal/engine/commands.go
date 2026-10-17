@@ -399,8 +399,9 @@ func variableHint(shown string) string {
 	if !strings.Contains(shown, "$") {
 		return ""
 	}
-	// The analysis doesn't follow variables, not even one set earlier on the same line
-	return "; the hook doesn't follow shell variables, so writing the path itself lets it be checked"
+	// The analysis follows only an assignment on the same line (shell/vars.go)
+	return "; the hook follows a variable only when the command sets it to a plain value first (f=path; cmd \"$f\"), " +
+		"so doing that or writing the path itself lets it be checked"
 }
 
 // unlisted returns the first command layer that no allow rule certainly matches

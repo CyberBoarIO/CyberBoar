@@ -95,10 +95,15 @@ type analyzer struct {
 	expanding map[string]bool
 	// persistent: later commands run in the same shell (Options.Persistent)
 	persistent bool
-	cmds       []Command
-	code       []Code
-	files      []FileRef
-	edges      []commandSet
+	// The variables the line set itself (vars.go): those in each statement
+	// of the current script and those known in the statement being analyzed
+	vars           map[string]string
+	varsAt         map[*syntax.Stmt]map[string]string
+	varsQuotedOnly bool
+	cmds           []Command
+	code           []Code
+	files          []FileRef
+	edges          []commandSet
 	// Code run by a shell or wrapper inherits its stdin and stdout, so
 	// whatever feeds the outer command feeds the inner ones, and vice versa
 	transparent []transparent
@@ -156,7 +161,6 @@ func analyze(src, home string, start dir, cdPath, persistent bool, fsys osfs.FS,
 	var aliases map[string]bool
 	for {
 		a := &analyzer{
-			expandCfg:   &expand.Config{Env: expand.ListEnviron("HOME=" + home)},
 			home:        home,
 			fs:          fsys,
 			windows:     fsys.Windows,
@@ -171,6 +175,7 @@ func analyze(src, home string, start dir, cdPath, persistent bool, fsys osfs.FS,
 			sawAliases:  maps.Clone(aliases),
 			persistent:  persistent,
 		}
+		a.expandCfg = &expand.Config{Env: varsEnviron{a: a, base: expand.ListEnviron("HOME=" + home)}}
 		if _, err := a.script(src, 0, start); err != nil {
 			return nil, err
 		}
@@ -194,6 +199,12 @@ func (a *analyzer) script(src string, depth int, start dir) ([]int, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrUnparseable, err)
 	}
+	// Each script knows only its own variables
+	saved, savedAt, savedQuoted := a.vars, a.varsAt, a.varsQuotedOnly
+	defer func() { a.vars, a.varsAt, a.varsQuotedOnly = saved, savedAt, savedQuoted }()
+	a.vars = nil
+	lv := a.knownVars(f)
+	a.varsAt, a.varsQuotedOnly = lv.at, lv.quotedOnly
 	pass := a.newCwdPass(f)
 	pass.list(f.Stmts, start)
 	ids := map[*syntax.Stmt]int{}
@@ -206,6 +217,7 @@ func (a *analyzer) script(src string, depth int, start dir) ([]int, error) {
 		if !ok {
 			return true
 		}
+		a.vars = a.varsAt[st]
 		d := pass.of[st] // unknown if the pass didn't reach it
 		a.files = append(a.files, a.redirectRefs(st, d)...)
 		switch c := st.Cmd.(type) {
