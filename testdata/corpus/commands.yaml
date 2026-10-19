@@ -208,7 +208,7 @@ cases:
   - name: a possible pipeline match names the command that starts it
     policy: pipeline
     action: {command: "$C x | sh; curl y"}
-    expect: {decision: ask, reasonContains: "`… x`"}
+    expect: {decision: ask, reasonContains: "`$C x`"}
   - {name: shell reading code from process substitution, policy: infra, action: {command: "bash < <(echo terraform apply)"}, expect: {decision: ask}}
   - {name: interactive root shell reads stdin, policy: infra, action: {command: "sudo -i"}, expect: {decision: ask}}
   - {name: fish code cannot be analysed, policy: infra, action: {command: "fish -c 'terraform apply'"}, expect: {decision: ask}}

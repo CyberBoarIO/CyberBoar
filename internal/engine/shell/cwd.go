@@ -106,6 +106,7 @@ func (p *cwdPass) list(stmts []*syntax.Stmt, d dir) outcome {
 // stmt records d for st and everything nested in it
 func (p *cwdPass) stmt(st *syntax.Stmt, d dir) outcome {
 	p.of[st] = d
+	p.a.vars = p.a.varsAt[st]
 	for _, r := range st.Redirs {
 		p.nested(r, d)
 	}
@@ -118,6 +119,7 @@ func (p *cwdPass) stmt(st *syntax.Stmt, d dir) outcome {
 		for _, w := range c.Args {
 			p.nested(w, d)
 		}
+		p.a.vars = p.a.varsAt[st] // a nested statement may have set its own
 		o = p.call(c, d)
 	case *syntax.Subshell:
 		p.list(c.Stmts, d)

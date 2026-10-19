@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"time"
@@ -39,8 +40,27 @@ import (
 	"cyberboar.dev/cyberboar/pkg/brand"
 )
 
-// version is set at build time with -ldflags "-X main.version=VERSION"
+// version is set at build time with -ldflags "-X main.version=VERSION";
+// without it, init falls back to the module version Go records in the binary
 var version = "dev"
+
+func init() {
+	info, ok := debug.ReadBuildInfo()
+	version = buildVersion(version, info, ok)
+}
+
+// buildVersion is v, or when v is the unset "dev", the main module's version
+// from info: what `go install module@version` and a build in a VCS checkout
+// record. A build with no module version, such as a test binary's, stays "dev"
+func buildVersion(v string, info *debug.BuildInfo, ok bool) string {
+	if v != "dev" || !ok || info == nil {
+		return v
+	}
+	if m := info.Main.Version; m != "" && m != "(devel)" {
+		return m
+	}
+	return v
+}
 
 // host is what the commands read from the machine they run on
 type host struct {

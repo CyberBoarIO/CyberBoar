@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"path"
 	"strings"
+	"syscall"
 
 	"cyberboar.dev/cyberboar/internal/engine/osfs"
 	"cyberboar.dev/cyberboar/internal/fold"
@@ -30,6 +31,19 @@ func absPath(p, cwd, home string) (string, error) {
 	default:
 		return cwd + "/" + p, nil
 	}
+}
+
+// shortPathMax is the smallest PATH_MAX of the systems the hook runs on (macOS)
+const shortPathMax = 1024
+
+// nameTooLong reports whether looking up p failed because its last
+// component is longer than its filesystem allows, so no file has that
+// name: a word such as a long sed script, which every command line word is
+// checked as. The path as a whole must be short, since a path over
+// PATH_MAX also fails this way, but a program can still reach the file by
+// a relative path from a directory along it
+func nameTooLong(p string, err error) bool {
+	return errors.Is(err, syscall.ENAMETOOLONG) && len(p) < shortPathMax
 }
 
 // resolvePath returns the path the kernel would reach for abs. It walks the
@@ -81,7 +95,7 @@ func resolveLinks(fsys osfs.FS, abs string) (dest string, hops []string, err err
 			return path.Join(append([]string{next}, pending...)...), hops, nil
 		}
 		fi, err := fsys.Lstat(next)
-		if errors.Is(err, fs.ErrNotExist) {
+		if errors.Is(err, fs.ErrNotExist) || nameTooLong(next, err) {
 			return path.Join(append([]string{next}, pending...)...), hops, nil
 		}
 		if err != nil {

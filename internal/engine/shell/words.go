@@ -6,6 +6,7 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"mvdan.cc/sh/v3/expand"
 	"mvdan.cc/sh/v3/syntax"
@@ -38,6 +39,8 @@ type Elem struct {
 	// /proc/$PPID/environ). The built-in rules check it, since its literal
 	// parts can pin it under /proc or /dev
 	Shape string
+	// Src is a run-time value's word as written ("$f"), for messages
+	Src string
 }
 
 // String returns the element as written in messages: a literal or glob
@@ -47,6 +50,35 @@ func (e Elem) String() string {
 		return e.Text // a literal, or a glob shape like *.go
 	}
 	return "…"
+}
+
+// Shown returns the element as written in messages, as String does, but
+// shows a value only known at run time as its word ("$f") where known
+func (e Elem) Shown() string {
+	if s := e.String(); s != "…" || e.Src == "" {
+		return s
+	}
+	return e.Src
+}
+
+// maxSrc bounds Elem.Src, so a long word doesn't flood a message
+const maxSrc = 80
+
+// wordSrc returns w as written, cut to maxSrc bytes
+func wordSrc(w *syntax.Word) string {
+	var b strings.Builder
+	if err := syntax.NewPrinter().Print(&b, w); err != nil {
+		return ""
+	}
+	s := b.String()
+	if len(s) > maxSrc {
+		cut := maxSrc
+		for cut > 0 && !utf8.RuneStart(s[cut]) {
+			cut--
+		}
+		s = s[:cut] + "…"
+	}
+	return s
 }
 
 // classify reports what a word expands to, without expanding it
@@ -82,7 +114,7 @@ func (a *analyzer) classify(w *syntax.Word) Kind {
 				case *syntax.Lit:
 				case *syntax.ParamExp:
 					switch {
-					case a.knownParam(ip):
+					case a.knownParam(ip, true):
 					case ip.Param != nil && (ip.Param.Value == "@" || ip.Index != nil),
 						ip.Excl && ip.Names != syntax.NamesPrefix:
 						// "$@", "${a[@]}" and "${!prefix@}" expand to any number
@@ -96,7 +128,7 @@ func (a *analyzer) classify(w *syntax.Word) Kind {
 				}
 			}
 		case *syntax.ParamExp:
-			if !a.knownParam(p) {
+			if !a.knownParam(p, false) {
 				raise(Many) // unquoted: field splitting and globbing
 			}
 		case *syntax.ProcSubst:
@@ -105,18 +137,26 @@ func (a *analyzer) classify(w *syntax.Word) Kind {
 			raise(Many)
 		}
 	}
-	if glob {
-		raise(Many)
+	if glob || zshGlobSubst(w.Parts) {
+		raise(Many) // zsh's $~NAME and $=NAME expand the value of NAME as a glob or a path
 	}
 	return kind
 }
 
-// knownParam reports a plain $HOME or ${HOME}: the only variable whose value
-// the engine knows (the action's home directory)
-func (a *analyzer) knownParam(p *syntax.ParamExp) bool {
-	return !a.homeUnsure && p.Param != nil && p.Param.Value == "HOME" && !p.Excl && !p.Length && !p.Width &&
-		!p.IsSet && p.Flags == nil && p.NestedParam == nil && p.Index == nil &&
-		len(p.Modifiers) == 0 && p.Slice == nil && p.Repl == nil && p.Names == 0 && p.Exp == nil
+// knownParam reports a plain $NAME or ${NAME} whose value the engine knows:
+// HOME (the action's home directory), or a variable the line set itself
+// (vars.go). Unquoted, the value must also come through field splitting and
+// globbing as it is
+func (a *analyzer) knownParam(p *syntax.ParamExp, quoted bool) bool {
+	if p.Param == nil || p.Excl || p.Length || p.Width || p.IsSet || p.Flags != nil || p.NestedParam != nil ||
+		p.Index != nil || len(p.Modifiers) > 0 || p.Slice != nil || p.Repl != nil || p.Names != 0 || p.Exp != nil {
+		return false
+	}
+	if p.Param.Value == "HOME" {
+		return !a.homeUnsure
+	}
+	v, ok := a.vars[p.Param.Value]
+	return ok && (quoted || splitSafe(v))
 }
 
 func hasUnescapedMeta(s string) bool {
@@ -139,18 +179,18 @@ func hasUnescapedMeta(s string) bool {
 func (a *analyzer) word(w *syntax.Word) []Elem {
 	switch a.classify(w) {
 	case One:
-		return []Elem{{Kind: One, Text: a.tildeShape(w), Shape: a.shape(w)}}
+		return []Elem{{Kind: One, Text: a.tildeShape(w), Shape: a.shape(w), Src: wordSrc(w)}}
 	case Many:
 		if !a.hasDynamicPart(w) {
 			if f, err := a.fields(w); err == nil && len(f) == 1 {
 				return []Elem{{Kind: Many, Text: f[0], Glob: true}} // a glob: its words all match the glob itself
 			}
 		}
-		return []Elem{{Kind: Many, Text: "*", Shape: a.shape(w)}}
+		return []Elem{{Kind: Many, Text: "*", Shape: a.shape(w), Src: wordSrc(w)}}
 	}
 	f, err := a.fields(w)
 	if err != nil {
-		return []Elem{{Kind: Many, Text: "*"}}
+		return []Elem{{Kind: Many, Text: "*", Src: wordSrc(w)}}
 	}
 	out := make([]Elem, len(f))
 	for i, v := range f {
@@ -160,6 +200,9 @@ func (a *analyzer) word(w *syntax.Word) []Elem {
 }
 
 func (a *analyzer) hasDynamicPart(w *syntax.Word) bool {
+	if zshGlobSubst(w.Parts) {
+		return true // $~NAME is a value, not the text written
+	}
 	for i, part := range w.Parts {
 		switch p := part.(type) {
 		case *syntax.SglQuoted:
@@ -372,14 +415,14 @@ func (a *analyzer) shape(w *syntax.Word) string {
 		case *syntax.DblQuoted:
 			for _, in := range p.Parts {
 				pe, isParam := in.(*syntax.ParamExp)
-				if _, isLit := in.(*syntax.Lit); isLit || isParam && a.knownParam(pe) {
+				if _, isLit := in.(*syntax.Lit); isLit || isParam && a.knownParam(pe, true) {
 					lit = append(lit, &syntax.DblQuoted{Parts: []syntax.WordPart{in}})
 				} else if !dynamic() {
 					return ""
 				}
 			}
 		case *syntax.ParamExp:
-			if a.knownParam(p) {
+			if a.knownParam(p, false) {
 				lit = append(lit, p)
 			} else if !dynamic() {
 				return ""

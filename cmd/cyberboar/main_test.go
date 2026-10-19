@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -382,6 +383,31 @@ func TestHookUnwritableAnswerDenies(t *testing.T) {
 		}
 		if code := run(tc.args, strings.NewReader(tc.stdin), brokenWriter{}, &errb, env); code != 2 || !strings.Contains(errb.String(), "can't write its answer") {
 			t.Errorf("%s: exit %d stderr %q, want 2", tc.name, code, errb.String())
+		}
+	}
+}
+
+// A version from -ldflags wins; without one, the module version Go recorded
+// stands in for "dev" unless there is none
+func TestBuildVersion(t *testing.T) {
+	mod := func(v string) *debug.BuildInfo {
+		return &debug.BuildInfo{Main: debug.Module{Path: "cyberboar.dev/cyberboar", Version: v}}
+	}
+	for _, c := range []struct {
+		v    string
+		info *debug.BuildInfo
+		ok   bool
+		want string
+	}{
+		{"1.0.0", mod("v1.0.0-rc.1"), true, "1.0.0"},
+		{"dev", mod("v1.0.0-rc.1"), true, "v1.0.0-rc.1"},
+		{"dev", mod("v1.0.0-rc.1.0.20261017113155-6b7a4d9d9640+dirty"), true, "v1.0.0-rc.1.0.20261017113155-6b7a4d9d9640+dirty"},
+		{"dev", mod("(devel)"), true, "dev"},
+		{"dev", mod(""), true, "dev"},
+		{"dev", nil, false, "dev"},
+	} {
+		if got := buildVersion(c.v, c.info, c.ok); got != c.want {
+			t.Errorf("buildVersion(%q, %+v) = %q, want %q", c.v, c.info, got, c.want)
 		}
 	}
 }
