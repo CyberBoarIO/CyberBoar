@@ -25,6 +25,7 @@ func TestLiteralsWords(t *testing.T) {
 		`A=gh; A+=p_x; echo $A`:                    {"gh", "p_x", "echo", "ghp_x"},
 		`echo $'\x67h\160_x' $'\u0067'`:            {"echo", "ghp_x", "g"},
 		`printf '\x67\150p_x' 'a\0147'`:            {"printf", `\x67\150p_x`, "ghp_x", `g\150p_x`, "x67150p_x", `a\0147`, "a\f7", "ag", "a0147"},
+		`echo $'\501' $'\U110000x\UFFFFFFFFy'`:     {"echo", "A", "xy"}, // the low byte; past MaxRune is dropped
 		`echo ${A:-x} ${#A} ${A/a/b}`:              {"echo", "x", "a", "b"},
 	} {
 		got, _, err := Literals(src)

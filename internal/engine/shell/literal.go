@@ -3,6 +3,7 @@ package shell
 import (
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"mvdan.cc/sh/v3/syntax"
@@ -284,11 +285,11 @@ func cEscapes(s string, echo bool) string {
 				b.WriteByte(c)
 				continue
 			}
-			v, _ := strconv.ParseUint(s[i+1:j], 16, 32)
 			if c == 'x' {
-				b.WriteByte(byte(v)) // #nosec G115 -- at most 2 hex digits
-			} else if r := rune(v); utf8.ValidRune(r) { // #nosec G115 -- at most 8 hex digits
-				b.WriteRune(r)
+				v, _ := strconv.ParseUint(s[i+1:j], 16, 8) // at most 2 hex digits
+				b.WriteByte(byte(v))
+			} else if v, _ := strconv.ParseUint(s[i+1:j], 16, 32); v <= unicode.MaxRune && utf8.ValidRune(rune(v)) {
+				b.WriteRune(rune(v))
 			}
 			i = j - 1
 		default:
@@ -307,11 +308,12 @@ func cEscapes(s string, echo bool) string {
 				start = i + 1
 			}
 			j := start
+			var v byte // bash keeps the low byte
 			for j < len(s) && j-start < n && s[j] >= '0' && s[j] <= '7' {
+				v = v<<3 | (s[j] - '0')
 				j++
 			}
-			v, _ := strconv.ParseUint("0"+s[start:j], 8, 16)
-			b.WriteByte(byte(v)) // #nosec G115 -- bash keeps the low byte
+			b.WriteByte(v)
 			i = j - 1
 		}
 	}
