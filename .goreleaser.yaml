@@ -70,9 +70,6 @@ signs:
     args: ["sign-blob", "--bundle=${signature}", "--yes", "${artifact}"]
     artifacts: checksum
 
-changelog:
-  disable: true
-
 release:
   draft: true
   prerelease: auto

@@ -819,7 +819,8 @@ output, exit `0`. Verification failure does not replace the installed policy.
 
 ### `version`
 
-A source build without a release version reports `dev`:
+A build with no version recorded, such as one from a source tree outside version
+control, reports `dev`:
 
 ```sh
 cyberboar version
@@ -831,5 +832,8 @@ Stdout (exit `0`):
 cyberboar dev (policy cyberboar.dev/v1)
 ```
 
-A release binary prints its installed version in place of `dev`. `--version` produces
-the same response.
+A release binary prints its installed version in place of `dev`. Without one, the
+binary prints the module version Go recorded when it was built: the tag for
+`go install cyberboar.dev/cyberboar/cmd/cyberboar@VERSION`, or a pseudo-version such as
+`v1.0.0-rc.1.0.20261017113155-6b7a4d9d9640` for a build in a git checkout.
+`--version` produces the same response.

@@ -564,6 +564,9 @@ func wrapAlias(a *analyzer, name string, args []Elem) unwrapped {
 
 // wrapShell handles POSIX-style shells: -c CODE, a script file, or stdin.
 func wrapShell(a *analyzer, name string, args []Elem) unwrapped {
+	if informational(args) {
+		return unwrapped{} // prints and exits before it reads any code
+	}
 	p := parseOpts(args, optSpec{short: "oO", plus: true, long: set("rcfile", "init-file")})
 	for _, o := range p.values("O") {
 		a.shoptOption(o) // bash -O dotglob
@@ -580,6 +583,23 @@ func wrapShell(a *analyzer, name string, args []Elem) unwrapped {
 		// A script file: its contents are not analyzed.
 		return unwrapped{unknown: p.ambiguous}
 	}
+}
+
+// informational reports whether a shell's arguments are --version or --help
+// before any option that gives it code, a script or stdin to run. The shell
+// prints and exits at those, so no code runs
+func informational(args []Elem) bool {
+	for _, e := range args {
+		switch {
+		case e.Kind != Lit:
+			return false
+		case e.Text == "--version" || e.Text == "--help":
+			return true
+		case e.Text == "-" || e.Text == "--" || !strings.HasPrefix(e.Text, "-") || strings.HasPrefix(e.Text, "--") || strings.Contains(e.Text, "c"):
+			return false
+		}
+	}
+	return false
 }
 
 // wrapFish is the wrapper for fish and other non-POSIX shells: fish syntax isn't POSIX, so its code

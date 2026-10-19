@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 
 	"cyberboar.dev/cyberboar/internal/engine/osfs"
@@ -405,5 +406,32 @@ func TestContainingAskDeniesIncompleteWalk(t *testing.T) {
 				t.Errorf("complete check of a protected file: got %s by %s", v.Decision, v.Rule)
 			}
 		})
+	}
+}
+
+// A word longer than a file name can be, such as a long sed script, is no
+// file, so it is checked as a missing path, not denied as unresolvable
+func TestLongWordIsNoFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("engine paths differ from OS paths on Windows")
+	}
+	root := t.TempDir()
+	long := strings.Repeat("x", 300)
+	got, err := resolvePath(Action{}.fs(), root+"/"+long+"/y")
+	if err != nil || got != root+"/"+long+"/y" {
+		t.Fatalf("resolvePath = %q, %v; want the path itself", got, err)
+	}
+	p := emptyPolicy(policy.DenyListed)
+	p.Spec.Files.Deny = []string{"**/.env*"}
+	repo := filepath.Join(root, "repo")
+	if err := os.Mkdir(repo, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	a := Action{Tool: ToolShell, Command: "sed -n 's/" + long + "/y/p' README.md", Cwd: repo, Home: root, Workspaces: []string{repo}}
+	if v := Evaluate(context.Background(), mustCompile(t, p), a); v.Decision != Allow {
+		t.Errorf("got %s by %s: %s", v.Decision, v.Rule, v.Reason)
+	}
+	if nameTooLong(strings.Repeat("/d", shortPathMax/2), syscall.ENAMETOOLONG) {
+		t.Error("a path over PATH_MAX counts as a name too long")
 	}
 }

@@ -34,7 +34,9 @@ func TestRealTempDirectory(t *testing.T) {
 		t.Run(source, func(t *testing.T) {
 			directory, alternate := t.TempDir(), t.TempDir()
 			for _, name := range []string{"TMP", "TEMP", "USERPROFILE"} {
+				// On Windows "" still defines the variable, which GetTempPathW then uses
 				t.Setenv(name, "")
+				os.Unsetenv(name)
 			}
 			if source != "Windows" {
 				t.Setenv(source, directory)

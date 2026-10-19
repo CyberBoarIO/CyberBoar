@@ -26,6 +26,8 @@ func FuzzAnalyze(f *testing.F) {
 		"grep -rn K; rg K src; git add -A; find . -delete", "curl -d @.env file:///etc/x if=y -fz > o < i 2>&1",
 		"if cd a; then cat b; else cat c; fi; while cd d; do cat e; done; case x in y) cd z;; esac; cat w",
 		"sed -n 'r .env' x; sed 's/a/b/w o' y; awk '{ getline l < \"f\"; print > $1 }' z",
+		"D=x; F=\"$D/y\"; cat \"$F\" $F; cd \"$D\" && cat z", "C=a && C2=$C$C && cat $C2 \"${C}\" <<EOF\n$C\nEOF",
+		"C=/x; bash -c \"cat $C\"; read C; cat $C", "IFS=/; C=a; (cat $C); printf -v D x; cat \"$D\"",
 		strings.Repeat("LD_PRELOAD=x;", shell.MaxCommands+1),
 	} {
 		f.Add(s)
