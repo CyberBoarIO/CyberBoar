@@ -133,7 +133,7 @@ func explainShell(w io.Writer, a engine.Action) {
 		for j, layer := range c.Layers {
 			parts := make([]string, len(layer))
 			for k, e := range layer {
-				parts[k] = e.String()
+				parts[k] = e.Shown()
 			}
 			marker := "  "
 			if j > 0 {

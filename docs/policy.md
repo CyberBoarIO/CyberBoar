@@ -50,6 +50,8 @@ list restricts its own category even under `deny-listed` posture. For example,
 A definite deny takes precedence over ask or allow. Actions inferred from one tool call
 are combined conservatively: any denied action blocks the call. Runtime values that
 cannot be resolved may require confirmation, and cannot establish an allow-list match.
+A shell variable is resolved only when the same command line first sets it to a plain
+value (`f=src/file.txt; cat "$f"`) and nothing on the line could change it again.
 Built-in protections and evaluation errors can deny an action even when a policy allow
 rule matches.
 

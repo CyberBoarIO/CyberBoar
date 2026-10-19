@@ -59,6 +59,9 @@ type Analysis struct {
 	// command lines that aren't a single plain command. Values that name a
 	// single plain command (GIT_EDITOR=true) are not listed; that command is
 	Code []Code
+	// Hidden lists constructs that evaluate a run-time value as code or as a
+	// name, so the value may run commands the analysis can't see (hidden.go)
+	Hidden []string
 	// Files lists every path the command line may touch
 	Files []FileRef
 	feeds []commandSet
@@ -95,10 +98,15 @@ type analyzer struct {
 	expanding map[string]bool
 	// persistent: later commands run in the same shell (Options.Persistent)
 	persistent bool
-	cmds       []Command
-	code       []Code
-	files      []FileRef
-	edges      []commandSet
+	// The variables the line set itself (vars.go): those in each statement
+	// of the current script and those known in the statement being analyzed
+	vars   map[string]string
+	varsAt map[*syntax.Stmt]map[string]string
+	cmds   []Command
+	code   []Code
+	hidden []string
+	files  []FileRef
+	edges  []commandSet
 	// Code run by a shell or wrapper inherits its stdin and stdout, so
 	// whatever feeds the outer command feeds the inner ones, and vice versa
 	transparent []transparent
@@ -156,7 +164,6 @@ func analyze(src, home string, start dir, cdPath, persistent bool, fsys osfs.FS,
 	var aliases map[string]bool
 	for {
 		a := &analyzer{
-			expandCfg:   &expand.Config{Env: expand.ListEnviron("HOME=" + home)},
 			home:        home,
 			fs:          fsys,
 			windows:     fsys.Windows,
@@ -171,6 +178,7 @@ func analyze(src, home string, start dir, cdPath, persistent bool, fsys osfs.FS,
 			sawAliases:  maps.Clone(aliases),
 			persistent:  persistent,
 		}
+		a.expandCfg = &expand.Config{Env: varsEnviron{a: a, base: expand.ListEnviron("HOME=" + home)}}
 		if _, err := a.script(src, 0, start); err != nil {
 			return nil, err
 		}
@@ -182,7 +190,7 @@ func analyze(src, home string, start dir, cdPath, persistent bool, fsys osfs.FS,
 			lastpipe = a.sawLastpipe
 			continue
 		}
-		return &Analysis{Commands: a.cmds, Code: a.code, Files: a.files, feeds: a.closure()}, nil
+		return &Analysis{Commands: a.cmds, Code: a.code, Hidden: a.hidden, Files: a.files, feeds: a.closure()}, nil
 	}
 }
 
@@ -194,6 +202,13 @@ func (a *analyzer) script(src string, depth int, start dir) ([]int, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrUnparseable, err)
 	}
+	// Each script knows only its own variables
+	saved, savedAt := a.vars, a.varsAt
+	defer func() { a.vars, a.varsAt = saved, savedAt }()
+	a.vars = nil
+	lv := a.knownVars(f)
+	a.varsAt = lv.at
+	a.hiddenCode(f)
 	pass := a.newCwdPass(f)
 	pass.list(f.Stmts, start)
 	ids := map[*syntax.Stmt]int{}
@@ -206,6 +221,7 @@ func (a *analyzer) script(src string, depth int, start dir) ([]int, error) {
 		if !ok {
 			return true
 		}
+		a.vars = a.varsAt[st]
 		d := pass.of[st] // unknown if the pass didn't reach it
 		a.files = append(a.files, a.redirectRefs(st, d)...)
 		switch c := st.Cmd.(type) {
