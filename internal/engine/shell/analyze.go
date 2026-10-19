@@ -59,6 +59,9 @@ type Analysis struct {
 	// command lines that aren't a single plain command. Values that name a
 	// single plain command (GIT_EDITOR=true) are not listed; that command is
 	Code []Code
+	// Hidden lists constructs that evaluate a run-time value as code or as a
+	// name, so the value may run commands the analysis can't see (hidden.go)
+	Hidden []string
 	// Files lists every path the command line may touch
 	Files []FileRef
 	feeds []commandSet
@@ -97,13 +100,13 @@ type analyzer struct {
 	persistent bool
 	// The variables the line set itself (vars.go): those in each statement
 	// of the current script and those known in the statement being analyzed
-	vars           map[string]string
-	varsAt         map[*syntax.Stmt]map[string]string
-	varsQuotedOnly bool
-	cmds           []Command
-	code           []Code
-	files          []FileRef
-	edges          []commandSet
+	vars   map[string]string
+	varsAt map[*syntax.Stmt]map[string]string
+	cmds   []Command
+	code   []Code
+	hidden []string
+	files  []FileRef
+	edges  []commandSet
 	// Code run by a shell or wrapper inherits its stdin and stdout, so
 	// whatever feeds the outer command feeds the inner ones, and vice versa
 	transparent []transparent
@@ -187,7 +190,7 @@ func analyze(src, home string, start dir, cdPath, persistent bool, fsys osfs.FS,
 			lastpipe = a.sawLastpipe
 			continue
 		}
-		return &Analysis{Commands: a.cmds, Code: a.code, Files: a.files, feeds: a.closure()}, nil
+		return &Analysis{Commands: a.cmds, Code: a.code, Hidden: a.hidden, Files: a.files, feeds: a.closure()}, nil
 	}
 }
 
@@ -200,11 +203,12 @@ func (a *analyzer) script(src string, depth int, start dir) ([]int, error) {
 		return nil, fmt.Errorf("%w: %v", ErrUnparseable, err)
 	}
 	// Each script knows only its own variables
-	saved, savedAt, savedQuoted := a.vars, a.varsAt, a.varsQuotedOnly
-	defer func() { a.vars, a.varsAt, a.varsQuotedOnly = saved, savedAt, savedQuoted }()
+	saved, savedAt := a.vars, a.varsAt
+	defer func() { a.vars, a.varsAt = saved, savedAt }()
 	a.vars = nil
 	lv := a.knownVars(f)
-	a.varsAt, a.varsQuotedOnly = lv.at, lv.quotedOnly
+	a.varsAt = lv.at
+	a.hiddenCode(f)
 	pass := a.newCwdPass(f)
 	pass.list(f.Stmts, start)
 	ids := map[*syntax.Stmt]int{}

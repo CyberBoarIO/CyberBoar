@@ -137,8 +137,8 @@ func (a *analyzer) classify(w *syntax.Word) Kind {
 			raise(Many)
 		}
 	}
-	if glob {
-		raise(Many)
+	if glob || zshGlobSubst(w.Parts) {
+		raise(Many) // zsh's $~NAME and $=NAME expand the value of NAME as a glob or a path
 	}
 	return kind
 }
@@ -156,7 +156,7 @@ func (a *analyzer) knownParam(p *syntax.ParamExp, quoted bool) bool {
 		return !a.homeUnsure
 	}
 	v, ok := a.vars[p.Param.Value]
-	return ok && (quoted || !a.varsQuotedOnly && splitSafe(v))
+	return ok && (quoted || splitSafe(v))
 }
 
 func hasUnescapedMeta(s string) bool {
@@ -200,6 +200,9 @@ func (a *analyzer) word(w *syntax.Word) []Elem {
 }
 
 func (a *analyzer) hasDynamicPart(w *syntax.Word) bool {
+	if zshGlobSubst(w.Parts) {
+		return true // $~NAME is a value, not the text written
+	}
 	for i, part := range w.Parts {
 		switch p := part.(type) {
 		case *syntax.SglQuoted:

@@ -46,7 +46,7 @@ func TestLineVars(t *testing.T) {
 		{`D=src; F="$D/main.go"; cat "$F"`, "cat src/main.go"},
 		{`A=1 B=$A; cat "$B"`, "cat 1"},
 		{`C='a b'; cat "$C"`, "cat a b"},
-		{`C=~/x; cat "$C"`, "cat /home/u/x"},
+		{`C=~/x; cat "$C"`, "cat ?"}, // a tilde in a value is not followed (allowlist)
 		{`C=/x; printf '%s' "$C"`, "printf %s /x"},
 		{`C=/x; printf -- '%s' "$C"`, "printf -- %s /x"},
 		{`C=/x; command -v ls; cat "$C"`, "cat /x"},
@@ -94,8 +94,8 @@ func TestLineVars(t *testing.T) {
 		{`IFS=/; cat "$IFS"`, "cat ?"},
 		{`C='a b'; cat $C`, "cat ?"},      // split unquoted
 		{`C=\*; cat $C`, "cat ?"},         // globbed unquoted
-		{`IFS=/; C=x; cat $C`, "cat ?"},   // IFS assigned: unquoted is unknown
-		{`IFS=/; C=x; cat "$C"`, "cat x"}, // quoted is not split
+		{`IFS=/; C=x; cat $C`, "cat ?"},   // IFS is special: the line is not followed
+		{`IFS=/; C=x; cat "$C"`, "cat ?"}, // so quoted uses are not known either
 
 		// Arithmetic evaluates the values of the names it reads, so any of it
 		// may assign: [[ -eq ]], (( )), $(( )), for (( )), indexes and slices
@@ -105,7 +105,7 @@ func TestLineVars(t *testing.T) {
 		{`C=/x; for ((i = 0; i < 1; i++)); do :; done; cat "$C"`, "cat ?"},
 		{`C=/x; : "${A[X]}"; cat "$C"`, "cat ?"},
 		{`C=/x; : "${A:X}"; cat "$C"`, "cat ?"},
-		{`C=/x; [[ -f a && $X == b ]]; cat "$C"`, "cat /x"}, // string tests aren't arithmetic
+		{`C=/x; [[ -f a && $X == b ]]; cat "$C"`, "cat ?"}, // [[ ]] is not followed (allowlist)
 
 		// Options that assign, in clusters and after other options' arguments
 		{`C=/x; wait -np C; cat "$C"`, "cat ?"},

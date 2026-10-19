@@ -307,3 +307,19 @@ cases:
     policy: secrets
     action: {command: 'awk ''BEGIN {print "fixture" > "\056env"}'''}
     expect: {decision: deny, rule: "files.deny[0]"}
+  # Variables followed only where the analysis models every use (vars.go): anything
+  # else asks, and a value the shell evaluates in another way is not followed at all
+  - {name: zsh glob-subst of an unknown name, policy: secrets, action: {command: "cat $~F"}, expect: {decision: ask}}
+  - {name: zsh glob-subst of line values, policy: secrets, action: {command: "f=/x/id_; g=rs?; cat $~f$~g"}, expect: {decision: ask}}
+  - {name: zsh modifier after a line variable, policy: secrets, action: {command: "f=/x/.ssh/k.pub; cat $f:r"}, expect: {decision: ask}}
+  - {name: zsh subscript in quotes, policy: secrets, action: {command: "f=/x/id_rsaZ; cat \"$f[1,-2]\""}, expect: {decision: ask}}
+  - {name: brace in a line value, policy: secrets, action: {command: "f=x{a..a}/k; cat \"$f\""}, expect: {decision: ask}}
+  - {name: zsh precommand before a writer, policy: secrets, action: {command: "f=/x/ok; nocorrect read f < list; cat \"$f\""}, expect: {decision: ask}}
+  - {name: line variable still checked, policy: secrets, action: {command: "f=$HOME/.ssh/id_rsa; cat \"$f\""}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: indirect default assign, policy: secrets, action: {command: "f=; x=f; : \"${!x:=/x/.ssh/k}\"; cat \"$f\""}, expect: {decision: ask}}
+  - {name: "subscript expansion in [[ -v ]]", policy: secrets, action: {command: "f=; [[ -v 'a[${f:=/x/.ssh/k}]' ]]; cat \"$f\""}, expect: {decision: ask}}
+  - {name: zsh repeat before a writer, policy: secrets, action: {command: "f=/x/ok; repeat 1 read f < list; cat \"$f\""}, expect: {decision: ask}}
+  - {name: colon tilde past 80 bytes, policy: secrets, action: {command: "P=/tmp/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:~/.ssh/k; cat \"$P\""}, expect: {decision: ask}}
+  - {name: arithmetic in an array subscript, policy: secrets, action: {command: "f=/x/ok; a[f=3]=; cat \"$f\""}, expect: {decision: ask}}
+  - {name: zsh integer parameter, policy: secrets, action: {command: "f=/x/ok; HISTSIZE=f=3; cat \"$f\""}, expect: {decision: ask}}
+  - {name: prompt expansion assigns, policy: secrets, action: {command: "f=; x='${f:=/x/.ssh/k}'; : \"${x@P}\"; cat \"$f\""}, expect: {decision: ask}}

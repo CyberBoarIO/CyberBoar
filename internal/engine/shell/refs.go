@@ -411,7 +411,8 @@ func (a *analyzer) wordRefs(e Elem, d dir, glob globOpts, printing bool, add fun
 	case e.Text == "{}": // find -exec placeholder: paths under find's own arguments
 	case e.Kind == One && strings.HasPrefix(e.Text, "*/"):
 		// A directory only known at run time plus a literal tail (~-/x).
-		add(FileRef{Display: e.Text, Rel: e.Text[2:], Shape: e.Shape, Src: e.Src})
+		// Shown as …/rest: the text keeps its "*" for the glob matches above
+		add(FileRef{Display: "…/" + e.Text[2:], Rel: e.Text[2:], Shape: e.Shape, Src: e.Src})
 	default:
 		if !printing {
 			add(FileRef{Display: e.Shown(), Shape: e.Shape})

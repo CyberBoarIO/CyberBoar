@@ -203,3 +203,35 @@ cases:
   - {name: allow-listed never allows inline code, policy: strict-allow, action: {command: "python -c 'print(1)'"}, expect: {decision: deny, rule: posture.allow-listed}}
   - {name: allow-listed allows the script form, policy: strict-allow, action: {command: "python build.py"}, expect: {decision: allow, rule: "commands.allow[0]"}}
   - {name: allow-listed checks programs named by variables, policy: strict-allow, action: {command: "GIT_EDITOR=vim git commit"}, expect: {decision: deny, rule: posture.allow-listed}}
+  # Hidden code: a run-time value the shell evaluates as code or as a name (hidden.go)
+  - {name: prompt expansion of code in a value, policy: default, action: {command: "y='$(git push)'; : \"${y@P}\""}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: prompt expansion without code asks, policy: default, action: {command: "x='${f:=/w/.ssh/k}'; : \"${x@P}\""}, expect: {decision: ask, rule: commands.hiddenCode}}
+  - {name: arithmetic on a name holding code, policy: default, action: {command: "y='a[$(git push)]'; echo $(( y ))"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: test -v on a subscripted name, policy: default, action: {command: "test -v 'a[$(git push)]'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: bash --version runs no code, policy: default, action: {command: "bash --version"}, expect: {decision: allow}}
+  - {name: indirect expansion runs code, policy: default, action: {command: "y='a[$(git push)]'; : \"${!y}\""}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: printf -v runs code, policy: default, action: {command: "printf -v 'a[$(git push)]' x"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: unset runs code, policy: default, action: {command: "unset 'a[$(git push)]'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: arithmetic test runs code, policy: default, action: {command: "y='a[$(git push)]'; [[ $y -eq 0 ]]"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  # Arithmetic asks only for a name that may hold a non-number (names.go)
+  - {name: arithmetic on a loop counter allows, policy: default, action: {command: "for i in 1 2 3; do echo $((i * 2)); done"}, expect: {decision: allow}}
+  - {name: arithmetic on a counter it sets allows, policy: default, action: {command: "n=0; n=$((n + 1)); echo $n"}, expect: {decision: allow}}
+  - {name: C-style loop counter allows, policy: default, action: {command: "for ((i=0; i<3; i++)); do echo $i; done"}, expect: {decision: allow}}
+  - {name: arithmetic on a name from the environment allows, policy: default, action: {command: "echo $((LIMIT * 2))"}, expect: {decision: allow}}
+  - {name: arithmetic on a name read from a command asks, policy: default, action: {command: "x=$(date +%s); echo $((x))"}, expect: {decision: ask, rule: commands.hiddenCode}}
+  - {name: arithmetic on a name read at run time asks, policy: default, action: {command: "read n; echo $((n + 1))"}, expect: {decision: ask, rule: commands.hiddenCode}}
+  - {name: arithmetic on a command substitution asks, policy: default, action: {command: "echo $(( $(date +%s) + 1 ))"}, expect: {decision: ask, rule: commands.hiddenCode}}
+  - {name: substring offset from a name read from a command asks, policy: default, action: {command: "x=$(id); echo \"${s:x:1}\""}, expect: {decision: ask, rule: commands.hiddenCode}}
+  - {name: declare -i asks, policy: default, action: {command: "declare -i n=5; echo $n"}, expect: {decision: ask, rule: commands.hiddenCode}}
+  - {name: name reference asks, policy: default, action: {command: "declare -n r=x; echo $r"}, expect: {decision: ask, rule: commands.hiddenCode}}
+  - {name: declaration of a run-time name asks, policy: default, action: {command: "v=FOO; declare \"$v\"=5"}, expect: {decision: ask, rule: commands.hiddenCode}}
+  - {name: export of a run-time name asks, policy: default, action: {command: "v=FOO; export $v"}, expect: {decision: ask, rule: commands.hiddenCode}}
+  - {name: zsh integer parameter with a non-number asks, policy: default, action: {command: "HISTSIZE=f=3"}, expect: {decision: ask, rule: commands.hiddenCode}}
+  - {name: zsh print -v with a subscripted name asks, policy: default, action: {command: "print -v 'a[1]' x"}, expect: {decision: ask, rule: commands.hiddenCode}}
+  - {name: zsh print -v runs code, policy: default, action: {command: "print -v 'a[$(git push)]' x"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: printf -v attached to its name runs code, policy: default, action: {command: "printf -v'a[$(git push)]' x"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: printf -v in a cluster runs code, policy: default, action: {command: "printf -va'[$(git push)]' x"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: printf -v attached to a plain name allows, policy: default, action: {command: "printf -vout %s x"}, expect: {decision: allow}}
+  - {name: printf with an option only known at run time asks, policy: default, action: {command: "printf \"$f\" x"}, expect: {decision: ask, rule: commands.hiddenCode}}
+  - {name: let with quoted code in a subscript runs code, policy: default, action: {command: "let 'x=a[$(git push)]'"}, expect: {decision: deny, rule: commands.denyInterpreters}}
+  - {name: mapfile -t takes its array name as a name, policy: default, action: {command: "v=x; mapfile -t \"$v\" < list"}, expect: {decision: ask, rule: commands.hiddenCode}}

@@ -18,6 +18,8 @@ import (
 const (
 	// RuleDenyInterpreters denies inline code when the policy sets denyInterpreters
 	RuleDenyInterpreters = "commands.denyInterpreters"
+	// RuleHiddenCode asks about a construct that evaluates a run-time value as code or as a name
+	RuleHiddenCode = "commands.hiddenCode"
 	// RuleNoCommand allows a command line that runs no commands
 	RuleNoCommand = "builtin.noCommand"
 	// RuleUnparseable denies a command line that isn't valid shell syntax
@@ -205,7 +207,7 @@ func (c *Compiled) evalShell(a Action) Verdict {
 	case err != nil:
 		return deny(RuleInternal, "internal error while analyzing the command, so it is blocked; "+noRetry)
 	}
-	if len(an.Commands) == 0 && len(an.Files) == 0 {
+	if len(an.Commands) == 0 && len(an.Files) == 0 && len(an.Code) == 0 && len(an.Hidden) == 0 {
 		return Verdict{Decision: Allow, Rule: RuleNoCommand, Reason: "the command line runs no commands"}
 	}
 
@@ -244,7 +246,7 @@ func (c *Compiled) evalShell(a Action) Verdict {
 			if v, ok := b.anywhereDeny(ref); ok {
 				return v
 			}
-			if v, ok := possibleFile(b, ref); ok {
+			if v, ok := possibleFile(b, ref, a.ShellPersists); ok {
 				asks = append(asks, v)
 			}
 			if b.allowListed && ref.Accessed && notAllowed == nil {
@@ -286,6 +288,9 @@ func (c *Compiled) evalShell(a Action) Verdict {
 	if c.policy.Spec.Commands.InterpretersDenied() && len(an.Code) > 0 {
 		what := an.Code[0].What
 		return deny(RuleDenyInterpreters, fmt.Sprintf("the command runs inline code (%s), which this policy blocks (denyInterpreters); do not attempt to run the code another way", what))
+	}
+	for _, what := range an.Hidden {
+		asks = append(asks, Verdict{Decision: Ask, Rule: RuleHiddenCode, Reason: fmt.Sprintf("the command evaluates %s, so the value it reads is only known at run time and may run commands; it needs confirmation", what)})
 	}
 	cmdsListed := c.allowListed(c.policy.Spec.Commands.Rules)
 	if cmdsListed {
@@ -358,7 +363,7 @@ func (b *boundRules) anywhereDeny(ref shell.FileRef) (Verdict, bool) {
 // possibleFile is the verdict for a path only known at run time
 // It could be any file, so any deny or ask rule might match. The verdict
 // names the first rule that could, but the reason doesn't blame it alone
-func possibleFile(b *boundRules, ref shell.FileRef) (Verdict, bool) {
+func possibleFile(b *boundRules, ref shell.FileRef, persistent bool) (Verdict, bool) {
 	var rule string
 	switch {
 	case len(b.deny) > 0:
@@ -373,14 +378,14 @@ func possibleFile(b *boundRules, ref shell.FileRef) (Verdict, bool) {
 		return Verdict{}, false
 	}
 	switch {
-	case ref.Rel != "" && strings.HasPrefix(ref.Display, "*/"):
+	case ref.Rel != "" && strings.HasPrefix(ref.Display, "…/"):
 		// A tail under a directory only known at run time, such as ~ when HOME may have changed
 		shown := "…/" + ref.Rel
 		if ref.Src != "" {
 			shown = ref.Src
 		}
 		return Verdict{Decision: Ask, Rule: rule, Reason: fmt.Sprintf("the command might access `%s`, a path in a directory only known at run time "+
-			"that could be any file, including files the policy protects (rule %s among them), so it needs confirmation%s", shown, rule, variableHint(shown))}, true
+			"that could be any file, including files the policy protects (rule %s among them), so it needs confirmation%s", shown, rule, variableHint(shown, persistent))}, true
 	case ref.Rel != "":
 		return Verdict{Decision: Ask, Rule: rule, Reason: fmt.Sprintf("the command might access `%s` relative to a working directory the hook isn't told, "+
 			"so it could be any file, including files the policy protects (rule %s among them), so it needs confirmation; "+
@@ -391,13 +396,17 @@ func possibleFile(b *boundRules, ref shell.FileRef) (Verdict, bool) {
 		shown = shapeDisplay(ref.Shape)
 	}
 	return Verdict{Decision: Ask, Rule: rule, Reason: fmt.Sprintf("the command might access `%s`, a path only known at run time that could be any file, "+
-		"including files the policy protects (rule %s among them), so it needs confirmation%s", shown, rule, variableHint(shown))}, true
+		"including files the policy protects (rule %s among them), so it needs confirmation%s", shown, rule, variableHint(shown, persistent))}, true
 }
 
 // variableHint is the end of a reason about a word shown as written
-func variableHint(shown string) string {
+func variableHint(shown string, persistent bool) string {
 	if !strings.Contains(shown, "$") {
 		return ""
+	}
+	if persistent {
+		// An earlier command may have set the variable, so the example would not be followed
+		return "; the hook doesn't follow variables in this shell, so writing the path itself lets it be checked"
 	}
 	// The analysis follows only an assignment on the same line (shell/vars.go)
 	return "; the hook follows a variable only when the command first sets it to a plain value in a statement that always runs " +
