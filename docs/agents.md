@@ -11,9 +11,9 @@ For a short allowed/denied test with each integration, follow the
 [60-second agent demos](quick-demos.md).
 The official Claude Code, Codex and opencode editor extensions are supported and under
 active testing. The Cursor editor is supported, with real-agent validation pending.
-**Copilot editor support is experimental**;
-this does not change the Copilot CLI setup below. See [Editor
-integrations](editor-integrations.md) for setup and current validation limits.
+The Copilot CLI setup below also covers Copilot in VS Code, both its Copilot session
+target and its Local agent. See [Editor integrations](editor-integrations.md) for
+setup and current validation limits.
 
 ## Choose an integration
 
@@ -21,7 +21,7 @@ integrations](editor-integrations.md) for setup and current validation limits.
 |---|---|---|---|
 | Claude Code (`claude-code`) | Available | Git Bash only | Native confirmation |
 | Codex CLI (`codex`) | Available | Use WSL or a Linux container | Deny |
-| GitHub Copilot CLI (`copilot-cli`) | Available | Use WSL or a Linux container | Native confirmation; deny in headless mode |
+| GitHub Copilot CLI and Copilot in VS Code (`copilot-cli`) | Available | Use WSL or a Linux container | Native confirmation; deny in headless mode |
 | Cursor (`cursor`) | Available; CLI validated with a real agent, editor validation pending | Use WSL / Remote-WSL or a Linux container | Deny |
 | opencode (`opencode`) | Available through a plugin | Use WSL or a Linux container | Deny |
 
@@ -198,8 +198,9 @@ Official reference: [GitHub Copilot hooks
 reference](https://docs.github.com/en/copilot/reference/hooks-reference).
 
 Create `.github/hooks/cyberboar.json`; user configuration is
-`~/.copilot/hooks/cyberboar.json` (or under `COPILOT_HOME`). The CLI's exec form runs
-CyberBoar directly without a shell. Repository hooks run from the repository root.
+`~/.copilot/hooks/cyberboar.json` (or under `COPILOT_HOME`). Copilot CLI, VS Code's
+Copilot session target and VS Code's Local agent all read these files. Repository
+hooks run from the repository root (VS Code: the workspace folder).
 
 ```json
 {
@@ -208,16 +209,15 @@ CyberBoar directly without a shell. Repository hooks run from the repository roo
     "preToolUse": [
       {
         "type": "command",
-        "exec": "cyberboar",
-        "args": ["hook", "--agent", "copilot-cli", "--policy", ".cyberboar/policy.yaml", "--deadline", "5s"],
+        "bash": "'cyberboar' 'hook' '--agent' 'copilot-cli' '--policy' '.cyberboar/policy.yaml' '--deadline' '5s' || exit 2",
+        "powershell": "[Console]::Error.WriteLine('cyberboar: GitHub Copilot on native Windows is not supported, so the tool call is blocked; use WSL or a Linux dev container'); exit 2",
         "timeoutSec": 15
       }
     ],
     "sessionStart": [
       {
         "type": "command",
-        "exec": "cyberboar",
-        "args": ["brief", "--agent", "copilot-cli", "--policy", ".cyberboar/policy.yaml"],
+        "bash": "'cyberboar' 'brief' '--agent' 'copilot-cli' '--policy' '.cyberboar/policy.yaml'",
         "timeoutSec": 15
       }
     ]
@@ -225,9 +225,14 @@ CyberBoar directly without a shell. Repository hooks run from the repository roo
 }
 ```
 
-This is for **Copilot CLI**, not the VS Code extension or cloud agent. Ensure the
-scope's settings do not set `disableAllHooks`. Reload Copilot and test a denied call.
-Keep the 5-second decision deadline below the 15-second timeout: timeouts can fail open.
+Use `bash`, not Copilot's `exec` form: VS Code's Local agent skips `exec` hooks.
+Keep `|| exit 2`, so that VS Code denies when the binary is missing or crashes; it
+lets a tool run on any other failing exit. The `powershell` command denies every call
+on native Windows, where neither surface is supported. This doesn't cover Copilot's
+cloud agent. Ensure the scope's settings do not set `disableAllHooks`, and that VS
+Code's `chat.useHooks` is on. Reload Copilot or start a new VS Code chat, and test a
+denied call. Keep the 5-second decision deadline below the 15-second timeout:
+timeouts can fail open.
 
 ### Cursor
 
@@ -346,6 +351,8 @@ when its hook never runs:
 - Codex can fail open when the hook cannot launch. Managed prefix rules provide
   a limited fallback for literal command rules.
 - Copilot CLI can fail open on timeout or invalid JSON; other failures deny.
+  VS Code's Local agent fails open on timeout and on exits other than 0 and 2; the
+  installed `|| exit 2` turns a missing binary or a crash into a deny.
 - Cursor hooks are installed with `failClosed`. Cursor CLI passed the real-agent
   harness; Cursor editor sessions remain unverified.
 - The opencode plugin denies execution failures. A plugin that fails to load is
