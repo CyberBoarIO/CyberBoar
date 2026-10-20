@@ -28,6 +28,9 @@ func applyCopilot(a applyArgs, stdout io.Writer, getenv func(string) string, fai
 	var target string
 	// settings are the files of the scope that can switch its hooks off
 	var settings []string
+	// local says whether VS Code's Local agent reads the target: it reads the
+	// repository's .github/hooks and ~/.copilot/hooks
+	local := true
 	switch o.Scope {
 	case copilot.ScopeUser:
 		dir := getenv("COPILOT_HOME")
@@ -37,6 +40,8 @@ func applyCopilot(a applyArgs, stdout io.Writer, getenv func(string) string, fai
 				return fail("%v", err)
 			}
 			dir = filepath.Join(home, ".copilot")
+		} else if home, err := userHome(getenv); err != nil || filepath.Clean(dir) != filepath.Join(home, ".copilot") {
+			local = false
 		}
 		target = filepath.Join(dir, "hooks", copilot.FileName)
 		settings = []string{filepath.Join(dir, "config.json"), filepath.Join(dir, "settings.json")}
@@ -55,6 +60,7 @@ func applyCopilot(a applyArgs, stdout io.Writer, getenv func(string) string, fai
 		}
 	case copilot.ScopeManaged:
 		target = filepath.Join(a.managedDir, copilot.FileName)
+		local = false
 	default:
 		return usage("unknown --scope %q for copilot-cli (user, project, managed)", a.scope)
 	}
@@ -92,6 +98,11 @@ func applyCopilot(a applyArgs, stdout io.Writer, getenv func(string) string, fai
 	notes := []string{
 		"Copilot lets a tool call through when the hook times out or answers with invalid JSON; the hook answers within --deadline to stay clear of that",
 		"command, file and MCP rules are enforced only by the hook",
+	}
+	if local {
+		notes = append(notes, "VS Code's Copilot session target and Local agent run this hook too, in a trusted workspace while chat.useHooks is on; start a new chat to load it")
+	} else {
+		notes = append(notes, "VS Code's Local agent doesn't read "+filepath.Dir(target)+", so it runs without this hook; to cover it, also apply --scope project, or --scope user with COPILOT_HOME unset")
 	}
 	if o.Scope != copilot.ScopeManaged {
 		notes = append(notes, "users can switch user and repository hooks off (disableAllHooks); --scope managed can't be switched off and must be owned by root")

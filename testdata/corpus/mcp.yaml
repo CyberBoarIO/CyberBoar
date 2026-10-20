@@ -58,6 +58,23 @@ policies:
       spec:
         mcp:
           deny: ["fs.srv/write.file", "github-mcp"]    # [0] [1]
+  vscode-listed:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: vscode-listed}
+      spec:
+        mcp:
+          allow: ["*/search", "docs"]             # [0] [1]
+  vscode-cut:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: vscode-cut}
+      spec:
+        mcp:
+          deny: ["*/read_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_all"]   # [0]
+          allow: ["*/search*"]   # [0]
   copilot-listed:
     inline:
       apiVersion: cyberboar.dev/v1
@@ -141,6 +158,24 @@ cases:
   - {name: a server named in the hook input, policy: codex-names, action: {mcp: {server: fs.srv, tool: write_file, names: claude-code}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
   - {name: Claude Code keeps dashes, policy: codex-names, action: {mcp: {server: github-mcp, tool: create_issue, names: claude-code}}, expect: {decision: deny, rule: "mcp.deny[1]"}}
   - {name: other tools of a Claude Code server, policy: codex-names, action: {mcp: {server: fs_srv, tool: read_file, names: claude-code}}, expect: {decision: allow, rule: posture.deny-listed}}
+
+  # VS Code's prefix comes from a label the server reports
+  # Deny and ask rules match the tool of any server, and
+  # only an allow rule for every server ("*") covers a call
+  - {name: VS Code tool of any server is denied, policy: deny-only, action: {mcp: {server: e2e, tool: write_file, names: vscode}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: a VS Code label naming the server doesn't escape, policy: deny-only, action: {mcp: {server: other, tool: exec_all, names: vscode}}, expect: {decision: deny, rule: "mcp.deny[1]"}}
+  - {name: other VS Code tools pass, policy: deny-only, action: {mcp: {server: filesystem, tool: read_file, names: vscode}}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: VS Code tool names are rewritten, policy: codex-names, action: {mcp: {server: x, tool: write_file, names: vscode}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: a whole-server deny covers every VS Code tool, policy: listed, action: {mcp: {server: github, tool: create_issue, names: vscode}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: a VS Code call is allowed by an any-server rule, policy: vscode-listed, action: {mcp: {server: x, tool: search, names: vscode}}, expect: {decision: allow, rule: "mcp.allow[0]"}}
+  - {name: a server allow rule can't cover a VS Code call, policy: vscode-listed, action: {mcp: {server: docs, tool: read, names: vscode}}, expect: {decision: deny, rule: posture.allow-listed, reasonContains: "VS Code doesn't say which server"}}
+  # VS Code cuts mcp_<prefix>_<tool> at 64 characters
+  - {name: a cut VS Code name that starts like a denied tool is denied, policy: deny-only, action: {mcp: {server: abc, tool: write_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, names: vscode}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: a cut VS Code name no deny rule starts like passes, policy: deny-only, action: {mcp: {server: abc, tool: read_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, names: vscode}}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: a cut VS Code name may be a longer denied tool, policy: vscode-cut, action: {mcp: {server: abc, tool: read_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, names: vscode}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: a cut VS Code name is a tool allow rules can't name, policy: vscode-listed, action: {mcp: {server: abc, tool: searchxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, names: vscode}}, expect: {decision: deny, rule: posture.allow-listed, reasonContains: "whose tool pattern ends in * (*/searchxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*)"}}
+  - {name: a cut VS Code name is allowed by a pattern ending in *, policy: vscode-cut, action: {mcp: {server: abc, tool: searchxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, names: vscode}}, expect: {decision: allow, rule: "mcp.allow[0]"}}
+  - {name: a VS Code name one short of the cut is whole, policy: deny-only, action: {mcp: {server: abc, tool: read_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx, names: vscode}}, expect: {decision: allow, rule: posture.deny-listed}}
 
   # Names the patterns can't express are rejected
   - {name: slash in a server name, policy: deny-only, action: {mcp: {server: "any/thing", tool: execute}}, expect: {decision: deny, rule: error.invalidAction}}

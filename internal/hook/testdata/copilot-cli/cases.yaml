@@ -20,6 +20,8 @@ fs:
   - {path: proj/a.go, file: "package a\n"}
   - {path: proj/infra/terraform.tfstate, file: "a\n"}
   - {path: proj/.github/hooks/lint.json, file: "{}"}
+  - {path: repo/.git/HEAD, file: ""}
+  - {path: repo/app/a.txt, file: ""}
 
 env:
   COPILOT_PROJECT_DIR: "{{root}}/proj"
@@ -42,6 +44,13 @@ policies:
       metadata: {name: mcp-deny}
       spec:
         mcp: {deny: ["evil-srv"]}
+  deny-listed:
+    inline:
+      apiVersion: cyberboar.dev/v1
+      kind: Policy
+      metadata: {name: deny-listed}
+      spec:
+        files: {deny: ["**/.env*"]}
 
 cases:
   # --- bash -----------------------------------------------------------------------
@@ -167,6 +176,10 @@ cases:
     policy: baseline
     rawInput: '{"hook_event_name":"PreToolUse","session_id":"s","cwd":"/work","tool_name":"Bash","tool_input":{"command":"ls"}}'
     expect: {decision: deny, rule: error.invalidInput}
+  - name: the VS Code form without tool_use_id stays refused for VS Code's names too
+    policy: baseline
+    rawInput: '{"hook_event_name":"PreToolUse","session_id":"s","cwd":"/work","tool_name":"read_file","tool_input":{"filePath":"/work/a"}}'
+    expect: {decision: deny, rule: error.invalidInput}
   - name: VS Code form fields next to preToolUse ones
     # A harmless toolName must not hide a tool_name naming another tool
     policy: baseline
@@ -186,3 +199,124 @@ cases:
   - {name: "secrets: str_replace_editor create with an old_str it ignores", policy: baseline, input: {toolName: str_replace_editor, toolArgs: {command: create, path: "{{root}}/proj/a.go", file_text: "T={{fake:github-pat}}", old_str: "{{fake:github-pat}}"}}, expect: {decision: deny, rule: secrets.github-pat}}
   - {name: "secrets: str_replace_editor creating a key", policy: baseline, input: {toolName: str_replace_editor, toolArgs: {command: create, path: "{{root}}/proj/id_ed25519", file_text: "{{fake:private-key}}\n"}}, expect: {decision: deny, rule: secrets.private-key}}
   - {name: "secrets: patch adding a token", policy: baseline, input: {toolName: apply_patch, toolArgs: "*** Begin Patch\n*** Add File: {{root}}/proj/src/c.go\n+const t = \"{{fake:github-pat}}\"\n*** End Patch\n"}, expect: {decision: deny, rule: secrets.github-pat}}
+
+  # --- VS Code's Local agent -----------------------------------------------------------
+  # VS Code 1.142 (GitHub Copilot Chat 0.70) runs the hook file's bash command
+  # with its own input: tool_name, tool_input, tool_use_id and hook_event_name,
+  # in the workspace folder (cwd), without COPILOT_PROJECT_DIR
+  # It reads the answer from hookSpecificOutput (vscode-captured-1.142.jsonl)
+  - {name: "VS Code: reading a harmless file", policy: baseline, env: {COPILOT_PROJECT_DIR: ""}, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "call_1__vscode-1", tool_name: read_file, tool_input: {filePath: "{{root}}/proj/README.md", startLine: 1, endLine: 5}}, expect: {decision: none}}
+  - {name: "VS Code: reading a secret", policy: baseline, env: {COPILOT_PROJECT_DIR: ""}, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "call_1__vscode-1", tool_name: read_file, tool_input: {filePath: "{{root}}/proj/.env", startLine: 1, endLine: 5}}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: "VS Code: a relative path resolves in the workspace", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: view_image, tool_input: {filePath: ".env"}}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: "VS Code: listing ~/.ssh", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: list_dir, tool_input: {path: "{{root}}/home/.ssh"}}, expect: {decision: deny, rule: "files.deny[2]"}}
+  # VS Code's file tools read a path that isn't absolute but looks like a URI as one
+  - {name: "VS Code: a file URI is its path", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: read_file, tool_input: {filePath: "file://{{root}}/proj/.env", startLine: 1, endLine: 2}}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: "VS Code: another URI scheme in a file path", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_file, tool_input: {filePath: "vscode-userdata:/User/settings.json", content: "{}"}}, expect: {decision: deny, rule: error.invalidInput}}
+  - {name: "VS Code: a path VS Code would read as a URI without a scheme", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: list_dir, tool_input: {path: "proj/a:b"}}, expect: {decision: deny, rule: error.invalidInput}}
+  - {name: "VS Code: a file URI in a replacement", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: multi_replace_string_in_file, tool_input: {explanation: x, replacements: [{filePath: "file://{{root}}/proj/.env", oldString: "A", newString: "B"}]}}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: "VS Code: a file path that is not a string", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: read_file, tool_input: {filePath: ["{{root}}/proj/.env"], startLine: 1, endLine: 2}}, expect: {decision: deny, rule: error.invalidInput}}
+  - {name: "VS Code: grep searches the workspace's contents", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: grep_search, tool_input: {query: "API_KEY", isRegexp: false, includeIgnoredFiles: true, defaultMaxResults: 100}}, expect: {decision: deny, rule: "files.deny[0]", reasonContains: "contains"}}
+  - {name: "VS Code: file search returns names only", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: file_search, tool_input: {query: "**/*.go", maxResults: 20}}, expect: {decision: none}}
+  - {name: "VS Code: creating a harmless file", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_file, tool_input: {filePath: "{{root}}/proj/src/ok.txt", content: "ok\n"}}, expect: {decision: none}}
+  - {name: "VS Code: creating a secret file", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_file, tool_input: {filePath: "{{root}}/proj/.env.prod", content: "X=1\n"}}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: "VS Code: writing a token", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_file, tool_input: {filePath: "{{root}}/proj/src/c.go", content: "const t = \"{{fake:github-pat}}\"\n"}}, expect: {decision: deny, rule: secrets.github-pat}}
+  - {name: "VS Code: replacing a string adds a key", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: replace_string_in_file, tool_input: {filePath: "{{root}}/proj/deploy.sh", oldString: "KEY=", newString: "KEY={{fake:aws-access-token}}"}}, expect: {decision: deny, rule: secrets.aws-access-token}}
+  - {name: "VS Code: replacing next to a token already there", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: replace_string_in_file, tool_input: {filePath: "{{root}}/proj/deploy.sh", oldString: "N=1", newString: "N=2"}}, expect: {decision: none}}
+  - name: "VS Code: each replacement checks its own file"
+    policy: baseline
+    input:
+      hook_event_name: PreToolUse
+      session_id: v1
+      tool_use_id: c
+      tool_name: multi_replace_string_in_file
+      tool_input:
+        explanation: x
+        replacements:
+          - {filePath: "{{root}}/proj/src/main.go", oldString: "a", newString: "b"}
+          - {filePath: "{{root}}/proj/infra/terraform.tfstate", oldString: "a", newString: "b"}
+    expect: {decision: ask, rule: "files.ask[0]"}
+  - name: "VS Code: a replacement without a file"
+    policy: baseline
+    input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: c, tool_name: multi_replace_string_in_file, tool_input: {explanation: x, replacements: [{oldString: "a", newString: "b"}]}}
+    expect: {decision: deny, rule: error.invalidInput}
+  - {name: "VS Code: an edit sketch is checked for secrets", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: insert_edit_into_file, tool_input: {explanation: x, filePath: "{{root}}/proj/a.go", code: "// ...existing code...\nT={{fake:github-pat}}\n"}}, expect: {decision: deny, rule: secrets.github-pat}}
+  - {name: "VS Code: patch updating a secret", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: apply_patch, tool_input: {input: "*** Begin Patch\n*** Update File: .env\n@@\n-A=1\n+A=2\n*** End Patch\n", explanation: x}}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: "VS Code: creating a directory", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_directory, tool_input: {dirPath: "{{root}}/proj/newdir"}}, expect: {decision: none}}
+
+  # The agent's terminal keeps its directory between calls
+  - {name: "VS Code: a command without paths", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: run_in_terminal, tool_input: {command: "date", explanation: x, goal: x, mode: sync}}, expect: {decision: none}}
+  - {name: "VS Code: a relative path may be anywhere", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: run_in_terminal, tool_input: {command: "cat main.go", explanation: x, goal: x, mode: sync}}, expect: {decision: ask, reasonContains: "cd /absolute/directory &&"}}
+  - {name: "VS Code: an absolute cd makes paths checkable", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: run_in_terminal, tool_input: {command: "cd {{root}}/proj && cat src/main.go", explanation: x, goal: x, mode: sync}}, expect: {decision: none}}
+  - {name: "VS Code: reading a secret in the terminal", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: run_in_terminal, tool_input: {command: "cat .env", explanation: x, goal: x, mode: async}}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: "VS Code: an ask rule asks", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: run_in_terminal, tool_input: {command: "cd {{root}}/proj && git push origin main", explanation: x, goal: x, mode: sync}}, expect: {decision: ask, rule: "commands.ask[0]"}}
+  - {name: "VS Code: a command that is not a string", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: run_in_terminal, tool_input: {command: ["ls"], explanation: x, goal: x, mode: sync}}, expect: {decision: deny, rule: error.invalidInput}}
+  - {name: "VS Code: typing into a terminal is blocked", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: send_to_terminal, tool_input: {id: "12345678-1234-4123-8123-123456789012", command: "cat .env"}}, expect: {decision: deny, rule: adapter.uncheckedTool}}
+  - {name: "VS Code: reading terminal output touches nothing", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: terminal_last_command, tool_input: {}}, expect: {decision: none}}
+  - {name: "VS Code: a task runs its command in the workspace folder", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/proj", task: {label: hello, type: shell, command: "cat", args: ["src/main.go"]}}}, expect: {decision: none}}
+  - {name: "VS Code: a task reading a secret", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/proj", task: {label: x, type: shell, command: "cat", args: [".env"]}}}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: "VS Code: a task in another directory", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/proj", task: {label: x, type: shell, command: "cat id_rsa", options: {cwd: "{{root}}/home/.ssh"}}}}, expect: {decision: deny, rule: "files.deny[2]"}}
+  - {name: "VS Code: a task that isn't a shell task", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/proj", task: {label: x, type: npm, script: build}}}, expect: {decision: deny, rule: error.invalidInput}}
+  # Refuse task properties that change what runs or where and VS Code's ${…} variables
+  - {name: "VS Code: a task's environment", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/proj", task: {label: x, type: shell, command: "ls", options: {env: {BASH_ENV: "{{root}}/proj/.env"}}}}}, expect: {decision: deny, rule: error.invalidInput, reasonContains: "options.env"}}
+  - {name: "VS Code: a task's command for one platform", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/proj", task: {label: x, type: shell, command: "ls", linux: {command: "cat .env"}}}}, expect: {decision: deny, rule: error.invalidInput}}
+  - {name: "VS Code: a task that runs whenever the folder opens", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/proj", task: {label: x, type: shell, command: "ls", runOptions: {runOn: folderOpen}}}}, expect: {decision: deny, rule: error.invalidInput}}
+  - {name: "VS Code: a task depending on another", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/proj", task: {label: x, type: shell, command: "ls", dependsOn: ["build"]}}}, expect: {decision: deny, rule: error.invalidInput}}
+  - {name: "VS Code: a task variable", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/proj", task: {label: x, type: shell, command: "cat", args: ["${env:HOME}/.ssh/id_rsa"]}}}, expect: {decision: deny, rule: error.invalidInput, reasonContains: "variable"}}
+  - {name: "VS Code: a task running a VS Code command", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/proj", task: {label: x, type: shell, command: "echo ${command:workbench.action.files.saveAll}"}}}, expect: {decision: deny, rule: error.invalidInput}}
+  - {name: "VS Code: a task with the properties it may have", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/proj", task: {label: build, type: shell, command: "go", args: ["build", "./..."], isBackground: false, problemMatcher: ["$go"], group: build, options: {cwd: "src"}}}}, expect: {decision: none}}
+  # VS Code quotes arguments as it sees fit, so with arguments every word must read the same - quoted or not
+  - {name: "VS Code: a task argument VS Code may quote", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/proj", task: {label: x, type: shell, command: "cat", args: ["src/main.go", "two words"]}}}, expect: {decision: deny, rule: error.invalidInput, reasonContains: "may quote"}}
+  - {name: "VS Code: a task command line with arguments", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/proj", task: {label: x, type: shell, command: "go build", args: ["./..."]}}}, expect: {decision: deny, rule: error.invalidInput, reasonContains: "may quote"}}
+  - {name: "VS Code: a task command line without arguments", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/proj", task: {label: x, type: shell, command: "go build ./... && go vet ./..."}}}, expect: {decision: none}}
+  - {name: "VS Code: a task in another workspace folder", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/home", task: {label: x, type: shell, command: "ls"}}}, expect: {decision: deny, rule: error.invalidInput, reasonContains: "not the folder the hook runs in"}}
+  - {name: "VS Code: a task in the workspace folder written differently", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_and_run_task, tool_input: {workspaceFolder: "{{root}}/proj/", task: {label: x, type: shell, command: "ls"}}}, expect: {decision: none}}
+  - {name: "VS Code: running a saved task is blocked", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: run_task, tool_input: {id: "shell: build", workspaceFolder: "{{root}}/proj"}}, expect: {decision: deny, rule: adapter.uncheckedTool}}
+  - {name: "VS Code: running a VS Code command is blocked", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: run_vscode_command, tool_input: {commandId: "workbench.action.files.saveAll", name: "Save all"}}, expect: {decision: deny, rule: adapter.uncheckedTool}}
+
+  # A file: URL reads a local file; other URLs are network access, not governed
+  - {name: "VS Code: fetching a web page", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: fetch_webpage, tool_input: {urls: ["https://example.com/"], query: x}}, expect: {decision: none}}
+  - {name: "VS Code: fetching a secret file URL", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: fetch_webpage, tool_input: {urls: ["https://example.com/", "file://{{root}}/proj/.env"], query: x}}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: "VS Code: a file URL on another host", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: open_browser_page, tool_input: {url: "file://server/share/x"}}, expect: {decision: deny, rule: error.invalidInput}}
+  - {name: "VS Code: a file URL naming localhost", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: read_file, tool_input: {filePath: "file://localhost{{root}}/proj/README.md", startLine: 1, endLine: 2}}, expect: {decision: deny, rule: error.invalidInput}}
+  - {name: "VS Code: a URL scheme that may name a local file", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: open_browser_page, tool_input: {url: "vscode-remote://ssh-remote+host/home/dev/.env"}}, expect: {decision: deny, rule: error.invalidInput}}
+  - {name: "VS Code: a blank page", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: open_browser_page, tool_input: {url: "about:blank"}}, expect: {decision: none}}
+  - {name: "VS Code: a page's file chooser uploads a secret", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: handle_dialog, tool_input: {pageId: p, selectFiles: ["{{root}}/home/.ssh/id_rsa"]}}, expect: {decision: deny, rule: "files.deny[2]"}}
+
+  # VS Code's settings can switch the hook off (chat.useHooks, chat.hookFilesLocations)
+  - {name: "VS Code: workspace settings", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_file, tool_input: {filePath: "{{root}}/proj/.vscode/settings.json", content: "{\"chat.useHooks\": false}"}}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: "VS Code: the repository's hooks", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: replace_string_in_file, tool_input: {filePath: "{{root}}/proj/.github/hooks/lint.json", oldString: "{", newString: "{ "}}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: "VS Code: machine settings from the terminal", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: run_in_terminal, tool_input: {command: "echo '{}' > {{root}}/home/.vscode-server/data/Machine/settings.json", explanation: x, goal: x, mode: sync}}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: "VS Code: a profile's user settings", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_file, tool_input: {filePath: "{{root}}/home/.config/Code/User/profiles/abc123/settings.json", content: "{}"}}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: "VS Code: Codespaces machine settings", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_file, tool_input: {filePath: "{{root}}/home/.vscode-remote/data/Machine/settings.json", content: "{}"}}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: "VS Code: other user data stays writable", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_file, tool_input: {filePath: "{{root}}/home/.config/Code/User/snippets/go.json", content: "{}"}}, expect: {decision: none}}
+  - {name: "VS Code: Claude Code's hooks, which VS Code may run", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_file, tool_input: {filePath: "{{root}}/proj/.claude/settings.local.json", content: "{}"}}, expect: {decision: deny, rule: builtin.guarded}}
+
+  # Memory paths stay in VS Code's storage
+  - {name: "VS Code: viewing memories", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: memory, tool_input: {command: view, path: "/memories/"}}, expect: {decision: none}}
+  - {name: "VS Code: viewing the memory root without a slash", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: memory, tool_input: {command: view, path: "/memories"}}, expect: {decision: none}}
+  - {name: "VS Code: a memory path that only starts like the root", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: memory, tool_input: {command: view, path: "/memoriesx"}}, expect: {decision: deny, rule: error.invalidInput}}
+  - {name: "VS Code: a memory path that leaves /memories/", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: memory, tool_input: {command: create, path: "/memories/repo/../../../.vscode/settings.json", file_text: "{}"}}, expect: {decision: deny, rule: error.invalidInput}}
+  - {name: "VS Code: renaming a memory out of /memories/", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: memory, tool_input: {command: rename, old_path: "/memories/a.md", new_path: "/etc/x"}}, expect: {decision: deny, rule: error.invalidInput}}
+  - {name: "Copilot CLI may not change VS Code's settings either", policy: baseline, input: {toolName: create, toolArgs: {path: "{{root}}/proj/.vscode/settings.json", file_text: "{}"}}, expect: {decision: deny, rule: builtin.guarded}}
+  # Custom agents can declare hooks, which VS Code runs when the model starts the agent as a subagent
+  - {name: "VS Code: a custom agent", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_file, tool_input: {filePath: "{{root}}/proj/.github/agents/x.agent.md", content: "---\nname: x\n---\n"}}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: "VS Code: a Claude Code agent", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_file, tool_input: {filePath: "{{root}}/proj/.claude/agents/x.md", content: "x"}}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: "VS Code: a personal agent from the terminal", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: run_in_terminal, tool_input: {command: "touch {{root}}/home/.copilot/agents/x.agent.md", explanation: x, goal: x, mode: sync}}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: "VS Code: an agent plugin", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_file, tool_input: {filePath: "{{root}}/home/.vscode-server/data/User/agent-plugins/p/.plugin/plugin.json", content: "{}"}}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: "Copilot CLI may not add a custom agent either", policy: baseline, input: {toolName: create, toolArgs: {path: "{{root}}/proj/.github/agents/x.agent.md", file_text: "x"}}, expect: {decision: deny, rule: builtin.guarded}}
+  # Hook files and settings count in every folder from the session's up to the project or git work tree
+  - {name: "Copilot CLI in a subfolder may not change that folder's settings", policy: baseline, input: {cwd: "{{root}}/proj/src", toolName: create, toolArgs: {path: "{{root}}/proj/src/.vscode/settings.json", file_text: "{}"}}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: "VS Code: a subfolder of a work tree may not change the work tree's hooks", policy: baseline, input: {cwd: "{{root}}/repo/app", hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_file, tool_input: {filePath: "{{root}}/repo/.github/hooks/x.json", content: "{}"}}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: "VS Code: a subfolder of a work tree may not change the work tree's settings", policy: baseline, input: {cwd: "{{root}}/repo/app", hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_file, tool_input: {filePath: "{{root}}/repo/.vscode/settings.json", content: "{}"}}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: "VS Code: other files of the work tree stay writable", policy: baseline, input: {cwd: "{{root}}/repo/app", hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: create_file, tool_input: {filePath: "{{root}}/repo/notes.txt", content: "x"}}, expect: {decision: none}}
+
+  # MCP tools are mcp_<label>_<tool>, the label the server reports cut short
+  - {name: "VS Code: an MCP tool off the allow list", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: mcp_e2e_do_thing, tool_input: {a: x}}, expect: {decision: deny, rule: posture.allow-listed, reasonContains: "VS Code doesn't say which server"}}
+  - {name: "VS Code: a denied server's tools", policy: mcp-deny, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: mcp_evil_srv_run, tool_input: {}}, expect: {decision: deny, rule: "mcp.deny[0]"}}
+  - {name: "VS Code: a token sent to an MCP tool", policy: deny-listed, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: mcp_github_create_issue, tool_input: {body: "{{fake:github-pat}}"}}, expect: {decision: deny, rule: secrets.github-pat}}
+  - {name: "VS Code: an MCP name with no tool part", policy: mcp-deny, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: mcp_x, tool_input: {}}, expect: {decision: deny, rule: error.invalidInput}}
+
+  - {name: "VS Code: subagents and todo lists touch nothing", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: runSubagent, tool_input: {prompt: "list the files", description: sub}}, expect: {decision: none}}
+  - {name: "VS Code: an extension's tool is unclassified", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: install_python_packages, tool_input: {packageList: [requests]}}, expect: {decision: deny, rule: adapter.unclassifiedTool}}
+  - {name: "VS Code: Copilot CLI's names are not VS Code's", policy: baseline, input: {hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: Bash, tool_input: {command: "ls"}}, expect: {decision: deny, rule: adapter.unclassifiedTool}}
+  - {name: "VS Code: no workspace folder", policy: baseline, input: {cwd: "", hook_event_name: PreToolUse, session_id: v1, tool_use_id: "c", tool_name: read_file, tool_input: {filePath: "/etc/hostname", startLine: 1, endLine: 2}}, expect: {decision: deny}}

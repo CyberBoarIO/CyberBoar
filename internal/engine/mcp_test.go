@@ -283,3 +283,60 @@ func TestCopilotWildcardKeepsASCIIScope(t *testing.T) {
 		}
 	}
 }
+
+func TestGlobMatchesStart(t *testing.T) {
+	for _, tc := range []struct {
+		pattern, name string
+		want          bool
+	}{
+		{"write_*", "write_xx", true},
+		{"write_*", "read_xx", false},
+		{"read_file_all", "read_fi", true},
+		{"read_file_all", "read_fx", false},
+		{"*_all", "anything", true},
+		{"[rw]ead", "re", true},
+		{"[^r]ead", "re", false},
+		{`\*x`, "*", true},
+		{`\*x`, "a", false},
+		{"a?c", "ab", true},
+		{"", "a", false},
+	} {
+		got, err := globMatchesStart(tc.pattern, tc.name)
+		if err != nil || got != tc.want {
+			t.Errorf("globMatchesStart(%q, %q) = %v, %v; want %v", tc.pattern, tc.name, got, err, tc.want)
+		}
+	}
+	if _, err := globMatchesStart("[ab", "a"); err == nil {
+		t.Error("an unclosed class is no error")
+	}
+}
+
+// globMatchesStart finds every name a pattern matches with some ending
+func TestGlobMatchesStartCoversEndings(t *testing.T) {
+	patterns := []string{"ab*", "a?b", "[ab]c", "[^a]b*", `a\*`, "*b", "a*b*c", "abc", "?", "[a-b]?"}
+	alphabet := []string{"", "a", "b", "c", "*"}
+	var names []string
+	for _, x := range alphabet {
+		for _, y := range alphabet {
+			names = append(names, x+y)
+		}
+	}
+	for _, p := range patterns {
+		for _, name := range names {
+			if name == "" {
+				continue
+			}
+			some := false
+			for _, e1 := range alphabet {
+				for _, e2 := range alphabet {
+					if ok, _ := path.Match(p, name+e1+e2); ok {
+						some = true
+					}
+				}
+			}
+			if got, err := globMatchesStart(p, name); err != nil || some && !got {
+				t.Errorf("globMatchesStart(%q, %q) = %v, %v; an ending matches", p, name, got, err)
+			}
+		}
+	}
+}

@@ -3,8 +3,10 @@ package engine
 import (
 	"fmt"
 	"path"
+	"strconv"
 	"strings"
 	"unicode/utf16"
+	"unicode/utf8"
 
 	"cyberboar.dev/cyberboar/internal/fold"
 	"cyberboar.dev/cyberboar/internal/policy"
@@ -52,6 +54,9 @@ func compileMCPRules(r policy.Rules) mcpRules {
 // names an agent rewrote, deny and ask rules also match with their globs
 // rewritten the same way, so a rule for write.file still covers write_file
 func (r mcpRule) match(c MCPCall, folded bool) bool {
+	if c.Names == NamesVSCode {
+		return r.matchVSCode(c, folded)
+	}
 	ok, err := r.matchNames(r.server, r.tool, c, folded)
 	if err == nil && !ok && folded {
 		switch c.Names {
@@ -96,6 +101,123 @@ func (r mcpRule) matchNames(rs, rt string, c MCPCall, folded bool) (bool, error)
 	}
 	return ok, err
 }
+
+// matchVSCode matches VS Code's names, whose server part doesn't name the
+// server (NamesVSCode). A deny or ask rule matches the tool of any server,
+// as written or rewritten; an allow rule matches only if it allows every
+// server
+func (r mcpRule) matchVSCode(c MCPCall, folded bool) bool {
+	// VS Code cuts mcp_<prefix>_<tool> at 64 characters
+	cut := vscodeCut(c)
+	c.Server = "*" // a name every server glob matches
+	if !folded {
+		switch {
+		case r.server != "*":
+			return false
+		case r.tool == "":
+			return true
+		case cut:
+			// Every tool that starts with what is left must match, which a
+			// pattern ending in * does when it matches the start
+			toks, err := globTokens(r.tool)
+			if err != nil || len(toks) == 0 || toks[len(toks)-1] != "*" {
+				return false
+			}
+		}
+		ok, err := matchMCP("*", r.tool, c.Server, c.Tool)
+		return err == nil && ok
+	}
+	for _, tool := range []string{r.tool, r.opencodeTool} {
+		var ok bool
+		var err error
+		switch {
+		case tool == "":
+			return true
+		case cut:
+			ok, err = globMatchesStart(tool, c.Tool)
+			if err == nil && !ok {
+				ok, err = globMatchesStart(fold.String(tool), fold.String(c.Tool))
+			}
+		default:
+			ok, err = r.matchNames("*", tool, c, true)
+		}
+		if err != nil || ok {
+			return true // an error is a bug; it counts as a match for deny and ask
+		}
+	}
+	return false
+}
+
+// vscodeCut reports whether VS Code may have cut the call's name short
+func vscodeCut(c MCPCall) bool {
+	return len(VSCodeMCPPrefix)+len(c.Server)+1+len(c.Tool) >= vscodeNameMax
+}
+
+// globTokens splits a path.Match pattern into the pieces that each match
+// one character, or any run of them ("*")
+func globTokens(pattern string) ([]string, error) {
+	var out []string
+	for i := 0; i < len(pattern); {
+		j := i + 1
+		switch pattern[i] {
+		case '\\':
+			if j == len(pattern) {
+				return nil, path.ErrBadPattern
+			}
+			_, n := utf8.DecodeRuneInString(pattern[j:])
+			j += n
+		case '[':
+			// A class ends at the first ] that isn't its first character or escaped
+			if j < len(pattern) && pattern[j] == '^' {
+				j++
+			}
+			for first := true; ; first = false {
+				if j >= len(pattern) {
+					return nil, path.ErrBadPattern
+				}
+				if pattern[j] == ']' && !first {
+					j++
+					break
+				}
+				if pattern[j] == '\\' {
+					j++
+				}
+				j++
+			}
+		case '*', '?':
+		default:
+			_, n := utf8.DecodeRuneInString(pattern[i:])
+			j = i + n
+		}
+		out = append(out, pattern[i:j])
+		i = j
+	}
+	return out, nil
+}
+
+// globMatchesStart reports whether pattern may match a name that starts
+// with name: whether some leading tokens of the pattern match name. The
+// tokens that follow are taken to match some ending, which errs toward a match
+func globMatchesStart(pattern, name string) (bool, error) {
+	toks, err := globTokens(pattern)
+	if err != nil {
+		return false, err
+	}
+	for i := len(toks); i >= 0; i-- {
+		ok, err := path.Match(strings.Join(toks[:i], ""), name)
+		if err != nil || ok {
+			return ok, err
+		}
+	}
+	return false, nil
+}
+
+// VSCodeMCPPrefix starts the name of every MCP tool VS Code offers the
+// model: VSCodeMCPPrefix, the server's prefix, "_" and the tool, cut at
+// vscodeNameMax characters
+const VSCodeMCPPrefix = "mcp_"
+
+const vscodeNameMax = 64
 
 // copilotNameMax is the length Copilot CLI cuts server-tool names to
 const copilotNameMax = 64
@@ -350,6 +472,15 @@ func firstMCP(rules []mcpRule, c MCPCall, folded bool) (string, bool) {
 // evalMCP decides a call to an MCP tool
 func (c *Compiled) evalMCP(a Action) Verdict {
 	name := a.MCP.Server + "/" + a.MCP.Tool
+	hint := ""
+	if a.MCP.Names == NamesVSCode {
+		name = VSCodeMCPPrefix + a.MCP.Server + "_" + a.MCP.Tool + " (VS Code doesn't say which server it belongs to)"
+		hint = "; only an allow rule for every server (*/" + a.MCP.Tool + ") can cover it"
+		if vscodeCut(a.MCP) {
+			hint = "; VS Code cut its name at " + strconv.Itoa(vscodeNameMax) + " characters, so only an allow rule for every server " +
+				"whose tool pattern ends in * (*/" + a.MCP.Tool + "*) can cover it"
+		}
+	}
 	if id, ok := firstMCP(c.mcp.deny, a.MCP, true); ok {
 		return deny(id, fmt.Sprintf("the MCP tool %s is blocked by policy rule %s; do not attempt alternative ways to call it", name, id))
 	}
@@ -362,5 +493,5 @@ func (c *Compiled) evalMCP(a Action) Verdict {
 	if id, ok := firstMCP(c.mcp.allow, a.MCP, false); ok {
 		return Verdict{Decision: Allow, Rule: id, Reason: "allowed by policy rule " + id}
 	}
-	return deny(RulePostureAllowListed, fmt.Sprintf("the MCP tool %s is not on the MCP allow list; do not attempt alternative ways to call it", name))
+	return deny(RulePostureAllowListed, fmt.Sprintf("the MCP tool %s is not on the MCP allow list%s; do not attempt alternative ways to call it", name, hint))
 }

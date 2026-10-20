@@ -25,6 +25,8 @@ retain the policy and agent version involved.
 | A denied operation runs | Verify scope, hook loading, Codex trust and audit event. Review agent hook failure and visibility limits. |
 | An ask rule blocks without prompting | Codex, Cursor and opencode receive deny for ask; Copilot also denies in headless mode. |
 | Cursor shell commands with relative paths are denied | Cursor's shell keeps its directory between calls and reports it only when the call sets a working directory. Start the command with `cd /absolute/project/path &&`. |
+| Copilot in VS Code doesn't run the hook | Trust the workspace, keep `chat.useHooks` on and start a new chat. Run `apply` again if CyberBoar 1.0.0-rc.1 wrote the hook: VS Code's Local agent skips its `exec` form. **Chat: Configure Hooks** lists the files VS Code loaded; the **GitHub Copilot Chat Hooks** output channel shows each run. |
+| Copilot terminal commands in VS Code ask for confirmation | The agent terminal keeps its directory between commands and VS Code doesn't report it, so relative paths may be anywhere. Start the command with `cd /absolute/project/path &&`. |
 | Native Windows calls are blocked | Use Claude Code with Git Bash or another agent with the Linux binary in WSL/a Linux container. |
 | A read gets `builtin.guarded` | Shell access to guarded settings is a potential write. Use a native read tool for inspection; a user must change settings. |
 | A recursive search/archive is blocked | The directory may contain a protected file or built-in protected path. Review `files.containing` and narrow the operation. |

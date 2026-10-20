@@ -141,6 +141,15 @@ const (
 	// [A-Za-z0-9_-] replaced by "_", as Claude Code writes server names in
 	// mcp__<server>__<tool>; the tool part is treated the same way
 	NamesClaudeCode
+	// NamesVSCode has the server as part of VS Code's tool prefix, which comes
+	// from the name the server reports for itself (or its label) cut to 13
+	// characters, and the tool with every UTF-16 code unit outside
+	// [A-Za-z0-9_-] replaced by "_", the whole mcp_<prefix>_<tool> cut at
+	// 64 characters (seen in VS Code 1.142). The server can't be told from
+	// the prefix, so deny and ask rules match the tool of any server, and
+	// allow rules only cover a call when they allow every server ("*"),
+	// and every tool when the name may have been cut
+	NamesVSCode
 )
 
 // validate rejects malformed and ambiguous actions. A field that doesn't belong

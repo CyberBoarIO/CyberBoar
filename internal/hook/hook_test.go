@@ -204,7 +204,8 @@ func checkProtocol(t *testing.T, want string, r hook.Result) {
 
 // checkCopilotProtocol asserts Copilot CLI's preToolUse contract: deny exits
 // 2 with the JSON decision (Copilot shows its reason) and the reason on
-// stderr; ask exits 0 with the JSON decision.
+// stderr; ask exits 0 with the JSON decision
+// The same decision is in hookSpecificOutput, for VS Code's Local agent
 func checkCopilotProtocol(t *testing.T, want string, r hook.Result) {
 	t.Helper()
 	if want == "none" {
@@ -217,17 +218,25 @@ func checkCopilotProtocol(t *testing.T, want string, r hook.Result) {
 	if r.Exit != wantExit {
 		t.Errorf("want exit %d, got %d", wantExit, r.Exit)
 	}
-	var out struct {
+	type decision struct {
+		Event    string `json:"hookEventName,omitempty"`
 		Decision string `json:"permissionDecision"`
 		Reason   string `json:"permissionDecisionReason"`
+	}
+	var out struct {
+		decision
+		Specific decision `json:"hookSpecificOutput"`
 	}
 	dec := json.NewDecoder(bytes.NewReader(r.Stdout))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&out); err != nil {
 		t.Fatalf("stdout is not the hook JSON: %v (%q)", err, r.Stdout)
 	}
-	if out.Decision != want || out.Reason == "" {
+	if out.Decision != want || out.Reason == "" || out.Event != "" {
 		t.Errorf("unexpected hook JSON %+v", out)
+	}
+	if out.Specific != (decision{"PreToolUse", out.Decision, out.Reason}) {
+		t.Errorf("hookSpecificOutput %+v differs from the top-level answer", out.Specific)
 	}
 	if want == "deny" && !strings.Contains(r.Stderr, out.Reason) {
 		t.Errorf("deny reason not on stderr: %q", r.Stderr)

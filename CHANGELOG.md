@@ -7,6 +7,26 @@ protocol, audit schema and public Go packages under `pkg/`.
 
 ## [Unreleased]
 
+### Added
+
+- GitHub Copilot in VS Code: the `copilot-cli` hook now covers VS Code's
+  Copilot session target and its Local agent (verified with VS Code 1.142 and
+  GitHub Copilot Chat 0.70). The Local agent's file, terminal, task, search, URL
+  and MCP tools are classified. Tools the hook can't check (typing into
+  a terminal or running VS Code commands), and extensions' tools are denied.
+  VS Code's settings that can switch hooks off are guarded, in every profile.
+  For Copilot CLI and VS Code, hook files and workspace settings are
+  guarded in the session's folder and every folder above it up to its git work
+  tree, and so are custom agents and agent plugins, whose hooks VS Code runs.
+  `apply` informs when the Local agent won't read the installed hook (managed
+  scope, or `COPILOT_HOME` set).
+
+### Changed
+
+- `apply --agent copilot-cli` writes the hook as a quoted `bash` command ending
+  in `|| exit 2`, with a `powershell` command that denies every call on native Windows.
+- Copilot hook answers carry `hookSpecificOutput`.
+
 ### Fixed
 
 - A shell variable that the command line sets to a plain value before using
