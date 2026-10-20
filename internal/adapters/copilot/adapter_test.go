@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"cyberboar.dev/cyberboar/internal/adapters"
 	"cyberboar.dev/cyberboar/internal/engine"
 )
 
@@ -187,8 +188,107 @@ func TestSessionStartOutput(t *testing.T) {
 	if out := (Adapter{}).SessionStartOutput(""); out != nil {
 		t.Errorf("empty text: %q", out)
 	}
-	var got map[string]string
-	if err := json.Unmarshal((Adapter{}).SessionStartOutput("hi"), &got); err != nil || len(got) != 1 || got["additionalContext"] != "hi" {
-		t.Errorf("got %v, %v", got, err)
+	var got struct {
+		AdditionalContext  string
+		HookSpecificOutput map[string]string
+	}
+	err := json.Unmarshal((Adapter{}).SessionStartOutput("hi"), &got)
+	if err != nil || got.AdditionalContext != "hi" ||
+		len(got.HookSpecificOutput) != 2 || got.HookSpecificOutput["hookEventName"] != "SessionStart" || got.HookSpecificOutput["additionalContext"] != "hi" {
+		t.Errorf("got %+v, %v", got, err)
+	}
+}
+
+// Every input captured from VS Code's Local agent maps cleanly: known tool,
+// well-formed input. The tools denied on purpose (RuleUncheckedTool) count as known
+func TestCapturedVSCodeInputs(t *testing.T) {
+	files, _ := filepath.Glob(filepath.Join(testdata, "vscode-captured-*.jsonl"))
+	if len(files) == 0 {
+		t.Fatal("no captured inputs")
+	}
+	root := filepath.ToSlash(t.TempDir())
+	env := Env{Home: "/home/dev"}
+	for _, name := range files {
+		data, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+			line = strings.ReplaceAll(line, "{{root}}", root)
+			in, err := ParseInput([]byte(line))
+			if err != nil || !in.Local() {
+				t.Errorf("%s:%d: not a Local agent input: %v", filepath.Base(name), i+1, err)
+				continue
+			}
+			if _, err := VSCodeActions(in, env); err != nil {
+				if ae, ok := err.(*adapters.Error); !ok || ae.Rule != RuleUncheckedTool {
+					t.Errorf("%s:%d: %s: %v", filepath.Base(name), i+1, *in.ToolNameVSCode, err)
+				}
+			}
+		}
+	}
+}
+
+// Every built-in tool a captured VS Code offers the model is classified, so
+// a new tool shows up here before it reaches a user. Extensions' tools are
+// denied as unclassified, and MCP tools read as MCP tools
+func TestCapturedVSCodeToolsClassified(t *testing.T) {
+	files, _ := filepath.Glob(filepath.Join(testdata, "vscode-tools-*.json"))
+	if len(files) == 0 {
+		t.Fatal("no captured tool lists")
+	}
+	tools, err := vscodeClassification()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var list struct{ Tools, ExtensionTools, MCPTools []string }
+		if err := json.Unmarshal(data, &list); err != nil {
+			t.Fatal(err)
+		}
+		for _, tool := range list.Tools {
+			if _, ok := tools[tool]; !ok {
+				t.Errorf("%s: tool %s is not classified in vscode-tools.yaml", filepath.Base(f), tool)
+			}
+		}
+		for _, tool := range list.ExtensionTools {
+			if _, ok := tools[tool]; ok || strings.HasPrefix(tool, vscodeMCPPrefix) {
+				t.Errorf("%s: extension tool %s is classified or reads as MCP", filepath.Base(f), tool)
+			}
+		}
+		for _, tool := range list.MCPTools {
+			acts, err := vscodeMCPActions(tool, engine.Action{})
+			if err != nil || len(acts) == 0 {
+				t.Errorf("%s: MCP tool %s: %v", filepath.Base(f), tool, err)
+			}
+		}
+	}
+}
+
+// VS Code's MCP names split at every "_" inside the longest prefix
+func TestVSCodeMCPSplits(t *testing.T) {
+	for name, want := range map[string][]string{
+		"mcp_e2e_do_thing":              {"e2e/do_thing", "e2e_do/thing"},
+		"mcp_azure_bicep_m_build_bicep": {"azure/bicep_m_build_bicep", "azure_bicep/m_build_bicep", "azure_bicep_m/build_bicep"},
+		"mcp_github2_create_issue":      {"github2/create_issue"}, // a "_" at 18 would make the prefix too long
+		"mcp_abcdefghijklm_x_y":         {"abcdefghijklm/x_y"},
+		"mcp_x":                         nil,
+		"mcp__tool":                     nil,
+	} {
+		acts, _ := vscodeMCPActions(name, engine.Action{})
+		var got []string
+		for _, a := range acts {
+			got = append(got, a.MCP.Server+"/"+a.MCP.Tool)
+			if a.MCP.Names != engine.NamesVSCode {
+				t.Errorf("%s: names %v", name, a.MCP.Names)
+			}
+		}
+		if strings.Join(got, " ") != strings.Join(want, " ") {
+			t.Errorf("%s: splits %q, want %q", name, got, want)
+		}
 	}
 }

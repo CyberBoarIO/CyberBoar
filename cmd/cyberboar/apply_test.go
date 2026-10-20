@@ -256,11 +256,12 @@ func TestApplyCopilot(t *testing.T) {
 		code := run(append([]string{"apply", "-agent", "copilot-cli", "-policy", baseline}, args...), strings.NewReader(""), &out, &errb, env)
 		return code, out.String(), errb.String()
 	}
-	if code, out, errs := run1("-scope", "user", "-write", "-command", "/usr/local/bin/cyberboar"); code != 0 || !strings.Contains(out, "times out") {
+	if code, out, errs := run1("-scope", "user", "-write", "-command", "/usr/local/bin/cyberboar"); code != 0 || !strings.Contains(out, "times out") ||
+		!strings.Contains(out, "Local agent run this hook too") {
 		t.Fatalf("user scope: exit %d %s %s", code, out, errs)
 	}
 	got, err := os.ReadFile(filepath.Join(home, ".copilot", "hooks", "cyberboar.json"))
-	if err != nil || !strings.Contains(string(got), `"copilot-cli"`) || !strings.Contains(string(got), `"preToolUse"`) {
+	if err != nil || !strings.Contains(string(got), `'copilot-cli'`) || !strings.Contains(string(got), `"preToolUse"`) {
 		t.Fatalf("hooks file: %v %s", err, got)
 	}
 	// Copilot 1.0.97 writes config.json with comments
@@ -272,8 +273,22 @@ func TestApplyCopilot(t *testing.T) {
 	}
 	os.Remove(config)
 	managed := t.TempDir()
-	if code, _, errs := run1("-scope", "managed", "-managed-dir", managed, "-write", "-allow-unsigned"); code != 0 {
-		t.Fatalf("managed: %s", errs)
+	if code, out, errs := run1("-scope", "managed", "-managed-dir", managed, "-write", "-allow-unsigned"); code != 0 ||
+		!strings.Contains(out, "Local agent doesn't read "+managed+", so it runs without this hook") {
+		t.Fatalf("managed: exit %d %s %s", code, out, errs)
+	}
+	// VS Code's Local agent reads ~/.copilot/hooks
+	for _, tc := range []struct {
+		dir   string
+		local bool
+	}{{filepath.Join(home, "copilot-home"), false}, {filepath.Join(home, ".copilot") + "/", true}} {
+		var out, errb bytes.Buffer
+		cenv := func(k string) string { return map[string]string{"HOME": home, "COPILOT_HOME": tc.dir}[k] }
+		code := run([]string{"apply", "-agent", "copilot-cli", "-policy", baseline, "-scope", "user", "-command", "/usr/local/bin/cyberboar"},
+			strings.NewReader(""), &out, &errb, cenv)
+		if code != 0 || strings.Contains(out.String(), "Local agent run this hook too") != tc.local {
+			t.Errorf("COPILOT_HOME=%s: exit %d %s %s", tc.dir, code, out.String(), errb.String())
+		}
 	}
 	if _, err := os.Stat(filepath.Join(managed, "cyberboar.json")); err != nil {
 		t.Error(err)

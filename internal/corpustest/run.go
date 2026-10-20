@@ -144,6 +144,8 @@ func mcpNames(s string) engine.MCPNames {
 		return engine.NamesCodex
 	case "claude-code":
 		return engine.NamesClaudeCode
+	case "vscode":
+		return engine.NamesVSCode
 	}
 	return engine.NamesAsConfigured
 }
