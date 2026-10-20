@@ -1,0 +1,125 @@
+# How the tools of VS Code's Local agent touch the machine, for the PreToolUse
+# hook. VS Code runs the hook file's bash command with its own input:
+# tool_name, tool_input (an object) and tool_use_id
+#
+# A tool not listed here is denied, extensions' tools included: new tools are
+# never trusted until someone has read their input schema and classified
+# them. A name starting with "mcp_" that isn't listed is an MCP tool
+#
+# Per tool, one or more of:
+#   read, write, list: tool_input fields holding paths (as for Copilot CLI)
+#   content, edit:     fields holding text a write adds, and its text edits
+#   replacements:      field holding a list of {filePath, oldString, newString} edits
+#   patch:             field holding an apply_patch document
+#   shell:             field holding a command for the agent's terminal, which
+#                      keeps its directory, variables and aliases between calls,
+#                      so the command starts in a directory the hook isn't told
+#   task:              the input is create_and_run_task's: a shell task it saves in
+#                      .vscode/tasks.json and runs; task properties the hook can't
+#                      check (options.env, dependsOn, runOptions, …) and ${…}
+#                      variables are refused, and so are a workspace folder other
+#                      than the hook's and, with args, words VS Code may quote
+#   urls:              fields holding URLs; a file: URL is read, http(s), about and
+#                      data URLs are network access, and any other scheme is refused
+#   memory:            fields holding memory tool paths, which must stay in /memories/
+#   workspace:         read or list: the tool also searches the whole workspace
+#   defaultCwd:        read or list: with none of its path fields present, the tool
+#                      acts on the workspace
+#   sql:               duckdb: field "query" holds a query VS Code runs itself on
+#                      the session store; file access from SQL is refused
+#   required:          fields that must be present
+#   deny:              the tool is denied, with this reason
+#   passthrough:       the tool touches no local file and runs no command
+#
+# Field paths: "a", "a[]", "a[].b". Relative paths resolve against the
+# workspace folder (the hook input's cwd)
+#
+# Sources: the tool schemas VS Code 1.142 with GitHub Copilot Chat 0.70 offers
+# the model, and hook inputs captured from it
+
+version: 1
+tools:
+  # --- Files ----------------------------------------------------------------------
+  read_file: {read: [filePath], required: [filePath]}
+  view_image: {read: [filePath], required: [filePath]}
+  list_dir: {list: [path], required: [path]}
+  copilot_getNotebookSummary: {read: [filePath], required: [filePath]}
+  read_notebook_cell_output: {read: [filePath], required: [filePath]}
+  get_errors: {read: ["filePaths[]"], defaultCwd: read}           # diagnostics quote the code
+  test_search: {read: ["filePaths[]"]}
+  get_changed_files: {read: [repositoryPath], defaultCwd: read}   # diffs
+  file_search: {workspace: list}                                  # names only
+  read_project_structure: {workspace: list}
+  grep_search: {workspace: read}                                  # includeIgnoredFiles reaches .env
+  semantic_search: {workspace: read}
+  search_workspace_symbols: {workspace: read}
+  vscode_listCodeUsages: {read: [filePath], urls: [uri], workspace: read}
+
+  create_file: {write: [filePath], content: [content], required: [filePath, content]}
+  create_directory: {write: [dirPath], required: [dirPath]}
+  replace_string_in_file: {write: [filePath], edit: {old: oldString, new: newString}, required: [filePath]}
+  multi_replace_string_in_file: {replacements: replacements, required: [replacements]}
+  insert_edit_into_file: {write: [filePath], content: [code], required: [filePath, code]}   # a sketch of the change
+  apply_patch: {patch: input, required: [input]}
+  edit_notebook_file: {write: [filePath], content: [newCode], required: [filePath]}
+  create_new_jupyter_notebook: {passthrough: true}                # an untitled notebook; saving it is the user's
+  vscode_renameSymbol: {deny: "renames a symbol in every file that uses it, which the hook can't see; edit the files with replace_string_in_file instead"}
+  create_new_workspace: {deny: "creates a project in a folder the hook isn't told; ask the user to create it"}
+
+  # --- Commands -------------------------------------------------------------------
+  run_in_terminal: {shell: command, required: [command]}
+  create_and_run_task: {task: true, required: [workspaceFolder, task]}
+  # Output of, and control over, commands already checked
+  get_terminal_output: {passthrough: true}
+  terminal_last_command: {passthrough: true}
+  terminal_selection: {passthrough: true}
+  kill_terminal: {passthrough: true}
+  get_task_output: {passthrough: true}
+  testFailure: {passthrough: true}
+  send_to_terminal: {deny: "types input into a running terminal, which the hook never sees as a command; run the command with run_in_terminal, or ask the user to type it"}
+  run_task: {deny: "runs a task from tasks.json, whose command the hook can't check; run the command with run_in_terminal instead"}
+  runTests: {deny: "runs tests through an extension, whose command the hook can't check; run them with run_in_terminal instead"}
+  run_notebook_cell: {deny: "runs notebook code in a kernel, which the hook can't check; ask the user to run the cell"}
+  run_vscode_command: {deny: "runs any VS Code command, which can change settings or run code the hook can't check; ask the user to run it"}
+  install_extension: {deny: "installs an extension, which runs code the hook can't check; ask the user to install it"}
+
+  # --- Network and the integrated browser -----------------------------------------
+  # Network access is not governed (see the README's "What it does not do"), but a
+  # file: URL reads a local file
+  fetch_webpage: {urls: ["urls[]"], required: [urls]}
+  open_browser_page: {urls: [url]}
+  navigate_page: {urls: [url]}
+  handle_dialog: {read: ["selectFiles[]"]}           # a file chooser uploads these
+  read_page: {passthrough: true}
+  screenshot_page: {passthrough: true}
+  click_element: {passthrough: true}
+  hover_element: {passthrough: true}
+  drag_element: {passthrough: true}
+  type_in_page: {passthrough: true}
+  run_playwright_code: {deny: "runs code in the browser, which the hook can't check; use the other browser tools"}
+  github_repo: {passthrough: true}
+  github_text_search: {passthrough: true}
+
+  # --- Queries VS Code runs itself ---------------------------------------------------
+  session_store_sql: {sql: duckdb}
+
+  # --- No local file access, no commands ------------------------------------------
+  # Subagents' own tool calls go through this hook too (seen in 0.70)
+  runSubagent: {passthrough: true}
+  search_subagent: {passthrough: true}
+  explore_subagent: {passthrough: true}
+  execution_subagent: {passthrough: true}
+  switch_agent: {passthrough: true}
+  tool_search: {passthrough: true}
+  skill: {passthrough: true}
+  manage_todo_list: {passthrough: true}
+  vscode_askQuestions: {passthrough: true}
+  vscode_reviewPlan: {passthrough: true}
+  vscode_get_confirmation: {passthrough: true}
+  vscode_get_confirmation_with_options: {passthrough: true}
+  vscode_get_terminal_confirmation: {passthrough: true}
+  get_vscode_api: {passthrough: true}
+  vscode_searchExtensions_internal: {passthrough: true}
+  # Memory files live in VS Code's own storage, under paths of its own (/memories/)
+  memory: {memory: [path, old_path, new_path], required: [command]}
+  resolve_memory_file_uri: {passthrough: true}

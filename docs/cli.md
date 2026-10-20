@@ -603,34 +603,15 @@ Stdout (exit `0`):
   "hooks": {
     "preToolUse": [
       {
-        "args": [
-          "hook",
-          "--agent",
-          "copilot-cli",
-          "--policy",
-          "policies/starter.yaml",
-          "--audit",
-          "/tmp/cyberboar-example/audit.jsonl",
-          "--state",
-          "/tmp/cyberboar-example/hook-state",
-          "--deadline",
-          "5s"
-        ],
-        "exec": "cyberboar",
+        "bash": "'cyberboar' 'hook' '--agent' 'copilot-cli' '--policy' 'policies/starter.yaml' '--audit' '/tmp/cyberboar-example/audit.jsonl' '--state' '/tmp/cyberboar-example/hook-state' '--deadline' '5s' || exit 2",
+        "powershell": "[Console]::Error.WriteLine('cyberboar: GitHub Copilot on native Windows is not supported, so the tool call is blocked; use WSL or a Linux dev container'); exit 2",
         "timeoutSec": 15,
         "type": "command"
       }
     ],
     "sessionStart": [
       {
-        "args": [
-          "brief",
-          "--agent",
-          "copilot-cli",
-          "--policy",
-          "policies/starter.yaml"
-        ],
-        "exec": "cyberboar",
+        "bash": "'cyberboar' 'brief' '--agent' 'copilot-cli' '--policy' 'policies/starter.yaml'",
         "timeoutSec": 15,
         "type": "command"
       }
@@ -642,6 +623,7 @@ Stdout (exit `0`):
 Notes:
   - Copilot lets a tool call through when the hook times out or answers with invalid JSON; the hook answers within --deadline to stay clear of that
   - command, file and MCP rules are enforced only by the hook
+  - VS Code's Copilot session target and Local agent run this hook too, in a trusted workspace while chat.useHooks is on; start a new chat to load it
   - users can switch user and repository hooks off (disableAllHooks); --scope managed can't be switched off and must be owned by root
 ```
 

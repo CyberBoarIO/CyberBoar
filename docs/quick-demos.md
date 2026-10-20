@@ -13,10 +13,9 @@ ordering proxy, not a CLI market-share claim. See the [capability
 matrix](capability-matrix.md) for CyberBoar's enforcement coverage.
 
 Using an editor instead of a CLI? Follow [Editor integrations](editor-integrations.md)
-for the supported Claude Code, Codex, opencode and Cursor editor integrations, all
-under active testing, then run the prompts from the editor. **Copilot editor support
-is experimental.** Its Local VS Code agent still requires a separate adapter;
-the Copilot CLI demo does not validate either editor session target.
+for the supported Claude Code, Codex, opencode, Cursor and Copilot in VS Code
+integrations, then run the prompts from the editor. The Copilot CLI setup also covers
+Copilot in VS Code; run the prompts from a VS Code chat to check it there.
 
 ## Before the clock starts
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"cyberboar.dev/cyberboar/internal/adapters"
 	"cyberboar.dev/cyberboar/pkg/brand"
@@ -124,15 +125,24 @@ func BriefArgs(o FragmentOptions) []string {
 	return adapters.BriefArgs("copilot-cli", o.Policy, o.PubKey)
 }
 
-// HooksFile returns the hooks file for a scope. The command is run directly
-// (exec and args), never through a shell, so no path needs quoting
+// WindowsDenial is the hook's PowerShell command, which Copilot CLI and VS
+// Code run on native Windows
+const WindowsDenial = "[Console]::Error.WriteLine('" + brand.Name + ": GitHub Copilot on native Windows is not supported, so the tool call is blocked; use WSL or a Linux dev container'); exit 2"
+
+// HooksFile returns the hooks file for a scope. Each hook is a bash command
+// with every word quoted, which Copilot CLI, VS Code's Copilot session target
+// and VS Code's Local agent all run; the Local agent skips an exec and args
+// hook. The pre-tool hook ends in "|| exit 2": VS Code lets a tool run when
+// the hook exits with any other status but 0, such as 127 when the command is
+// missing, while Copilot denies on any status but 0
 // The hook has no matcher, so it runs for every tool, MCP tools included
 func HooksFile(o FragmentOptions) ([]byte, error) {
 	hooks := map[string]any{
-		"preToolUse": []any{map[string]any{"type": "command", "exec": o.Command, "args": HookArgs(o), "timeoutSec": HookTimeout}},
+		"preToolUse": []any{map[string]any{"type": "command", "bash": shellLine(o.Command, HookArgs(o)) + " || exit 2",
+			"powershell": WindowsDenial, "timeoutSec": HookTimeout}},
 	}
 	if o.Briefing {
-		hooks["sessionStart"] = []any{map[string]any{"type": "command", "exec": o.Command, "args": BriefArgs(o), "timeoutSec": HookTimeout}}
+		hooks["sessionStart"] = []any{map[string]any{"type": "command", "bash": shellLine(o.Command, BriefArgs(o)), "timeoutSec": HookTimeout}}
 	}
 	out, err := json.MarshalIndent(map[string]any{"version": 1, "hooks": hooks}, "", "  ")
 	if err != nil {
@@ -141,12 +151,24 @@ func HooksFile(o FragmentOptions) ([]byte, error) {
 	return append(out, '\n'), nil
 }
 
+// shellLine quotes a command and its arguments as one POSIX shell line
+func shellLine(command string, args []string) string {
+	words := make([]string, 0, 1+len(args))
+	for _, w := range append([]string{command}, args...) {
+		words = append(words, adapters.ShellQuote(w))
+	}
+	return strings.Join(words, " ")
+}
+
 // SessionStartOutput returns Copilot's sessionStart answer, which has
-// additionalContext at the top level. Empty text gives no output
+// additionalContext at the top level, and the same text in
+// hookSpecificOutput for VS Code's Local agent. Copilot ignores
+// hookSpecificOutput (seen in 1.0.98)
 func (Adapter) SessionStartOutput(text string) []byte {
 	if text == "" {
 		return nil
 	}
-	out, _ := json.Marshal(map[string]any{"additionalContext": text})
+	out, _ := json.Marshal(map[string]any{"additionalContext": text,
+		"hookSpecificOutput": map[string]any{"hookEventName": "SessionStart", "additionalContext": text}})
 	return append(out, '\n')
 }

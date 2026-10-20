@@ -1,16 +1,16 @@
 # Editor integrations
 
 CyberBoar supports the official Claude Code, Codex and opencode editor extensions,
-and the Cursor editor. These integrations reuse the agents' existing hooks or
-plugins; CyberBoar runs in the agent's execution environment, not as a VS Code
-extension of its own. **Copilot editor support is experimental**; its Agent Host
-and Local session targets have different requirements, described below.
+the Cursor editor, and GitHub Copilot in VS Code: both its Copilot session target and
+its Local agent. These integrations reuse the agents' existing hooks or plugins;
+CyberBoar runs in the agent's execution environment, not as a VS Code extension of
+its own.
 
-**Active testing:** Editor integrations for all five supported agents are under
-active testing. This support status is not a claim that every editor tool, version
-or platform has been verified: CLI/runtime tests do not establish editor-session
-coverage, and end-to-end editor-session verification is still pending. Confirm an
-allowed and a policy-denied tool call from the editor before relying on a setup.
+**Active testing:** Copilot in VS Code has been verified end to end from editor
+sessions; the other editor integrations are under active testing. This support status
+is not a claim that every editor tool, version or platform has been verified:
+CLI/runtime tests do not establish editor-session coverage. Confirm an allowed and a
+policy-denied tool call from the editor before relying on a setup.
 See the [capability matrix](capability-matrix.md) for tested versions and limitations.
 
 ## Choose the integration
@@ -21,8 +21,8 @@ See the [capability matrix](capability-matrix.md) for tested versions and limita
 | Codex | `openai.chatgpt` | Supported; active testing | `--agent codex`; existing `.codex/hooks.json` |
 | opencode | `sst-dev.opencode` | Supported; active testing | `--agent opencode`; existing `.opencode/plugin/cyberboar.js` |
 | Cursor | Cursor editor, not a separate VS Code extension | Supported; real-agent validation pending | `--agent cursor`; existing `.cursor/hooks.json` |
-| Copilot on VS Code Agent Host | GitHub Copilot Chat (`GitHub.copilot-chat`); select the Copilot session target | Experimental; active testing | CLI hook implementation can be reused in principle; editor-session verification pending |
-| Copilot in VS Code's Local agent | GitHub Copilot Chat (`GitHub.copilot-chat`); select the Local session target | Experimental; adapter planned | Not supported by the current `copilot-cli` adapter; separate adapter work is planned |
+| Copilot in VS Code, Copilot session target | GitHub Copilot Chat, built into VS Code | Supported; validated with VS Code 1.142 | `--agent copilot-cli`; `.github/hooks/cyberboar.json` |
+| Copilot in VS Code, Local agent | GitHub Copilot Chat, built into VS Code | Supported; validated with VS Code 1.142 | `--agent copilot-cli`; the same `.github/hooks/cyberboar.json` |
 
 Selecting a Claude or OpenAI **model** in Copilot does not select the Claude Code or
 Codex runtime. Choose the actual extension/session target. VS Code documents these
@@ -137,22 +137,84 @@ and Tab-read checks. Real-agent validation of the Cursor editor remains pending.
 
 ## Copilot in VS Code
 
-**Experimental support:** Copilot editor integration is under active testing and
-development. Do not treat it as equivalent to the existing Copilot CLI integration.
+GitHub Copilot Chat is built into VS Code. Its **Copilot** session target runs Copilot
+CLI's runtime, and its **Local** agent runs VS Code's own tools. Both read Copilot's
+hook files, so one installation covers them and Copilot CLI:
 
-VS Code's **Copilot Agent Host** and **Local** session targets do not have identical
-tool payloads. Agent Host uses the Copilot SDK hook implementation shared with the
-CLI, but this editor workflow still needs verification against the selected VS Code
-version. Existing [Copilot CLI configuration](agents.md#github-copilot-cli) is a reuse
-candidate; experimental status does not mean this editor workflow is validated.
+```sh
+"$cyberboar_bin" apply --agent copilot-cli --scope project --dir . \
+  --command "$cyberboar_bin" --policy .cyberboar/policy.yaml \
+  --audit .cyberboar/audit.jsonl --state .cyberboar/hook-state
+```
 
-The **Local** agent sends VS Code-specific tools and `tool_name`/`tool_input` fields.
-The current `copilot-cli` adapter deliberately rejects that input. Loading the same
-JSON file, changing its event capitalization, or selecting a different model does
-not make it supported. Do not install the CLI hook as a Local-agent workaround.
-Separate adapter work must verify file, terminal and MCP mapping, output decisions,
-configuration guards and execution failures. See the [Local hooks
-reference](https://code.visualstudio.com/docs/agents/reference/hooks-reference).
+This creates `.github/hooks/cyberboar.json`; `--scope user` writes
+`~/.copilot/hooks/cyberboar.json` instead. The hook is a shell command, which both
+surfaces run (the Local agent skips Copilot's `exec` form), and it ends in
+`|| exit 2`: VS Code lets a tool run when a hook exits with anything but 0 or 2, such
+as when the binary is missing. If you installed with CyberBoar 1.0.0-rc.1, run
+`apply` again; its hook does not run in the Local agent.
+
+VS Code runs workspace hooks only in a **trusted workspace**, and only while
+`chat.useHooks` is on (the default). Run **Chat: Configure Hooks** to see the files
+VS Code found, and the **GitHub Copilot Chat Hooks** output channel to see each run.
+CyberBoar blocks agent changes to the settings that can switch hooks off: the
+workspace's `.vscode/settings.json`, your user settings in every profile and a remote
+machine's settings, including a Codespace's. Hook files and workspace settings are
+guarded in the workspace folder and every folder above it up to its git work tree,
+which VS Code also reads with `chat.useCustomizationsInParentRepositories` on. A
+`*.code-workspace` file can hold the same settings and is not guarded.
+
+The Local agent reads `.github/hooks` and `~/.copilot/hooks`. It doesn't read the
+managed directory (`--scope managed`), or a user hook installed while `COPILOT_HOME`
+points elsewhere; `apply` says so when that is the case.
+
+What the Local agent's hook checks differs from Copilot CLI's:
+
+- **Terminal:** the agent terminal keeps its directory between commands and VS Code
+  doesn't tell the hook which it is, so a command reaching a relative path asks for
+  confirmation, which VS Code shows. Commands that start with `cd /absolute/dir &&`
+  are checked fully. The terminal is read as bash or zsh: keep its profile on one of
+  those. `send_to_terminal`, which types into a running program, is denied.
+- **Searches:** `grep_search`, `semantic_search` and symbol searches can read every
+  file in the workspace, so a workspace holding a protected file blocks them; agents
+  then read files by name.
+- **Tools the hook can't check** are denied: running saved tasks, tests through an
+  extension or notebook cells, VS Code commands, installing extensions, browser code
+  and symbol renames across files. Tools contributed by other extensions are denied
+  as unclassified. A new task (`create_and_run_task`) may set only its command,
+  arguments and working directory; environment, shell, per-platform commands,
+  dependencies, automatic runs and `${…}` variables are refused. Its workspace
+  folder must be the one the hook runs in, and because VS Code decides how to quote
+  a task's arguments, a task with arguments may hold only plain words (letters,
+  digits and `_ . / = : , @ % + -`); a command line goes in the command alone.
+- **MCP tools** are named `mcp_<label>_<tool>`, where the label is the name the server
+  reports for itself, not the name you configured, and the whole name is cut at 64
+  characters. Deny and ask rules therefore match the tool of any server, so a rule
+  denying a whole server (`github`) denies every MCP tool in VS Code, and only allow
+  rules for every server (`*/search`) cover a call. When a name was cut, deny and ask
+  rules match if their tool could start with what is left, and only an allow rule
+  whose tool pattern ends in `*` (`*/search*`) covers it. A tool from another
+  extension whose name starts with `mcp_` can't be told from an MCP tool, so it is
+  checked as one instead of being denied.
+- **Output and edits:** `terminal_last_command` and `terminal_selection` return what
+  a terminal shows, which may be a command you typed yourself, not one the hook
+  checked. `insert_edit_into_file` sends a sketch of the change that another model
+  turns into the written text, so secrets are looked for in the sketch, not in what
+  is finally written.
+- **Custom agents:** an agent file can declare hooks, which VS Code runs when the
+  model starts that agent as a subagent. CyberBoar therefore blocks agent changes to
+  custom agents and agent plugins: `.github/agents` and `.claude/agents` (in the same
+  folders as the hook files), `~/.copilot/agents`, `~/.claude/agents` and each
+  profile's `agent-plugins`. Edit agent files yourself.
+- **Not covered:** the hook guards the files above, but not other files VS Code runs
+  from later: `.vscode/mcp.json` servers, `.vscode/tasks.json`, or hook and agent
+  locations added with `chat.hookFilesLocations` and `chat.agentFilesLocations`. VS Code tells the hook only the folder it runs in,
+  so in a multi-root workspace the other folders are unknown: searches are checked
+  against that folder only, and the other folders' `.vscode/settings.json` and
+  `.github/hooks` are not guarded. Keep protected files out of multi-root workspaces.
+
+See the [capability matrix](capability-matrix.md) for the full comparison and the
+[Local hooks reference](https://code.visualstudio.com/docs/agents/reference/hooks-reference).
 
 ## Verify from the editor
 

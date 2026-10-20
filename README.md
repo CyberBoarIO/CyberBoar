@@ -16,7 +16,8 @@ deploying.
 
 The official Claude Code, Codex and opencode editor extensions are supported and under
 active testing. The Cursor editor is supported, with real-agent validation pending.
-**Copilot editor support is experimental.**
+GitHub Copilot in VS Code, both its Copilot session target and its Local agent, is
+supported and verified with VS Code 1.142.
 See [editor integrations](docs/editor-integrations.md) for setup, validation status
 and session-specific limitations.
 

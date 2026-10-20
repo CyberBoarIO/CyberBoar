@@ -1,10 +1,13 @@
-// Package copilot maps GitHub Copilot CLI's preToolUse hook input to engine
-// actions and engine verdicts to hook output
+// Package copilot maps GitHub Copilot's preToolUse hook input to engine
+// actions and engine verdicts to hook output, for Copilot CLI, the Copilot
+// session target of VS Code (which runs Copilot CLI's runtime) and VS Code's
+// Local agent, which all read the same hook files
 //
 // The hook is installed under the camelCase event name preToolUse, whose
-// input names Copilot's own tools, such as bash, powershell and view. The
-// VS Code-compatible PreToolUse form reports bash and powershell both as Bash,
-// so the adapter refuses it
+// input from Copilot names its own tools, such as bash, powershell and view.
+// Copilot's VS Code-compatible PreToolUse form reports bash and powershell
+// both as Bash, so the adapter refuses it. VS Code's Local agent sends that
+// form with a tool_use_id and its own tools (vscode.go)
 package copilot
 
 import (
@@ -40,10 +43,17 @@ type Input struct {
 	Cwd       string          `json:"cwd"`
 	ToolName  string          `json:"toolName"`
 	ToolArgs  json.RawMessage `json:"toolArgs"`
-	// ToolNameVSCode is the VS Code-compatible form's field
-	// It is decoded only so that such input can be refused
-	ToolNameVSCode *string `json:"tool_name"`
+	// The VS Code-compatible form's fields. VS Code's Local agent sends this
+	// form with a tool_use_id and Copilot sends it without one
+	ToolNameVSCode *string         `json:"tool_name"`
+	ToolInput      json.RawMessage `json:"tool_input"`
+	ToolUseID      string          `json:"tool_use_id"`
+	SessionIDVS    string          `json:"session_id"`
+	HookEventName  string          `json:"hook_event_name"`
 }
+
+// Local reports whether the input is from VS Code's Local agent
+func (in *Input) Local() bool { return in.ToolNameVSCode != nil }
 
 // ParseInput decodes exactly one JSON object
 func ParseInput(data []byte) (*Input, error) {
@@ -52,7 +62,16 @@ func ParseInput(data []byte) (*Input, error) {
 		return nil, err
 	}
 	if in.ToolNameVSCode != nil {
-		return nil, adapters.Invalid("the hook input is in the VS Code-compatible PreToolUse form, which reports bash and powershell alike; install the hook under preToolUse")
+		switch {
+		case in.ToolUseID == "" || in.HookEventName != "PreToolUse":
+			return nil, adapters.Invalid("the hook input is in the VS Code-compatible PreToolUse form, which reports bash and powershell alike; install the hook under preToolUse")
+		case in.ToolName != "":
+			return nil, adapters.Invalid("the hook input has both toolName and tool_name")
+		case *in.ToolNameVSCode == "":
+			return nil, adapters.Invalid("the hook input has no tool_name")
+		}
+		in.SessionID = in.SessionIDVS
+		return &in, nil
 	}
 	if in.ToolName == "" {
 		return nil, adapters.Invalid("the hook input has no toolName")
@@ -81,9 +100,13 @@ func (Adapter) Parse(data []byte, getenv func(string) string) (*adapters.Call, e
 	}
 	env := Env{ProjectDir: getenv("COPILOT_PROJECT_DIR"), Home: getenv("HOME"), CopilotHome: getenv("COPILOT_HOME"),
 		CDPath: getenv("CDPATH") != ""}
+	if in.Local() {
+		return parseVSCode(in, env), nil
+	}
 	c := &adapters.Call{Session: in.SessionID, Cwd: in.Cwd, Project: env.ProjectDir, Tool: in.ToolName}
 	c.Actions, c.Err = Actions(in, env)
-	adapters.Guard(c.Actions, SettingsFiles(env)...)
+	// VS Code reads the same hook files, so its settings can switch the hook off as well
+	adapters.Guard(c.Actions, guardFiles(env, in.Cwd)...)
 	return c, nil
 }
 
@@ -95,21 +118,32 @@ func SettingsFiles(env Env) []string {
 	var out []string
 	for _, dir := range []string{adapters.Under(false, env.Home, ".copilot"), env.CopilotHome} {
 		if dir != "" {
+			// Custom agents can declare hooks, which VS Code runs for them
 			out = append(out, adapters.Under(false, dir, "config.json"), adapters.Under(false, dir, "settings.json"),
-				adapters.Under(false, dir, "hooks"))
+				adapters.Under(false, dir, "hooks"), adapters.Under(false, dir, "agents"))
 		}
 	}
-	if env.ProjectDir != "" {
-		out = append(out, adapters.Under(false, env.ProjectDir, ".github", "hooks"),
-			adapters.Under(false, env.ProjectDir, ".github", "copilot"))
-	}
+	out = append(out, copilotProjectFiles(env.ProjectDir)...)
 	return append(out, PolicyDir)
+}
+
+// copilotProjectFiles returns a folder's Copilot hook files and settings,
+// and its custom agents, whose hooks VS Code runs when the agent runs
+func copilotProjectFiles(dir string) []string {
+	if dir == "" {
+		return nil
+	}
+	return []string{adapters.Under(false, dir, ".github", "hooks"), adapters.Under(false, dir, ".github", "copilot"),
+		adapters.Under(false, dir, ".github", "agents")}
 }
 
 // Respond turns a verdict into hook output. Deny exits 2, which blocks even
 // if Copilot can't parse the JSON, and puts the reason on stderr too. Copilot
 // still shows the JSON reason. Allow produces no output, because CyberBoar
 // never answers "allow" and leaves Copilot's own permission flow in charge
+// The answer is in both shapes: Copilot reads the top-level fields and
+// ignores hookSpecificOutput, which VS Code's Local agent reads (seen in
+// Copilot CLI 1.0.98 and VS Code 1.142)
 func (Adapter) Respond(v engine.Verdict, prefix string) adapters.Output {
 	reason := prefix + v.Reason
 	var decision string
@@ -121,7 +155,8 @@ func (Adapter) Respond(v engine.Verdict, prefix string) adapters.Output {
 	default:
 		decision = "deny"
 	}
-	body, _ := json.Marshal(map[string]any{"permissionDecision": decision, "permissionDecisionReason": reason})
+	body, _ := json.Marshal(map[string]any{"permissionDecision": decision, "permissionDecisionReason": reason,
+		"hookSpecificOutput": map[string]any{"hookEventName": "PreToolUse", "permissionDecision": decision, "permissionDecisionReason": reason}})
 	body = append(body, '\n')
 	if decision == "ask" {
 		// Without a user to ask (copilot -p), Copilot denies

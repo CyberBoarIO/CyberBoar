@@ -2,16 +2,8 @@
   "hooks": {
     "preToolUse": [
       {
-        "args": [
-          "hook",
-          "--agent",
-          "copilot-cli",
-          "--policy",
-          ".cyberboar/policy.yaml",
-          "--deadline",
-          "5s"
-        ],
-        "exec": "cyberboar",
+        "bash": "'cyberboar' 'hook' '--agent' 'copilot-cli' '--policy' '.cyberboar/policy.yaml' '--deadline' '5s' || exit 2",
+        "powershell": "[Console]::Error.WriteLine('cyberboar: GitHub Copilot on native Windows is not supported, so the tool call is blocked; use WSL or a Linux dev container'); exit 2",
         "timeoutSec": 15,
         "type": "command"
       }
