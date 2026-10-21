@@ -5,7 +5,11 @@ and enforcement. Stable releases follow [Semantic Versioning](https://semver.org
 starting with `v1.0.0`. The v1 compatibility contract covers the policy format, CLI,
 protocol, audit schema and public Go packages under `pkg/`.
 
-## [Unreleased]
+## [v1.0.0-rc.2] - 2026-10-20
+
+Second release candidate for CyberBoar 1.0. It adds GitHub Copilot in VS Code and
+fixes shell analysis found in RC1. Copilot users re-run `apply --agent copilot-cli`
+to install the new hook form.
 
 ### Added
 
