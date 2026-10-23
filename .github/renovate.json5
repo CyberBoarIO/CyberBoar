@@ -6,8 +6,6 @@
     "customManagers:githubActionsVersions",
   ],
 
-  timezone: "Etc/UTC",
-  schedule: ["before 6am on monday"],
   labels: ["dependencies"],
   automerge: false,
   platformAutomerge: false,
@@ -15,11 +13,10 @@
   // A release must be a week old before it is proposed
   minimumReleaseAge: "7 days",
 
-  // Fixes for known vulnerabilities skip the wait and the schedule
+  // Fixes for known vulnerabilities skip the wait
   osvVulnerabilityAlerts: true,
   vulnerabilityAlerts: {
     labels: ["security"],
-    schedule: ["at any time"],
     minimumReleaseAge: null,
   },
 

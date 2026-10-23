@@ -29,6 +29,7 @@ jobs:
           permission-pull-requests: write
           permission-issues: write
           permission-workflows: write
+          permission-vulnerability-alerts: read
       - name: Look up bot identity
         id: bot
         env:
