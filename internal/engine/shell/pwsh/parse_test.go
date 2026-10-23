@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"cyberboar.dev/cyberboar/internal/engine/shell"
+	"cyberboar.dev/cyberboar/internal/engine/shell/limits"
 )
 
 // Every construct Parse refuses (docs/powershell.md "Refused") fails closed:
-// an *Error marked Refused that wraps shell.ErrUnparseable, so the engine denies the line
+// an *Error marked Refused that wraps limits.ErrUnparseable, so the engine denies the line
 // Each refusal in the lexer and the parser has a case here;
 // the differential can't show them, since PowerShell accepts them all
 func TestRefused(t *testing.T) {
@@ -47,13 +47,13 @@ func TestRefused(t *testing.T) {
 	} {
 		_, err := Parse(in)
 		var pe *Error
-		if !errors.As(err, &pe) || !pe.Refused || !errors.Is(err, shell.ErrUnparseable) {
+		if !errors.As(err, &pe) || !pe.Refused || !errors.Is(err, limits.ErrUnparseable) {
 			t.Errorf("%q: want a refusal wrapping ErrUnparseable, got %v", in, err)
 		}
 	}
 }
 
-// Syntax errors fail closed too: an *Error, not Refused, wrapping shell.ErrUnparseable
+// Syntax errors fail closed too: an *Error, not Refused, wrapping limits.ErrUnparseable
 func TestSyntaxErrors(t *testing.T) {
 	for _, in := range []string{
 		"(", ")", "{", "}", "[", "\"", "'", "@'\nx", "@\"\nx", "$(", "@(", "@{", "${",
@@ -68,7 +68,7 @@ func TestSyntaxErrors(t *testing.T) {
 	} {
 		_, err := Parse(in)
 		var pe *Error
-		if !errors.As(err, &pe) || pe.Refused || !errors.Is(err, shell.ErrUnparseable) {
+		if !errors.As(err, &pe) || pe.Refused || !errors.Is(err, limits.ErrUnparseable) {
 			t.Errorf("%q: want a syntax error wrapping ErrUnparseable, got %v", in, err)
 		}
 	}
@@ -80,15 +80,15 @@ func TestLimits(t *testing.T) {
 		in   string
 		want error
 	}{
-		"size":            {strings.Repeat("a", shell.MaxBytes+1), shell.ErrTooLarge},
-		"parentheses":     {strings.Repeat("(", 300) + "1" + strings.Repeat(")", 300), shell.ErrTooComplex},
-		"script blocks":   {strings.Repeat("{", 300) + strings.Repeat("}", 300), shell.ErrTooComplex},
-		"if statements":   {strings.Repeat("if (1) {", 200) + strings.Repeat("}", 200), shell.ErrTooComplex},
-		"subexpressions":  {strings.Repeat(`"$(`, 200) + strings.Repeat(`)"`, 200), shell.ErrTooComplex},
-		"attributes":      {strings.Repeat("[int]", 300) + "$x", shell.ErrTooComplex},
-		"unary operators": {strings.Repeat("-not ", 300) + "$x", shell.ErrTooComplex},
-		"commands":        {strings.Repeat("ls;", shell.MaxCommands+1), shell.ErrTooComplex},
-		"pipeline":        {strings.Repeat("ls|", shell.MaxCommands) + "ls", shell.ErrTooComplex},
+		"size":            {strings.Repeat("a", limits.MaxBytes+1), limits.ErrTooLarge},
+		"parentheses":     {strings.Repeat("(", 300) + "1" + strings.Repeat(")", 300), limits.ErrTooComplex},
+		"script blocks":   {strings.Repeat("{", 300) + strings.Repeat("}", 300), limits.ErrTooComplex},
+		"if statements":   {strings.Repeat("if (1) {", 200) + strings.Repeat("}", 200), limits.ErrTooComplex},
+		"subexpressions":  {strings.Repeat(`"$(`, 200) + strings.Repeat(`)"`, 200), limits.ErrTooComplex},
+		"attributes":      {strings.Repeat("[int]", 300) + "$x", limits.ErrTooComplex},
+		"unary operators": {strings.Repeat("-not ", 300) + "$x", limits.ErrTooComplex},
+		"commands":        {strings.Repeat("ls;", limits.MaxCommands+1), limits.ErrTooComplex},
+		"pipeline":        {strings.Repeat("ls|", limits.MaxCommands) + "ls", limits.ErrTooComplex},
 	} {
 		_, err := Parse(tc.in)
 		var pe *Error
@@ -96,8 +96,8 @@ func TestLimits(t *testing.T) {
 			t.Errorf("%s: want %v, got %v", name, tc.want, err)
 		}
 	}
-	if _, err := Parse(strings.Repeat("ls;", shell.MaxCommands)); err != nil {
-		t.Errorf("%d commands: %v", shell.MaxCommands, err)
+	if _, err := Parse(strings.Repeat("ls;", limits.MaxCommands)); err != nil {
+		t.Errorf("%d commands: %v", limits.MaxCommands, err)
 	}
 	if _, err := Parse(strings.Repeat("(", 50) + "1" + strings.Repeat(")", 50)); err != nil {
 		t.Errorf("50 parentheses: %v", err)

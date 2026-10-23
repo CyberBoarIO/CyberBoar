@@ -5,7 +5,7 @@ import (
 	"testing"
 	"unicode/utf16"
 
-	"cyberboar.dev/cyberboar/internal/engine/shell"
+	"cyberboar.dev/cyberboar/internal/engine/shell/limits"
 )
 
 // FuzzParsePowerShell checks that Parse fails closed on anything: it never
@@ -21,7 +21,7 @@ func FuzzParsePowerShell(f *testing.F) {
 		sb, err := Parse(in)
 		if err != nil {
 			var pe *Error
-			if !errors.As(err, &pe) || !(errors.Is(err, shell.ErrUnparseable) || errors.Is(err, shell.ErrTooLarge) || errors.Is(err, shell.ErrTooComplex)) {
+			if !errors.As(err, &pe) || !(errors.Is(err, limits.ErrUnparseable) || errors.Is(err, limits.ErrTooLarge) || errors.Is(err, limits.ErrTooComplex)) {
 				t.Fatalf("%q: error %T %v", in, err, err)
 			}
 			return
