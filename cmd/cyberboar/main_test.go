@@ -174,6 +174,15 @@ func TestExplainCommand(t *testing.T) {
 			t.Errorf("Windows paths on %s: exit %d\n%s", runtime.GOOS, code, out)
 		}
 	}
+	// PowerShell: cat is Get-Content, shown as a second name of the command
+	code, out, _ = call(t, "", "explain", "--policy", baseline, "--platform", "windows", "--cwd", `C:\work\repo`,
+		"--home", `C:\Users\dev`, "--shell", "powershell", "--verbose", "--command", `cat .env`)
+	if code != 0 || !strings.HasPrefix(out, "DENY  (files.deny[0])") || !strings.Contains(out, "↳ [0] Get-Content .env") {
+		t.Errorf("--shell powershell: exit %d\n%s", code, out)
+	}
+	if code, _, _ := call(t, "", "explain", "--policy", baseline, "--shell", "powershell", "--read", "a"); code != 2 {
+		t.Errorf("--shell with --read: exit %d", code)
+	}
 }
 
 func TestExplainVerboseAliases(t *testing.T) {

@@ -266,6 +266,7 @@ exactly one of `--command`, `--read`, `--write`, `--list`, `--mcp`.
 |---|---|---|---|
 | `--policy FILE` | `CYBERBOAR_POLICY` | none | The policy. Required |
 | `--command LINE` | none | none | A shell command line |
+| `--shell NAME` | none | `""` (bash) | The language of `--command`: empty for bash, or `powershell` ([PowerShell support](powershell.md)) |
 | `--read PATH` | none | none | A path the agent reads |
 | `--write PATH` | none | none | A path the agent writes |
 | `--list PATH` | none | none | A path whose names the agent lists |

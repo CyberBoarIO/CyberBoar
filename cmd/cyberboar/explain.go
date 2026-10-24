@@ -13,7 +13,9 @@ import (
 	"time"
 
 	"cyberboar.dev/cyberboar/internal/engine"
+	"cyberboar.dev/cyberboar/internal/engine/osfs"
 	"cyberboar.dev/cyberboar/internal/engine/shell"
+	"cyberboar.dev/cyberboar/internal/winpath"
 )
 
 // runExplain prints the decision the policy gives for one action, and with --verbose
@@ -23,6 +25,7 @@ func runExplain(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, st
 	wd, _ := os.Getwd()
 	policyPath := fs.String("policy", h.getenv(envName("policy")), "policy file (env "+envName("policy")+")")
 	shellCmd := fs.String("command", "", "a shell command line")
+	shellName := fs.String("shell", "", `the language of --command: "" (bash) or "powershell"`)
 	read := fs.String("read", "", "a path the agent reads")
 	write := fs.String("write", "", "a path the agent writes")
 	list := fs.String("list", "", "a path whose names the agent lists")
@@ -85,6 +88,11 @@ func runExplain(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, st
 		fmt.Fprintln(stderr, "explain: give exactly one of --command, --read, --write, --list, --mcp")
 		return 2
 	}
+	if *shellName != "" && a.Tool != engine.ToolShell {
+		fmt.Fprintln(stderr, "explain: --shell goes with --command")
+		return 2
+	}
+	a.Shell = *shellName
 	_, c, err := loadPolicy(*policyPath)
 	if err != nil {
 		fmt.Fprintf(stderr, "explain: %v\n", err)
@@ -124,6 +132,16 @@ func absOr(p string) string {
 // explainShell prints what the analysis saw, which is the commands, the inline code and the paths.
 func explainShell(w io.Writer, a engine.Action) {
 	an, err := shell.Analyze(a.Command, a.Home, a.Cwd)
+	if a.Shell == engine.ShellPowerShell {
+		// PowerShell reads Windows paths itself, in the engine's form
+		o := shell.Options{Cwd: a.Cwd, FS: osfs.FS{Windows: a.Platform == engine.PlatformWindows}}
+		home := a.Home
+		if o.FS.Windows {
+			o.Cwd, _, _ = winpath.Path(a.Cwd)
+			home, _, _ = winpath.Path(a.Home)
+		}
+		an, err = shell.AnalyzePowerShell(a.Command, home, o)
+	}
 	if err != nil {
 		fmt.Fprintf(w, "\nanalysis: %v\n", err)
 		return

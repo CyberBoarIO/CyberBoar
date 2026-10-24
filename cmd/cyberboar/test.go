@@ -34,6 +34,7 @@ type policyTestAction struct {
 	Write     string `json:"write,omitempty"`
 	List      string `json:"list,omitempty"`
 	Command   string `json:"command,omitempty"`
+	Shell     string `json:"shell,omitempty"` // the language of command: "" (bash) or "powershell"
 	MCP       string `json:"mcp,omitempty"`
 	Cwd       string `json:"cwd,omitempty"`
 	Home      string `json:"home,omitempty"`
@@ -123,7 +124,7 @@ func runTest(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stder
 		case c.Action.List != "":
 			a.Tool, a.Path = engine.ToolList, c.Action.List
 		case c.Action.Command != "":
-			a.Tool, a.Command = engine.ToolShell, c.Action.Command
+			a.Tool, a.Command, a.Shell = engine.ToolShell, c.Action.Command, c.Action.Shell
 		case c.Action.MCP != "":
 			a.Tool = engine.ToolMCP
 			a.MCP.Server, a.MCP.Tool, _ = strings.Cut(c.Action.MCP, "/")
@@ -162,6 +163,12 @@ func checkPolicyCase(c policyCase) error {
 	}
 	if n != 1 {
 		return fmt.Errorf("action must specify exactly one of read, write, list, command, mcp")
+	}
+	switch {
+	case c.Action.Shell != "" && c.Action.Command == "":
+		return fmt.Errorf("shell goes with command")
+	case c.Action.Shell != "" && c.Action.Shell != engine.ShellPowerShell:
+		return fmt.Errorf("shell must be empty (bash) or powershell")
 	}
 	if c.Action.MCP != "" {
 		server, tool, ok := strings.Cut(c.Action.MCP, "/")

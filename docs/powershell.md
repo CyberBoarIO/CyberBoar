@@ -1,8 +1,9 @@
 # PowerShell support
 
-**Experimental: PowerShell commands are not analyzed by the production engine.** The parser
-exists as development work, but is not connected to policy evaluation. There is no
-released policy opt-in or `explain --powershell` flag.
+**Experimental: no agent's PowerShell commands are analyzed yet.** The engine reads a
+PowerShell command line when it is asked to (`cyberboar explain --shell powershell`, or
+`shell: powershell` in a [policy test](policy-tests.md) case), but no adapter asks it
+to: agents' PowerShell calls are still denied as described below.
 
 ## Current behavior
 
