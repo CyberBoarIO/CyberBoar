@@ -60,6 +60,10 @@ type Action struct {
 	// checked as if a later command passed it any arguments. Only shell
 	// actions may set it
 	ShellPersists bool
+	// Shell is the language Command is written in: "" for bash and the
+	// shells that read it (sh, zsh, Git Bash), or ShellPowerShell. Only
+	// shell actions may set it
+	Shell string
 	// CDPath says CDPATH is set where the command runs, so `cd NAME` may go
 	// elsewhere than ./NAME
 	// Adapters read it from the hook's environment
@@ -109,6 +113,10 @@ var ErrRewriteTooLarge = errors.New("the edited file is too large to check for s
 
 // PlatformWindows is Action.Platform for native Windows
 const PlatformWindows = "windows"
+
+// ShellPowerShell is Action.Shell for PowerShell: Windows PowerShell 5.1 or
+// PowerShell 7 (pwsh), read as package shell's AnalyzePowerShell reads them
+const ShellPowerShell = "powershell"
 
 // MCPCall names the MCP server and tool an action calls
 type MCPCall struct {
@@ -183,6 +191,12 @@ func (a Action) validate() error {
 	}
 	if a.ShellPersists && a.Tool != ToolShell {
 		return fmt.Errorf("%s action can't run in a persistent shell", a.Tool)
+	}
+	switch {
+	case a.Shell != "" && a.Tool != ToolShell:
+		return fmt.Errorf("%s action can't name a shell", a.Tool)
+	case a.Shell != "" && a.Shell != ShellPowerShell:
+		return fmt.Errorf("unknown shell %q", a.Shell)
 	}
 	switch a.Tool {
 	case ToolShell:

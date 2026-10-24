@@ -98,6 +98,7 @@ type Action struct {
 	CwdUnknown bool   `yaml:"cwdUnknown"`
 	// ShellPersists is engine.Action.ShellPersists
 	ShellPersists bool              `yaml:"shellPersists"`
+	Shell         string            `yaml:"shell"` // engine.Action.Shell
 	CDPath        bool              `yaml:"cdpath"`
 	Home          string            `yaml:"home"`
 	Workspaces    []string          `yaml:"workspaces"`

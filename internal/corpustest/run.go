@@ -87,6 +87,7 @@ func (a *Action) engineAction() engine.Action {
 		Cwd:           a.Cwd,
 		CwdUnknown:    a.CwdUnknown,
 		ShellPersists: a.ShellPersists,
+		Shell:         a.Shell,
 		CDPath:        a.CDPath,
 		Home:          a.Home,
 		Workspaces:    a.Workspaces,
