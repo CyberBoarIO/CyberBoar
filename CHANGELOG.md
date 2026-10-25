@@ -5,6 +5,21 @@ and enforcement. Stable releases follow [Semantic Versioning](https://semver.org
 starting with `v1.0.0`. The v1 compatibility contract covers the policy format, CLI,
 protocol, audit schema and public Go packages under `pkg/`.
 
+## [Unreleased]
+
+### Fixed
+
+- Claude Code: custom agents, skills and commands, whose frontmatter can
+  declare hooks that Claude Code runs without the CyberBoar hook seeing them,
+  are guarded like settings files. That is `.claude/agents`, `.claude/skills`
+  and `.claude/commands` in `~/.claude`, `CLAUDE_CONFIG_DIR`, the project and
+  every folder above it up to its git work tree, and installed plugins in
+  `~/.claude/plugins`. Claude's file tools may read them, but not change them,
+  and the shell may not touch them. `apply`
+  writes native `Edit` denies for these folders at any depth; re-run `apply`
+  to install them. Skills in folders below the project and folders added with
+  `--add-dir` are still not guarded against shell writes.
+
 ## [v1.0.0-rc.2] - 2026-10-20
 
 Second release candidate for CyberBoar 1.0. It adds GitHub Copilot in VS Code and

@@ -77,6 +77,10 @@
         "Bash(osascript -e *)",
         "Edit(//**/.claude/settings.json)",
         "Edit(//**/.claude/settings.local.json)",
+        "Edit(//**/.claude/agents/**)",
+        "Edit(//**/.claude/skills/**)",
+        "Edit(//**/.claude/commands/**)",
+        "Edit(//**/.claude/plugins/**)",
         "Edit(/.cyberboar/policy.yaml)",
         "Edit(/.cyberboar/policy.yaml.sig)",
         "PowerShell"
