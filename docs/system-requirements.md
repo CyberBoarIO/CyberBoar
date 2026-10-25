@@ -2,7 +2,7 @@
 
 CyberBoar runs on the developer's machine. Download the binary for its operating system
 and CPU; there is no universal macOS or Windows executable. Prebuilt binaries do not
-need Go. Source builds require **Go 1.27.2 or later**.
+need Go. Source builds require **Go 1.27.3 or later**.
 
 ## Operating systems and architectures
 

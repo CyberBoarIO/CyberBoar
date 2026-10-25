@@ -124,7 +124,7 @@ details](system-requirements.md#download-and-operating-system-trust).
 
 ## Build from source
 
-You need **Go 1.27.2 or later** and a checkout of CyberBoar's source. Run these commands
+You need **Go 1.27.3 or later** and a checkout of CyberBoar's source. Run these commands
 **from the repository root**:
 
 ```sh

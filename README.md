@@ -40,7 +40,7 @@ and session-specific limitations.
 
 ## Quick example
 
-With Go 1.27.2 or later, run from the repository root on macOS or Linux:
+With Go 1.27.3 or later, run from the repository root on macOS or Linux:
 
 ```sh
 mkdir -p "$HOME/.local/bin"

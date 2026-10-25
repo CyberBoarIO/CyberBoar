@@ -11,7 +11,7 @@ The versions identify the reviewed source dependencies, not the version
 of CyberBoar. Preserve these notices in distributed release archives.
 
 ========================================================================
-Go implementation (go.mod: Go 1.27.2)
+Go implementation (go.mod: Go 1.27.3)
 Source: https://go.dev/
 
 Copyright 2009 The Go Authors.
