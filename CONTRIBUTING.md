@@ -54,7 +54,7 @@ helpers serving one subsystem belong beneath it.
 
 ## Build and validation
 
-Use Go 1.27.2 or later, Python 3.9 or later, and Bash. The release and workflow tests
+Use Go 1.27.3 or later, Python 3.9 or later, and Bash. The release and workflow tests
 use only Python's standard library; no Python packages are needed:
 
 ```sh

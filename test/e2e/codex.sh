@@ -33,7 +33,19 @@ done
 
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 work=$(mktemp -d)
-trap 'kill $model_pid 2>/dev/null || true; rm -rf "$work"' EXIT
+# Codex clones its plugin marketplace into CODEX_HOME in the background, and
+# the clone can outlive codex exec and still be writing when the run ends.
+# Stop it and retry the removal, since a cleanup failure isn't a failed check
+cleanup() {
+  kill $model_pid 2>/dev/null || true
+  pkill -f -- "$work" 2>/dev/null || true
+  for _ in 1 2 3 4 5; do
+    rm -rf "$work" 2>/dev/null && return
+    sleep 1
+  done
+  echo "warning: could not remove $work" >&2
+}
+trap cleanup EXIT
 model_pid=
 secret="fake-e2e-$(od -An -N6 -tx1 /dev/urandom | tr -d ' \n')"
 

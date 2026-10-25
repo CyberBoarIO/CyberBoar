@@ -234,11 +234,15 @@ func (f *Fragment) permissionRules(p *policy.Policy, scope Scope) (deny, ask []s
 
 // guardRules returns the rules that keep Claude's own file tools away from
 // what installs the hook, as builtin.guarded does in the hook. That is every
-// Claude Code settings file, the policy and its signature, the signing key,
+// Claude Code settings file, the agents, skills, commands and plugins that
+// can run hooks of their own, the policy and its signature, the signing key,
 // the audit log and the hook binary. One Edit of .claude/settings.local.json
-// would switch the hook off.
+// would switch the hook off. The rules match these folders at any depth,
+// including skills below the project, which the hook can't list in advance.
 func guardRules(o FragmentOptions) []string {
-	rules := []string{"Edit(//**/.claude/settings.json)", "Edit(//**/.claude/settings.local.json)"}
+	rules := []string{"Edit(//**/.claude/settings.json)", "Edit(//**/.claude/settings.local.json)",
+		"Edit(//**/.claude/agents/**)", "Edit(//**/.claude/skills/**)", "Edit(//**/.claude/commands/**)",
+		"Edit(//**/.claude/plugins/**)"}
 	files := []string{o.Policy, o.Policy + ".sig", o.PubKey, o.Audit, o.Command}
 	for _, f := range files {
 		if pat, ok := nativeFile(f); ok {

@@ -105,7 +105,8 @@ func TestGuardRulesInEveryScope(t *testing.T) {
 		f := BuildFragment(p, FragmentOptions{Scope: scope, Command: "/opt/cyberboar", Policy: "/etc/policy.yaml", Deadline: "5s"})
 		deny, _ := f.Settings["permissions"].(map[string]any)["deny"].([]any)
 		for _, want := range []string{"Edit(//**/.claude/settings.json)", "Edit(//**/.claude/settings.local.json)",
-			"Edit(//etc/policy.yaml)", "Edit(//opt/cyberboar)"} {
+			"Edit(//**/.claude/agents/**)", "Edit(//**/.claude/skills/**)", "Edit(//**/.claude/commands/**)",
+			"Edit(//**/.claude/plugins/**)", "Edit(//etc/policy.yaml)", "Edit(//opt/cyberboar)"} {
 			if !slices.Contains(deny, any(want)) {
 				t.Errorf("%s scope: no %s in %v", scope, want, deny)
 			}

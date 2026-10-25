@@ -6,6 +6,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"os"
+	"path"
 	"regexp"
 	"runtime"
 	"slices"
@@ -59,11 +61,13 @@ func parse(data []byte, getenv func(string) string, goos string, gitBash gitbash
 	return c, nil
 }
 
-// SettingsFiles returns the Claude Code settings files that can install,
-// change or switch off the hook, which agents may not change
-// (builtin.guarded). They are the user's settings in ~/.claude or
-// CLAUDE_CONFIG_DIR, the project's shared and local settings, and the managed
-// settings directory on goos, a runtime.GOOS value
+// SettingsFiles returns the Claude Code files that can install, change or
+// switch off the hook, or run hooks of their own, which agents may not
+// change (builtin.guarded). They are the user's settings and plugins in
+// ~/.claude or CLAUDE_CONFIG_DIR, the project's shared and local settings,
+// the managed settings directory on goos, a runtime.GOOS value, and the
+// custom agents, skills and commands of the user and of every folder
+// projectDirs returns
 func SettingsFiles(env Env, configDir, goos string) []string {
 	w := env.Windows
 	var out []string
@@ -71,9 +75,70 @@ func SettingsFiles(env Env, configDir, goos string) []string {
 		out = append(out, adapters.Under(w, dir, "settings.json"), adapters.Under(w, dir, "settings.local.json"))
 	}
 	if w {
-		return append(out, ManagedDir("windows"), legacyManagedDir)
+		out = append(out, ManagedDir("windows"), legacyManagedDir)
+	} else {
+		out = append(out, ManagedDir(goos))
 	}
-	return append(out, ManagedDir(goos))
+	// An enabled plugin's hooks/hooks.json runs after /reload-plugins
+	for _, dir := range []string{adapters.Under(w, env.Home, ".claude"), configDir} {
+		out = append(out, adapters.Under(w, dir, "plugins"))
+		out = append(out, customizations(w, dir)...)
+	}
+	for _, dir := range projectDirs(env) {
+		out = append(out, customizations(w, adapters.Under(w, dir, ".claude"))...)
+	}
+	return out
+}
+
+// customizations returns the folders of a .claude directory whose custom
+// agents, skills and commands can declare hooks in their frontmatter.
+// Claude Code picks up changes there during the session and runs those
+// hooks when the model starts the agent or invokes the skill
+func customizations(windows bool, dir string) []string {
+	return []string{adapters.Under(windows, dir, "agents"), adapters.Under(windows, dir, "skills"),
+		adapters.Under(windows, dir, "commands")}
+}
+
+// projectDirs returns the folders whose .claude agents, skills and commands
+// Claude Code loads: the project directory, where it started, and every
+// folder above it up to the git work tree holding it. Outside a work tree
+// it is the project directory alone
+func projectDirs(env Env) []string {
+	if env.ProjectDir == "" {
+		return nil
+	}
+	start := path.Clean(env.ProjectDir)
+	if env.Windows {
+		start = strings.TrimRight(env.ProjectDir, `\`)
+	}
+	var walked []string
+	for d := start; d != ""; d = parent(env.Windows, d) {
+		walked = append(walked, d)
+		if _, err := os.Lstat(adapters.Under(env.Windows, d, ".git")); err == nil {
+			return walked
+		}
+	}
+	return walked[:1]
+}
+
+// parent returns the folder holding dir, or "" when dir is the root (on
+// Windows, of a drive or a share)
+func parent(windows bool, dir string) string {
+	if !windows {
+		if p := path.Dir(dir); p != dir {
+			return p
+		}
+		return ""
+	}
+	dir = strings.TrimRight(dir, `\`)
+	i := strings.LastIndexByte(dir, '\\')
+	switch {
+	case i < 0, strings.HasPrefix(dir, `\\`) && (i < 2 || !strings.Contains(dir[2:i], `\`)):
+		return ""
+	case i == 2 && dir[1] == ':':
+		return dir[:3]
+	}
+	return dir[:i]
 }
 
 // windowsEnv reads the environment on native Windows. Git Bash expands ~
