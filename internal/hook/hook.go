@@ -552,9 +552,5 @@ func Brief(o Options) []byte {
 	if minimum := compiled.Policy().Spec.MinimumVersion; minimum != "" && !semver.AtLeast(o.Version, minimum) {
 		return out(versionVerdict(minimum, o.Version).Reason + ".\nTell the user before doing anything else.\n")
 	}
-	text := briefing.Text(compiled.Policy())
-	if o.GOOS == "windows" {
-		text += briefing.Windows(compiled.Policy())
-	}
-	return out(text)
+	return out(briefing.Text(compiled.Policy()))
 }

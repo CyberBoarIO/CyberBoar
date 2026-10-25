@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -353,11 +354,13 @@ func TestMinimumVersion(t *testing.T) {
 	}
 }
 
-// The PowerShell tool can't be checked, so every call is denied whatever the policy says
-// The agent is sent to the Bash tool, where the same command is
-// checked, the user is told why, and on Windows the briefing says so at
-// session start, since an agent that isn't told keeps reaching for PowerShell
+// Outside native Windows the PowerShell tool can't be checked, so every call
+// is denied whatever the policy says. The agent is sent to the Bash tool,
+// where the same command is checked, and the user is told why
 func TestPowerShellPointsToBash(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("on native Windows PowerShell is analysed")
+	}
 	powershell := `{"hook_event_name":"PreToolUse","tool_name":"PowerShell","cwd":"/work/repo","tool_input":{"command":"Get-ChildItem"}}`
 	interp := []byte("apiVersion: " + brand.APIVersion + "\nkind: Policy\nmetadata: {name: p}\nspec: {commands: {denyInterpreters: false}}\n")
 	for _, pol := range [][]byte{baselinePolicy(t), interp} {
@@ -386,14 +389,6 @@ func TestPowerShellPointsToBash(t *testing.T) {
 		hook.Options{Adapter: cc, StateDir: t.TempDir(), PolicyPath: policyFile(t, baselinePolicy(t), nil), Getenv: env})
 	if strings.Contains(r.Verdict.Reason, "Bash tool") || r.Verdict.Notice != "" {
 		t.Errorf("Bash's own inline code treated as PowerShell: %+v", r.Verdict)
-	}
-
-	for goos, want := range map[string]bool{"windows": true, "linux": false} {
-		for _, pol := range [][]byte{baselinePolicy(t), interp} {
-			if got := strings.Contains(string(hook.Brief(hook.Options{GOOS: goos, PolicyPath: policyFile(t, pol, nil)})), "PowerShell"); got != want {
-				t.Errorf("%s: briefing mentions PowerShell: %v", goos, got)
-			}
-		}
 	}
 }
 

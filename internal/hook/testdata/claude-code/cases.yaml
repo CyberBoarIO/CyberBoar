@@ -69,12 +69,12 @@ cases:
   - {name: Write content that is a list, policy: baseline, input: {tool_name: Write, tool_input: {file_path: "{{root}}/proj/a.txt", content: ["x"]}}, expect: {decision: deny, rule: error.invalidInput}}
   - {name: Artifact mapped path that is a number, policy: baseline, input: {tool_name: Artifact, tool_input: {file_path: "page.html", files: {"data.txt": 1}}}, expect: {decision: deny, rule: error.invalidInput}}
   - {name: Bash with null input, policy: baseline, input: {tool_name: Bash, tool_input: null}, expect: {decision: deny, rule: error.invalidInput}}
-  # PowerShell isn't analysed, so the PowerShell tool is always denied, and
-  # the user is told too (systemMessage)
-  - {name: PowerShell is denied and the agent is sent to Bash, policy: baseline, input: {tool_name: PowerShell, tool_input: {command: "Get-Content .env"}}, expect: {decision: deny, rule: builtin.powershell, reasonContains: "Run the command with the Bash tool", noticeContains: "can't check PowerShell"}}
-  - {name: harmless PowerShell is denied too, policy: baseline, input: {tool_name: PowerShell, tool_input: {command: "Get-ChildItem"}}, expect: {decision: deny, rule: builtin.powershell, noticeContains: "PowerShell tool"}}
-  - {name: PowerShell is denied when inline code is allowed, policy: interpreters-allowed, input: {tool_name: PowerShell, tool_input: {command: "Get-ChildItem"}}, expect: {decision: deny, rule: builtin.powershell, noticeContains: "PowerShell tool"}}
-  - {name: PowerShell is denied when nothing else is, policy: empty, input: {tool_name: PowerShell, tool_input: {command: "Get-ChildItem"}}, expect: {decision: deny, rule: builtin.powershell, noticeContains: "PowerShell tool"}}
+  # PowerShell is analysed on native Windows only, so elsewhere the
+  # PowerShell tool is always denied, and the user is told too (systemMessage)
+  - {name: PowerShell is denied and the agent is sent to Bash, goos: [linux, darwin], policy: baseline, input: {tool_name: PowerShell, tool_input: {command: "Get-Content .env"}}, expect: {decision: deny, rule: builtin.powershell, reasonContains: "Run the command with the Bash tool", noticeContains: "checks PowerShell only on native Windows"}}
+  - {name: harmless PowerShell is denied too, goos: [linux, darwin], policy: baseline, input: {tool_name: PowerShell, tool_input: {command: "Get-ChildItem"}}, expect: {decision: deny, rule: builtin.powershell, noticeContains: "PowerShell tool"}}
+  - {name: PowerShell is denied when inline code is allowed, goos: [linux, darwin], policy: interpreters-allowed, input: {tool_name: PowerShell, tool_input: {command: "Get-ChildItem"}}, expect: {decision: deny, rule: builtin.powershell, noticeContains: "PowerShell tool"}}
+  - {name: PowerShell is denied when nothing else is, goos: [linux, darwin], policy: empty, input: {tool_name: PowerShell, tool_input: {command: "Get-ChildItem"}}, expect: {decision: deny, rule: builtin.powershell, noticeContains: "PowerShell tool"}}
   - {name: PowerShell command that is not a string, policy: baseline, input: {tool_name: PowerShell, tool_input: {command: 42}}, expect: {decision: deny, rule: error.invalidInput}}
   - {name: PowerShell without a valid policy, policy: broken, input: {tool_name: PowerShell, tool_input: {command: "Get-ChildItem"}}, expect: {decision: deny, rule: error.noPolicy}}
   - {name: inline code in Bash tells only the agent, policy: baseline, input: {tool_name: Bash, tool_input: {command: "python3 -c 1"}}, expect: {decision: deny, rule: commands.denyInterpreters}}

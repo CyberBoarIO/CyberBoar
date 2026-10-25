@@ -412,10 +412,10 @@ func TestApplyRefusesUnsupportedPlatform(t *testing.T) {
 	}
 }
 
-// On Windows, whoever installs the hook is told that the PowerShell tool will
-// be blocked, and why, before an agent runs into it
-func TestApplyWarnsAboutPowerShell(t *testing.T) {
-	for os, want := range map[string]bool{"windows": true, "linux": false} {
+// The settings keep Claude Code's PowerShell tool on, whose commands the hook
+// checks on Windows: they deny no whole tool and mirror the Bash rules
+func TestApplyKeepsPowerShell(t *testing.T) {
+	for _, os := range []string{"windows", "linux"} {
 		home := t.TempDir()
 		env := func(k string) string { return map[string]string{"HOME": home}[k] }
 		h := host{getenv: env, goos: os, now: time.Now}
@@ -423,8 +423,8 @@ func TestApplyWarnsAboutPowerShell(t *testing.T) {
 		if code := h.run([]string{"apply", "--policy", baseline, "--scope", "user", "--command", "/opt/cyberboar"}, nil, &out, &errb); code != 0 {
 			t.Fatalf("%s: apply: exit %d, stderr %q", os, code, errb.String())
 		}
-		if got := strings.Contains(out.String(), "PowerShell tool"); got != want {
-			t.Errorf("%s: warns about PowerShell: %v\n%s", os, got, out.String())
+		if s := out.String(); strings.Contains(s, `"PowerShell"`) || !strings.Contains(s, `"PowerShell(terraform apply *)"`) || strings.Contains(s, "PowerShell tool") {
+			t.Errorf("%s: PowerShell rules or notes:\n%s", os, s)
 		}
 	}
 }

@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -50,7 +52,10 @@ type hookCase struct {
 	Env      map[string]string `yaml:"env"`
 	Input    map[string]any    `yaml:"input"`
 	RawInput *string           `yaml:"rawInput"`
-	Expect   struct {
+	// GOOS lists the operating systems (runtime.GOOS values) the case runs
+	// on, for an adapter that reads the one it runs on. Empty means every one
+	GOOS   []string `yaml:"goos"`
+	Expect struct {
 		Decision       string `yaml:"decision"` // what the agent is told: deny | ask | none
 		Verdict        string `yaml:"verdict"`  // the engine verdict, when it differs (Codex: ask → deny)
 		Rule           string `yaml:"rule"`
@@ -109,6 +114,9 @@ func runCases(t *testing.T, casesPath string, adapter adapters.Adapter, check fu
 
 	for _, c := range cf.Cases {
 		t.Run(c.Name, func(t *testing.T) {
+			if len(c.GOOS) > 0 && !slices.Contains(c.GOOS, runtime.GOOS) {
+				t.Skipf("runs on %v only", c.GOOS)
+			}
 			pol, err := fixture.PolicyBytes(c.Policy, root)
 			if err != nil {
 				t.Fatal(err)

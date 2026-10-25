@@ -131,9 +131,7 @@ func BuildFragment(p *policy.Policy, o FragmentOptions) Fragment {
 	}
 	f := Fragment{Settings: map[string]any{"hooks": hooks}}
 	deny, ask := f.permissionRules(p, o.Scope)
-	// The bare tool name removes the PowerShell tool from Claude's context,
-	// which the hook would deny on every call anyway.
-	deny = dedupe(append(append(deny, guardRules(o)...), "PowerShell"))
+	deny = dedupe(append(deny, guardRules(o)...))
 	perms := map[string]any{}
 	if len(deny) > 0 {
 		perms["deny"] = toAny(deny)
@@ -178,6 +176,19 @@ var inlineCode = []string{
 	"ruby -e", "php -r", "pwsh -c", "pwsh -Command", "osascript -e",
 }
 
+// psInlineCode are the PowerShell commands that run a string as code, added
+// to inlineCode for the PowerShell tool. Claude Code matches aliases (iex)
+// with the cmdlet's rule.
+var psInlineCode = []string{"Invoke-Expression"}
+
+// shellRules returns the rules for a command pattern in both of Claude's
+// shell tools. A PowerShell rule takes the same shape as a Bash one, and its
+// presence keeps the PowerShell tool on: without it, Claude Code turns the
+// tool off for a session whose settings deny anything in Bash.
+func shellRules(pat string) []string {
+	return []string{"Bash(" + pat + " *)", "PowerShell(" + pat + " *)"}
+}
+
 func (f *Fragment) permissionRules(p *policy.Policy, scope Scope) (deny, ask []string) {
 	addFile := func(list *[]string, pat string) {
 		cc := nativePath(pat, scope)
@@ -194,7 +205,7 @@ func (f *Fragment) permissionRules(p *policy.Policy, scope Scope) (deny, ask []s
 			f.note("command pattern %q (pipeline, quoting or ?/[ ] wildcards) has no native equivalent; only the hook enforces it", pat)
 			return
 		}
-		*list = append(*list, "Bash("+pat+" *)")
+		*list = append(*list, shellRules(pat)...)
 	}
 	for _, pat := range p.Spec.Commands.Deny {
 		addCmd(&deny, pat)
@@ -204,7 +215,10 @@ func (f *Fragment) permissionRules(p *policy.Policy, scope Scope) (deny, ask []s
 	}
 	if p.Spec.Commands.InterpretersDenied() {
 		for _, c := range inlineCode {
-			deny = append(deny, "Bash("+c+" *)")
+			deny = append(deny, shellRules(c)...)
+		}
+		for _, c := range psInlineCode {
+			deny = append(deny, "PowerShell("+c+" *)")
 		}
 		f.note("denyInterpreters: native rules cover only common spellings (%s and others); the hook covers the rest", strings.Join(inlineCode[:3], ", "))
 	}

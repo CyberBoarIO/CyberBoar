@@ -49,9 +49,10 @@ func parse(data []byte, getenv func(string) string, goos string, gitBash gitbash
 		}
 	}
 	c.Actions, c.Err = Actions(in, env)
-	if tools, err := classification(); err == nil && tools[in.ToolName].PowerShell != "" && c.Err == nil {
-		// The command stays in Actions for the audit log
-		c.Err, c.Notice = adapters.PowerShell(in.ToolName, "the Bash tool (Git Bash)")
+	if tools, err := classification(); err == nil && tools[in.ToolName].PowerShell != "" && c.Err == nil && !env.Windows {
+		// The engine reads PowerShell with Windows semantics only. The command
+		// stays in Actions for the audit log
+		c.Err, c.Notice = adapters.PowerShell(in.ToolName, "the Bash tool")
 	}
 	configDir := getenv("CLAUDE_CONFIG_DIR")
 	if env.Windows {
@@ -296,20 +297,18 @@ func Actions(in *Input, env Env) ([]engine.Action, error) {
 		set(&a)
 		out = append(out, a)
 	}
+	// The PowerShell tool runs each command in a new process, like Bash: only
+	// the working directory carries over, and it comes as the input's cwd
 	for _, sf := range []struct {
-		field string
-		wrap  func(string) string
-	}{
-		{spec.Shell, func(c string) string { return c }},
-		{spec.PowerShell, func(c string) string { return "pwsh -Command " + adapters.ShellQuote(c) }},
-	} {
+		field, shell string
+	}{{spec.Shell, ""}, {spec.PowerShell, engine.ShellPowerShell}} {
 		if sf.field == "" {
 			continue
 		}
 		switch v := input[sf.field].(type) {
 		case nil: // optional and absent (a WebSocket Monitor)
 		case string:
-			add(engine.ToolShell, func(a *engine.Action) { a.Command = sf.wrap(v) })
+			add(engine.ToolShell, func(a *engine.Action) { a.Command, a.Shell = v, sf.shell })
 		default:
 			return nil, adapters.Invalid("the %s tool input field %q is not a string", in.ToolName, sf.field)
 		}

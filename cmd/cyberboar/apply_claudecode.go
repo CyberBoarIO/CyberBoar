@@ -79,10 +79,6 @@ func applyClaudeCode(a applyArgs, stdout io.Writer, getenv func(string) string, 
 		fmt.Fprintln(stdout, "NOTE: Claude Code runs no hook while any of its settings files sets disableAllHooks, and users can set it "+
 			"in their own settings at any time. Only --scope managed --lock stops that.")
 	}
-	if a.goos == "windows" {
-		fmt.Fprintf(stdout, "NOTE: Claude Code's PowerShell tool is blocked: %s can't check PowerShell yet. The settings deny the tool, "+
-			"so Claude uses its Bash tool (Git Bash, from Git for Windows) instead; without Git Bash, use WSL.\n", brand.DisplayName)
-	}
 	if len(frag.Notes) > 0 {
 		printNotes(stdout, "Native permission rules are a fallback for when the hook can't run. Enforced only by the hook:", frag.Notes)
 	}

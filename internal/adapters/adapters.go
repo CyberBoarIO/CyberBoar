@@ -21,20 +21,22 @@ const (
 	RuleInvalidInput     = "error.invalidInput"
 	RuleUnclassifiedTool = "adapter.unclassifiedTool"
 	// RulePowerShell denies every call of an agent's PowerShell tool, whatever
-	// the policy says, because the engine doesn't analyze PowerShell yet
+	// the policy says, where the engine doesn't analyze PowerShell: outside
+	// native Windows
 	RulePowerShell = "builtin.powershell"
 )
 
-// PowerShell returns the denial of a call to an agent's PowerShell tool, and
-// what the user is told about it. tool is the agent's name for that tool, and
-// bash names the tool the agent should use instead, such as "the Bash tool (Git Bash)"
+// PowerShell returns the denial of a call to an agent's PowerShell tool
+// outside native Windows, and what the user is told about it. tool is the
+// agent's name for that tool, and bash names the tool the agent should use
+// instead, such as "the Bash tool"
 func PowerShell(tool, bash string) (err *Error, notice string) {
 	name := brand.DisplayName
-	err = &Error{Rule: RulePowerShell, Msg: fmt.Sprintf("%s can't check PowerShell yet, so every command for the %s tool is blocked, whatever it does. "+
-		"Run the command with %s instead, where it is checked. If it can't be done there, stop and tell the user that %s blocks PowerShell",
+	err = &Error{Rule: RulePowerShell, Msg: fmt.Sprintf("%s checks PowerShell only on native Windows, so here every command for the %s tool is blocked, whatever it does. "+
+		"Run the command with %s instead, where it is checked. If it can't be done there, stop and tell the user that %s blocks PowerShell here",
 		name, tool, bash, name)}
-	notice = fmt.Sprintf("%s blocked a command for the %s tool: %s can't check PowerShell yet, so every PowerShell command is blocked. "+
-		"The agent was told to use %s instead, where commands are checked. Without it, use WSL or a Linux dev container.", name, tool, name, bash)
+	notice = fmt.Sprintf("%s blocked a command for the %s tool: %s checks PowerShell only on native Windows, so here every PowerShell command is blocked. "+
+		"The agent was told to use %s instead, where commands are checked.", name, tool, name, bash)
 	return err, notice
 }
 

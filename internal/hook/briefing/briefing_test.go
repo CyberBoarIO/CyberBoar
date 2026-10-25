@@ -120,17 +120,3 @@ func TestSessionStartOutput(t *testing.T) {
 		t.Errorf("output = %+v", v)
 	}
 }
-
-func TestWindows(t *testing.T) {
-	if got := briefing.Windows(load(t, policyWith("{}"))); !strings.Contains(got, "Bash tool") || !strings.Contains(got, "PowerShell") {
-		t.Errorf("Windows note: %q", got)
-	}
-	// The PowerShell tool is denied whatever denyInterpreters says.
-	interp := []byte("apiVersion: " + brand.APIVersion + "\nkind: Policy\nmetadata: {name: p}\nspec: {commands: {denyInterpreters: false}}\n")
-	if got := briefing.Windows(load(t, interp)); !strings.Contains(got, "PowerShell") {
-		t.Errorf("inline code allowed: the note must still say PowerShell is blocked: %q", got)
-	}
-	if got := briefing.Windows(load(t, policyWith("{briefing: {enabled: false}}"))); got != "" {
-		t.Errorf("briefing off: got %q", got)
-	}
-}
