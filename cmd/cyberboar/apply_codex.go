@@ -6,7 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
+	"cyberboar.dev/cyberboar/internal/adapters"
 	"cyberboar.dev/cyberboar/internal/adapters/codex"
+	"cyberboar.dev/cyberboar/internal/winpath"
 	"cyberboar.dev/cyberboar/pkg/brand"
 )
 
@@ -19,25 +21,41 @@ func applyCodex(a applyArgs, stdout io.Writer, getenv func(string) string, fail,
 	if a.lock && codex.Scope(a.scope) != codex.ScopeManaged {
 		return usage("--lock needs --scope managed")
 	}
+	windows := a.goos == "windows"
 	o := codex.FragmentOptions{Scope: codex.Scope(a.scope), Policy: a.policy, Audit: a.audit, State: a.state, Deadline: a.deadline.String(),
-		Command: a.command, Lock: a.lock, PubKey: a.pubkey}
+		Command: a.command, Lock: a.lock, PubKey: a.pubkey, Windows: windows}
+	if windows && o.Scope == codex.ScopeProject {
+		return usage("%v", codex.CheckWindows(o))
+	}
 
 	var target string
 	switch o.Scope {
 	case codex.ScopeUser:
-		// Codex reads the user's hooks.json from CODEX_HOME when it is set
+		// Codex reads the user's hooks.json from CODEX_HOME when it is set,
+		// and on Windows finds the home through Windows (USERPROFILE)
 		dir := getenv("CODEX_HOME")
 		switch {
-		case dir != "" && !filepath.IsAbs(dir):
-			return fail("CODEX_HOME %q is not an absolute path", dir)
-		case dir == "":
+		case dir != "" && windows:
+			if _, err := winpath.Abs(dir); err != nil {
+				return fail("CODEX_HOME: %v", err)
+			}
+		case dir != "":
+			if !filepath.IsAbs(dir) {
+				return fail("CODEX_HOME %q is not an absolute path", dir)
+			}
+		case windows:
+			if dir = getenv("USERPROFILE"); dir == "" {
+				return fail("USERPROFILE is not set")
+			}
+			dir = adapters.Under(true, dir, ".codex")
+		default:
 			home, err := userHome(getenv)
 			if err != nil {
 				return fail("%v", err)
 			}
 			dir = filepath.Join(home, ".codex")
 		}
-		target = filepath.Join(dir, "hooks.json")
+		target = adapters.Under(windows, dir, "hooks.json")
 	case codex.ScopeProject:
 		target = filepath.Join(a.dir, ".codex", "hooks.json")
 		rel, err := projectPolicy(a.dir, a.policy)
@@ -49,7 +67,7 @@ func applyCodex(a applyArgs, stdout io.Writer, getenv func(string) string, fail,
 			o.Command = brand.Name
 		}
 	case codex.ScopeManaged:
-		target = filepath.Join(a.managedDir, "requirements.toml")
+		target = adapters.Under(windows, a.managedDir, "requirements.toml")
 	default:
 		return usage("unknown --scope %q for codex (user, project, managed)", a.scope)
 	}
@@ -60,6 +78,11 @@ func applyCodex(a applyArgs, stdout io.Writer, getenv func(string) string, fail,
 	o.Briefing = p.Spec.Session.Briefing.On()
 	if o.Command, err = hookCommand(o.Command); err != nil {
 		return fail("%v", err)
+	}
+	if windows {
+		if err := codex.CheckWindows(o); err != nil {
+			return fail("%v", err)
+		}
 	}
 
 	existing, rerr := os.ReadFile(target)

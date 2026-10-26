@@ -16,7 +16,6 @@ import (
 
 	"cyberboar.dev/cyberboar/internal/adapters"
 	"cyberboar.dev/cyberboar/internal/adapters/claudecode"
-	"cyberboar.dev/cyberboar/internal/adapters/codex"
 	"cyberboar.dev/cyberboar/internal/adapters/copilot"
 	"cyberboar.dev/cyberboar/internal/adapters/cursor"
 	"cyberboar.dev/cyberboar/internal/adapters/opencode"
@@ -261,17 +260,14 @@ func TestUnsupportedPlatformDenies(t *testing.T) {
 	for _, goos := range []string{"plan9", "js"} {
 		r := hook.Run(context.Background(), strings.NewReader(bashLS), hook.Options{GOOS: goos, Adapter: cc, StateDir: t.TempDir(), PolicyPath: policyFile(t, baselinePolicy(t), nil), Getenv: env})
 		assertDenied(t, r, hook.RuleUnsupportedPlatform)
+		// Only the user can fix it, so the user is told too, not only the agent.
+		var out struct{ SystemMessage string }
+		if err := json.Unmarshal(r.Stdout, &out); err != nil || out.SystemMessage != r.Verdict.Reason {
+			t.Errorf("the user isn't told why every call is blocked: %q (%v)", r.Stdout, err)
+		}
 	}
 	goos := "windows"
-	r := hook.Run(context.Background(), strings.NewReader(`{"hook_event_name":"PreToolUse","tool_name":"Bash","cwd":"C:\\work\\repo","tool_input":{"command":"dir"}}`),
-		hook.Options{GOOS: goos, Adapter: codex.Adapter{}, StateDir: t.TempDir(), PolicyPath: policyFile(t, baselinePolicy(t), nil), Getenv: env})
-	assertDenied(t, r, hook.RuleUnsupportedPlatform)
-	// Only the user can fix it, so the user is told too, not only the agent.
-	var out struct{ SystemMessage string }
-	if err := json.Unmarshal(r.Stdout, &out); err != nil || out.SystemMessage != r.Verdict.Reason {
-		t.Errorf("the user isn't told why every call is blocked: %q (%v)", r.Stdout, err)
-	}
-	r = hook.Run(context.Background(), strings.NewReader(`{"sessionId":"s","cwd":"C:\\work\\repo","toolName":"powershell","toolArgs":{"command":"dir"}}`),
+	r := hook.Run(context.Background(), strings.NewReader(`{"sessionId":"s","cwd":"C:\\work\\repo","toolName":"powershell","toolArgs":{"command":"dir"}}`),
 		hook.Options{GOOS: goos, Adapter: copilot.Adapter{}, StateDir: t.TempDir(), PolicyPath: policyFile(t, baselinePolicy(t), nil), Getenv: env})
 	assertDenied(t, r, hook.RuleUnsupportedPlatform)
 	// The user must be told why and where to go instead.

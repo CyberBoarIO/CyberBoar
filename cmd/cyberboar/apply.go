@@ -61,6 +61,9 @@ func runApply(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stde
 		apply = applyClaudeCode
 	case "codex":
 		apply, managed = applyCodex, codex.ManagedDir
+		if h.goos == "windows" {
+			managed = codex.WindowsManagedDir(h.getenv("ProgramData"))
+		}
 	case "copilot-cli":
 		apply, managed = applyCopilot, copilot.PolicyDir
 	case "cursor":

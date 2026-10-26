@@ -14,11 +14,22 @@ import (
 
 	"cyberboar.dev/cyberboar/internal/adapters"
 	"cyberboar.dev/cyberboar/internal/policy"
+	"cyberboar.dev/cyberboar/internal/winpath"
 	"cyberboar.dev/cyberboar/pkg/brand"
 )
 
 // ManagedDir is where Codex reads managed requirements (requirements.toml)
+// and system configuration outside Windows
 const ManagedDir = "/etc/codex"
+
+// WindowsManagedDir is ManagedDir on Windows: OpenAI\Codex in the
+// ProgramData folder, programData, or in C:\ProgramData when it is unset
+func WindowsManagedDir(programData string) string {
+	if programData == "" {
+		programData = `C:\ProgramData`
+	}
+	return adapters.Under(true, programData, "OpenAI", "Codex")
+}
 
 // Scope is where Codex hook configuration lives
 type Scope string
@@ -50,48 +61,88 @@ type FragmentOptions struct {
 	Deadline string
 	Lock     bool // in managed scope, set allow_managed_hooks_only
 	Briefing bool // install the SessionStart briefing (the policy's spec.session.briefing)
+	// Windows makes the hook a command line for cmd.exe, which Codex runs
+	// hooks with on Windows; its paths are Windows paths (CheckWindows)
+	Windows bool
 }
 
 // HookCommand returns the shell command line Codex runs for the hook. Codex
 // runs hook commands through a shell in the session cwd
 // A project-scope policy is found from the git root, as the Codex docs recommend
 func HookCommand(o FragmentOptions) string {
-	cmd := adapters.ShellQuote(o.Command) + " hook --agent codex --policy " + policyArg(o)
+	q := quoter(o)
+	cmd := q(o.Command) + " hook --agent codex --policy " + policyArg(o)
 	if o.Audit != "" {
-		cmd += " --audit " + adapters.ShellQuote(o.Audit)
+		cmd += " --audit " + q(o.Audit)
 	}
 	if o.State != "" {
-		cmd += " --state " + adapters.ShellQuote(o.State)
+		cmd += " --state " + q(o.State)
 	}
 	if o.PubKey != "" {
-		cmd += " --pubkey " + adapters.ShellQuote(o.PubKey)
+		cmd += " --pubkey " + q(o.PubKey)
 	}
-	return cmd + " --deadline " + adapters.ShellQuote(o.Deadline)
+	return cmd + " --deadline " + q(o.Deadline)
 }
 
 // policyArg returns the --policy value as the shell sees it
 func policyArg(o FragmentOptions) string {
-	if o.Scope == ScopeProject {
+	if o.Scope == ScopeProject && !o.Windows {
 		return `"$(git rev-parse --show-toplevel)"/` + adapters.ShellQuote(o.Policy)
 	}
-	return adapters.ShellQuote(o.Policy)
+	return quoter(o)(o.Policy)
 }
 
 // BriefCommand returns the shell command line for the SessionStart briefing
 func BriefCommand(o FragmentOptions) string {
-	cmd := adapters.ShellQuote(o.Command) + " brief --agent codex --policy " + policyArg(o)
+	cmd := quoter(o)(o.Command) + " brief --agent codex --policy " + policyArg(o)
 	if o.PubKey != "" {
-		cmd += " --pubkey " + adapters.ShellQuote(o.PubKey)
+		cmd += " --pubkey " + quoter(o)(o.PubKey)
 	}
 	return cmd
 }
 
+// quoter returns how a value is quoted in the hook's command line: for a
+// POSIX shell, or on Windows in double quotes, which cmd.exe and the
+// program's own argument parsing both take literally (CheckWindows)
+func quoter(o FragmentOptions) func(string) string {
+	if o.Windows {
+		return func(s string) string { return `"` + s + `"` }
+	}
+	return adapters.ShellQuote
+}
+
+// CheckWindows reports a hook that can't be installed on Windows: Codex runs
+// it with `cmd.exe /C`, where a value in double quotes stays literal unless
+// it holds a quote, a percent sign (cmd expands %VAR% there) or a line
+// break, or ends in a backslash, which would escape the closing quote. There
+// is no git root to find a project's policy from either
+func CheckWindows(o FragmentOptions) error {
+	if o.Scope == ScopeProject {
+		return errors.New("--scope project is not supported for Codex on Windows, which runs hooks with cmd.exe, where the policy can't be found from the git root; use --scope user")
+	}
+	for _, v := range []string{o.Command, o.Policy, o.Audit, o.State, o.PubKey, o.Deadline} {
+		if strings.ContainsAny(v, "\"%\r\n") || strings.HasSuffix(v, `\`) {
+			return fmt.Errorf("%q can't be written into a cmd.exe command line (no \", %%, line breaks or a trailing \\)", v)
+		}
+	}
+	return nil
+}
+
 func handler(o FragmentOptions) map[string]any {
-	return map[string]any{"type": "command", "command": HookCommand(o), "timeout": HookTimeout, "statusMessage": statusMessage}
+	return withWindows(o, map[string]any{"type": "command", "command": HookCommand(o), "timeout": HookTimeout, "statusMessage": statusMessage})
 }
 
 func briefHandler(o FragmentOptions) map[string]any {
-	return map[string]any{"type": "command", "command": BriefCommand(o), "timeout": HookTimeout, "statusMessage": briefingMessage}
+	return withWindows(o, map[string]any{"type": "command", "command": BriefCommand(o), "timeout": HookTimeout, "statusMessage": briefingMessage})
+}
+
+// withWindows gives a Windows handler its command as commandWindows too,
+// which Codex runs instead of command on Windows
+func withWindows(o FragmentOptions, h map[string]any) map[string]any {
+	if o.Windows {
+		h["commandWindows"] = h["command"]
+	}
+	return h
 }
 
 // MergeHooksJSON adds CyberBoar's PreToolUse handler to a hooks.json,
@@ -252,16 +303,26 @@ func Requirements(p *policy.Policy, o FragmentOptions) ([]byte, []string) {
 		b.WriteString("allow_managed_hooks_only = true\n")
 	}
 	b.WriteString("\n[features]\nhooks = true\n")
-	if filepath.IsAbs(o.Command) {
+	switch _, abs, _ := winpath.Path(o.Command); {
+	case o.Windows && abs:
+		fmt.Fprintf(&b, "\n[hooks]\nwindows_managed_dir = %s\n", tomlString(o.Command[:strings.LastIndexAny(o.Command, `\/`)]))
+	case !o.Windows && filepath.IsAbs(o.Command):
 		fmt.Fprintf(&b, "\n[hooks]\nmanaged_dir = %s\n", tomlString(filepath.Dir(o.Command)))
 	}
+	command := func(line string) string {
+		s := "command = " + tomlString(line) + "\n"
+		if o.Windows {
+			s += "command_windows = " + tomlString(line) + "\n"
+		}
+		return s
+	}
 	b.WriteString("\n[[hooks.PreToolUse]]\n\n[[hooks.PreToolUse.hooks]]\n")
-	fmt.Fprintf(&b, "type = \"command\"\ncommand = %s\ntimeout = %d\nstatusMessage = %s\n",
-		tomlString(HookCommand(o)), HookTimeout, tomlString(statusMessage))
+	fmt.Fprintf(&b, "type = \"command\"\n%stimeout = %d\nstatusMessage = %s\n",
+		command(HookCommand(o)), HookTimeout, tomlString(statusMessage))
 	if p.Spec.Session.Briefing.On() {
 		b.WriteString("\n[[hooks.SessionStart]]\n\n[[hooks.SessionStart.hooks]]\n")
-		fmt.Fprintf(&b, "type = \"command\"\ncommand = %s\ntimeout = %d\nstatusMessage = %s\n",
-			tomlString(BriefCommand(o)), HookTimeout, tomlString(briefingMessage))
+		fmt.Fprintf(&b, "type = \"command\"\n%stimeout = %d\nstatusMessage = %s\n",
+			command(BriefCommand(o)), HookTimeout, tomlString(briefingMessage))
 	}
 
 	var rules []string
