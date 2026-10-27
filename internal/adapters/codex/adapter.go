@@ -104,6 +104,7 @@ func parse(data []byte, getenv func(string) string, goos string, documents func(
 		codexHome = adapters.Under(env.Windows, env.Home, ".codex")
 	}
 	adapters.Guard(c.Actions, ConfigFiles(env.Windows, codexHome, in.Cwd, managed)...)
+	adapters.Guard(c.Actions, adapters.StartupFiles(env.Windows, env.Home, getenv)...)
 	if env.Windows {
 		adapters.Guard(c.Actions, PowerShellDirs(env.Home, documents())...)
 	}

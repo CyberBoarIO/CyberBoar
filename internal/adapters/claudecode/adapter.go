@@ -59,6 +59,7 @@ func parse(data []byte, getenv func(string) string, goos string, gitBash gitbash
 		configDir = winpath.FromGitBash(configDir)
 	}
 	adapters.Guard(c.Actions, SettingsFiles(env, configDir, goos)...)
+	adapters.Guard(c.Actions, adapters.StartupFiles(env.Windows, env.Home, getenv)...)
 	return c, nil
 }
 

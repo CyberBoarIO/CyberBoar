@@ -101,12 +101,15 @@ func (Adapter) Parse(data []byte, getenv func(string) string) (*adapters.Call, e
 	env := Env{ProjectDir: getenv("COPILOT_PROJECT_DIR"), Home: getenv("HOME"), CopilotHome: getenv("COPILOT_HOME"),
 		CDPath: getenv("CDPATH") != ""}
 	if in.Local() {
-		return parseVSCode(in, env), nil
+		c := parseVSCode(in, env)
+		adapters.Guard(c.Actions, adapters.StartupFiles(false, env.Home, getenv)...)
+		return c, nil
 	}
 	c := &adapters.Call{Session: in.SessionID, Cwd: in.Cwd, Project: env.ProjectDir, Tool: in.ToolName}
 	c.Actions, c.Err = Actions(in, env)
 	// VS Code reads the same hook files, so its settings can switch the hook off as well
 	adapters.Guard(c.Actions, guardFiles(env, in.Cwd)...)
+	adapters.Guard(c.Actions, adapters.StartupFiles(false, env.Home, getenv)...)
 	return c, nil
 }
 

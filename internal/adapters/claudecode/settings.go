@@ -257,6 +257,10 @@ func guardRules(o FragmentOptions) []string {
 	rules := []string{"Edit(//**/.claude/settings.json)", "Edit(//**/.claude/settings.local.json)",
 		"Edit(//**/.claude/agents/**)", "Edit(//**/.claude/skills/**)", "Edit(//**/.claude/commands/**)",
 		"Edit(//**/.claude/plugins/**)"}
+	// Shell startup files, which run outside the hook (adapters.StartupFiles)
+	for _, name := range adapters.StartupNames() {
+		rules = append(rules, "Edit(~/"+name+")")
+	}
 	files := []string{o.Policy, o.Policy + ".sig", o.PubKey, o.Audit, o.Command}
 	for _, f := range files {
 		if pat, ok := nativeFile(f); ok {

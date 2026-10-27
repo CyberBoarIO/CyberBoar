@@ -101,6 +101,16 @@
         "Edit(//**/.claude/skills/**)",
         "Edit(//**/.claude/commands/**)",
         "Edit(//**/.claude/plugins/**)",
+        "Edit(~/.profile)",
+        "Edit(~/.bash_profile)",
+        "Edit(~/.bash_login)",
+        "Edit(~/.bashrc)",
+        "Edit(~/.bash_logout)",
+        "Edit(~/.zshenv)",
+        "Edit(~/.zprofile)",
+        "Edit(~/.zshrc)",
+        "Edit(~/.zlogin)",
+        "Edit(~/.zlogout)",
         "Edit(/.cyberboar/policy.yaml)",
         "Edit(/.cyberboar/policy.yaml.sig)"
       ]

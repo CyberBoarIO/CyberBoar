@@ -205,6 +205,7 @@ func TestWindows(t *testing.T) {
 		{"redirected module", map[string]any{"cmd": `Set-Content D:\OneDrive\Documents\WindowsPowerShell\Modules\m\m.psm1 x`}, `D:\OneDrive\Documents`, engine.Deny, engine.RuleGuarded},
 		{"hooks", map[string]any{"cmd": `Set-Content C:\Users\dev\.codex\hooks.json '{}'`}, "", engine.Deny, engine.RuleGuarded},
 		{"managed", map[string]any{"cmd": `Set-Content C:\ProgramData\OpenAI\Codex\requirements.toml x`}, "", engine.Deny, engine.RuleGuarded},
+		{"startup file", map[string]any{"cmd": `Add-Content C:\Users\dev\.bashrc x`}, "", engine.Deny, engine.RuleGuarded},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			call, v := run(t, tc.args, tc.documents)
