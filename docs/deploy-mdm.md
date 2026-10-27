@@ -168,9 +168,9 @@ those hooks run too.
 `enroll` is safe to run on every check-in: an enrolled machine with a valid certificate
 sends nothing and needs no token, and one whose certificate is due renews it. The policy
 is installed before the hook, because a hook without its policy denies every tool call.
-For Codex on macOS/Linux, install its managed hook separately with the same policy/key
-options. Codex is unsupported on native Windows. Windows managed scope and locking
-remain unverified in a real managed deployment.
+For Codex, install its managed hook separately with the same policy/key options; on
+Windows it goes to `%ProgramData%\OpenAI\Codex\requirements.toml`. Windows managed
+scope and locking remain unverified in a real managed deployment.
 
 `enroll` makes the endpoint key in the TPM where it can (Linux's `/dev/tpmrm0`, the
 Platform Crypto Provider on Windows), else on Windows in the Software Key Storage

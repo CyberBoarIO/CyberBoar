@@ -27,7 +27,9 @@ retain the policy and agent version involved.
 | Cursor shell commands with relative paths are denied | Cursor's shell keeps its directory between calls and reports it only when the call sets a working directory. Start the command with `cd /absolute/project/path &&`. |
 | Copilot in VS Code doesn't run the hook | Trust the workspace, keep `chat.useHooks` on and start a new chat. Run `apply` again if CyberBoar 1.0.0-rc.1 wrote the hook: VS Code's Local agent skips its `exec` form. **Chat: Configure Hooks** lists the files VS Code loaded; the **GitHub Copilot Chat Hooks** output channel shows each run. |
 | Copilot terminal commands in VS Code ask for confirmation | The agent terminal keeps its directory between commands and VS Code doesn't report it, so relative paths may be anywhere. Start the command with `cd /absolute/project/path &&`. |
-| Native Windows calls are blocked | Use Claude Code with Git Bash or another agent with the Linux binary in WSL/a Linux container. |
+| Native Windows calls are blocked | Use Claude Code or Codex CLI, or another agent with the Linux binary in WSL/a Linux container. |
+| Codex on Windows: a command is blocked by `adapter.windowsShell` | The model asked for another shell, such as `cmd.exe` or Git Bash. Only PowerShell is checked there; ask it to run the command without `shell`. |
+| An agent can't edit `~/.bashrc` or another startup file | Shell startup files are guarded (`builtin.guarded`): what they hold runs outside the hook's checks. Edit them yourself. |
 | A read gets `builtin.guarded` | Shell access to guarded settings is a potential write. Use a native read tool for inspection; a user must change settings. |
 | A recursive search/archive is blocked | The directory may contain a protected file or built-in protected path. Review `files.containing` and narrow the operation. |
 | `secrets.<id>` blocks test data | Review the finding. Use placeholders; add a justified `secrets.ignore` exception only after review. |
