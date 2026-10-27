@@ -35,10 +35,10 @@ Install the binary, policy and hook configuration where the agent executes. With
 WSL, Remote-SSH or a dev container, this may be the remote Linux environment rather
 than the desktop host. A host path such as `C:\Users\...` is not a Linux policy path.
 
-Use the Linux binary inside WSL or a Linux container. Native Windows support is
-limited to Claude Code using Git Bash; see [system requirements](system-requirements.md)
-and [PowerShell status](powershell.md). Opening an editor on Windows does not imply
-native Windows execution or PowerShell analysis.
+Use the Linux binary inside WSL or a Linux container. Native Windows support covers
+Claude Code (Git Bash and its PowerShell tool) and Codex CLI; see [system
+requirements](system-requirements.md) and [PowerShell support](powershell.md). Opening
+an editor on Windows does not make its other agents run natively there.
 
 GUI extensions may inherit a different `PATH` from your terminal. The examples below
 pin the binary's absolute path with `--command`. Do not point them at a temporary
@@ -76,8 +76,8 @@ project in VS Code and start a **new Claude Code extension conversation**. Revie
 loaded handlers through Claude Code's hooks interface. Keep normal permissions
 enabled and verify from the extension conversation, not only the `claude` CLI.
 
-For native Windows, use the [Claude Code/Git Bash installation](getting-started.md)
-and a stable absolute `cyberboar.exe` path instead of this Linux/macOS shell example.
+For native Windows, use the [Claude Code installation](getting-started.md) and a
+stable absolute `cyberboar.exe` path instead of this Linux/macOS shell example.
 
 ## Codex extension
 

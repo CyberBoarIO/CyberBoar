@@ -71,13 +71,14 @@ const (
 
 // supported lists the operating systems whose path semantics the engine
 // implements, and the agents it can check on each. A nil set means every
-// agent. On native Windows, Codex, Copilot CLI and Cursor run their commands
-// through PowerShell, which the engine can't analyze, and so does opencode
-// unless $SHELL or its config names another shell. Claude Code runs them in Git Bash
+// agent. On native Windows, Claude Code runs commands in Git Bash or its
+// PowerShell tool, and Codex in PowerShell, which the engine analyzes. Its
+// adapters for Copilot CLI, Cursor and opencode don't read their PowerShell
+// calls on Windows yet
 var supported = map[string]map[string]bool{
 	"linux":   nil,
 	"darwin":  nil,
-	"windows": {"claude-code": true},
+	"windows": {"claude-code": true, "codex": true},
 }
 
 // PlatformSupported reports whether the engine can check the agent's tool
@@ -552,9 +553,5 @@ func Brief(o Options) []byte {
 	if minimum := compiled.Policy().Spec.MinimumVersion; minimum != "" && !semver.AtLeast(o.Version, minimum) {
 		return out(versionVerdict(minimum, o.Version).Reason + ".\nTell the user before doing anything else.\n")
 	}
-	text := briefing.Text(compiled.Policy())
-	if o.GOOS == "windows" {
-		text += briefing.Windows(compiled.Policy())
-	}
-	return out(text)
+	return out(briefing.Text(compiled.Policy()))
 }

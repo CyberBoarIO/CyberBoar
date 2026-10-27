@@ -67,7 +67,7 @@ type Verdict struct {
 	// Notice, when set, is also told to the user directly, where the agent
 	// can show the user a message of its own (Claude Code's systemMessage)
 	// It is set when the call was blocked for a reason only the user can do
-	// something about, such as PowerShell, which is not analyzed
+	// something about, such as PowerShell outside native Windows
 	// The engine never sets it
 	Notice string `json:"notice,omitempty"`
 }

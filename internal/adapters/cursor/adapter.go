@@ -90,6 +90,7 @@ func (Adapter) Parse(data []byte, getenv func(string) string) (*adapters.Call, e
 	c := &adapters.Call{Session: in.ConversationID, ToolUseID: in.ToolUseID, Cwd: in.Cwd, Project: env.ProjectDir, Tool: toolLabel(in)}
 	c.Actions, c.Err = Actions(in, env)
 	adapters.Guard(c.Actions, SettingsFiles(env, in.WorkspaceRoots)...)
+	adapters.Guard(c.Actions, adapters.StartupFiles(false, env.Home, getenv)...)
 	return c, nil
 }
 

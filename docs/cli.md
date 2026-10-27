@@ -221,9 +221,9 @@ user's own setting.
 |---|---|---|---|
 | `--agent NAME` | none | `claude-code` | `claude-code`, `codex`, `copilot-cli`, `cursor` or `opencode` |
 | `--policy FILE` | `CYBERBOAR_POLICY` | none | The policy the hook will read |
-| `--scope SCOPE` | none | `user` | `user`, `project`, `local` (Claude Code only) or `managed` (not opencode). `project` needs the policy inside the project |
+| `--scope SCOPE` | none | `user` | `user`, `project`, `local` (Claude Code only) or `managed` (not opencode). `project` needs the policy inside the project, and isn't available for Codex on Windows |
 | `--dir DIR` | none | the working directory | The project, for `project` and `local` |
-| `--managed-dir DIR` | none | the agent's machine-wide directory, e.g. `/etc/claude-code`, `/etc/codex` | Where `managed` writes |
+| `--managed-dir DIR` | none | the agent's machine-wide directory, e.g. `/etc/claude-code`, `/etc/codex`, on Windows `%ProgramData%\OpenAI\Codex` for Codex | Where `managed` writes |
 | `--command FILE` | none | this binary; `cyberboar` on `PATH` for `project` | The executable the hook runs |
 | `--audit FILE` | none | none | The hook's audit log (made absolute) |
 | `--state DIR` | none | none | The hook's `--state` (made absolute); without it the hook uses its default |

@@ -22,8 +22,9 @@ Copilot in VS Code; run the prompts from a VS Code chat to check it there.
 Install a verified CyberBoar binary using [Getting started](getting-started.md), and
 finish your agent's authentication/provider setup. The commands below use Bash on
 macOS or Linux, including WSL/a Linux dev container. For native Windows, follow the
-Claude Code/Git Bash instructions in [Getting started](getting-started.md); the other
-four integrations require WSL or a Linux container.
+Claude Code instructions in [Getting started](getting-started.md), or [Codex on
+Windows](agents.md#codex-on-windows); the other three integrations require WSL or a
+Linux container.
 
 Create a **new disposable project for each agent**. These commands do not change
 user-wide hooks or existing projects. Keep the same terminal open for its demo.

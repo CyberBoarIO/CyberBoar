@@ -106,7 +106,7 @@ func TestGuardRulesInEveryScope(t *testing.T) {
 		deny, _ := f.Settings["permissions"].(map[string]any)["deny"].([]any)
 		for _, want := range []string{"Edit(//**/.claude/settings.json)", "Edit(//**/.claude/settings.local.json)",
 			"Edit(//**/.claude/agents/**)", "Edit(//**/.claude/skills/**)", "Edit(//**/.claude/commands/**)",
-			"Edit(//**/.claude/plugins/**)", "Edit(//etc/policy.yaml)", "Edit(//opt/cyberboar)"} {
+			"Edit(//**/.claude/plugins/**)", "Edit(~/.bashrc)", "Edit(~/.zshenv)", "Edit(//etc/policy.yaml)", "Edit(//opt/cyberboar)"} {
 			if !slices.Contains(deny, any(want)) {
 				t.Errorf("%s scope: no %s in %v", scope, want, deny)
 			}
@@ -232,19 +232,31 @@ func TestManagedDir(t *testing.T) {
 	}
 }
 
-// A deny rule naming the whole PowerShell tool removes it from Claude's
-// context, so the agent never reaches for it, and holds even when the hook can't run
-// It is there whatever the policy says
-func TestFragmentDeniesPowerShell(t *testing.T) {
+// The PowerShell tool stays on, since the hook checks it on Windows: no rule
+// names the whole tool, and every Bash rule has a PowerShell twin, without
+// which Claude Code would turn the tool off. Under denyInterpreters the
+// PowerShell tool also gets a rule for Invoke-Expression
+func TestFragmentPowerShellRules(t *testing.T) {
 	for _, name := range []string{"baseline.yaml", "allow-listed.yaml"} {
 		p := loadPolicy(t, name)
 		for _, interp := range []bool{true, false} {
 			p.Spec.Commands.DenyInterpreters = &interp
 			f := BuildFragment(p, FragmentOptions{Scope: ScopeUser, Command: "cyberboar", Policy: "/p.yaml", Deadline: "5s"})
 			perms, _ := f.Settings["permissions"].(map[string]any)
+			for _, list := range []string{"deny", "ask"} {
+				rules, _ := perms[list].([]any)
+				for _, r := range rules {
+					if r == "PowerShell" || r == "PowerShell(*)" {
+						t.Errorf("%s, denyInterpreters %v: %s rule %v names the whole tool", name, interp, list, r)
+					}
+					if pat, ok := strings.CutPrefix(r.(string), "Bash("); ok && !slices.Contains(rules, any("PowerShell("+pat)) {
+						t.Errorf("%s, denyInterpreters %v: %s rule %v has no PowerShell twin", name, interp, list, r)
+					}
+				}
+			}
 			deny, _ := perms["deny"].([]any)
-			if !slices.Contains(deny, any("PowerShell")) {
-				t.Errorf("%s, denyInterpreters %v: no native PowerShell deny in %v", name, interp, deny)
+			if slices.Contains(deny, any("PowerShell(Invoke-Expression *)")) != interp {
+				t.Errorf("%s, denyInterpreters %v: Invoke-Expression rule in %v", name, interp, deny)
 			}
 		}
 	}

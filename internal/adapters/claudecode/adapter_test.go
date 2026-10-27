@@ -3,14 +3,17 @@ package claudecode
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 
+	"cyberboar.dev/cyberboar/internal/adapters"
 	"cyberboar.dev/cyberboar/internal/adapters/claudecode/gitbash"
 	"cyberboar.dev/cyberboar/internal/engine"
 )
@@ -113,6 +116,56 @@ func TestWindowsWithoutMounts(t *testing.T) {
 	for _, a := range call.Actions {
 		if v := engine.Evaluate(context.Background(), c, a); v.Rule == engine.RuleWindowsPath {
 			t.Errorf("with the mount table: %s by %s (%s)", v.Decision, v.Rule, v.Reason)
+		}
+	}
+}
+
+// On native Windows the PowerShell tool's command is analysed as PowerShell,
+// also without Git Bash, where Claude Code has no Bash tool. Elsewhere it is
+// denied and the agent is sent to the Bash tool
+func TestPowerShellTool(t *testing.T) {
+	noGit := gitbash.Env{Getenv: func(string) string { return "" },
+		LookPath: func(string) (string, error) { return "", exec.ErrNotFound },
+		ReadFile: func(string) ([]byte, error) { return nil, fs.ErrNotExist },
+		Exists:   func(string) bool { return false }}
+	getenv := func(k string) string {
+		return map[string]string{"USERPROFILE": `C:\Users\dev`, "CLAUDE_PROJECT_DIR": `C:\work\repo`}[k]
+	}
+	c, err := engine.Compile(loadPolicy(t, "baseline.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		command, rule string
+		decision      engine.Decision
+	}{
+		{"Get-Content .env", "files.deny[0]", engine.Deny},
+		{"gc .\\src\\..\\.env", "files.deny[0]", engine.Deny},
+		{"Invoke-Expression 'Get-Content .env'", "", engine.Deny},
+		{"Get-ChildItem src; git status", "", engine.Allow},
+	} {
+		input, _ := json.Marshal(map[string]any{"hook_event_name": "PreToolUse", "tool_name": "PowerShell", "cwd": `C:\work\repo`,
+			"tool_input": map[string]any{"command": tc.command}})
+		call, err := parse(input, getenv, "windows", noGit)
+		if err != nil || call.Err != nil || len(call.Actions) != 1 {
+			t.Fatalf("%s: call %+v, err %v", tc.command, call, err)
+		}
+		a := call.Actions[0]
+		if a.Shell != engine.ShellPowerShell || a.Command != tc.command || a.Platform != engine.PlatformWindows || a.ShellPersists {
+			t.Errorf("%s: action %+v", tc.command, a)
+		}
+		v := engine.Evaluate(context.Background(), c, a)
+		if v.Decision != tc.decision || (tc.rule != "" && v.Rule != tc.rule) {
+			t.Errorf("%s: %s by %s (%s); want %s %s", tc.command, v.Decision, v.Rule, v.Reason, tc.decision, tc.rule)
+		}
+	}
+
+	input := []byte(`{"hook_event_name":"PreToolUse","tool_name":"PowerShell","cwd":"/work/repo","tool_input":{"command":"Get-ChildItem"}}`)
+	for _, goos := range []string{"linux", "darwin"} {
+		call, err := parse(input, func(string) string { return "" }, goos, noGit)
+		var ae *adapters.Error
+		if err != nil || !errors.As(call.Err, &ae) || ae.Rule != adapters.RulePowerShell || !strings.Contains(ae.Msg, "Bash tool") || call.Notice == "" {
+			t.Errorf("%s: call %+v, err %v", goos, call, err)
 		}
 	}
 }

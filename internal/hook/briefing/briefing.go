@@ -92,19 +92,6 @@ func Text(p *policy.Policy) string {
 	return b.String()
 }
 
-// Windows returns what the briefing adds to Text on native Windows, where
-// Claude Code has a PowerShell tool next to Bash. PowerShell code isn't
-// analyzed, so every PowerShell command is denied, and an agent that isn't
-// told so keeps reaching for it.
-func Windows(p *policy.Policy) string {
-	if !p.Spec.Session.Briefing.On() {
-		return ""
-	}
-	return fmt.Sprintf("\nOn this Windows machine, run commands with the Bash tool (Git Bash), where they are checked. "+
-		"%s can't check PowerShell yet, so every command for the PowerShell tool is blocked, whatever the policy allows. "+
-		"If a task can only be done in PowerShell, tell the user instead of trying.\n", brand.DisplayName)
-}
-
 // NoPolicy is the briefing when the hook will deny everything.
 func NoPolicy(why string) string {
 	return fmt.Sprintf("%s has no valid policy for this session (%s), so every tool call will be denied. "+

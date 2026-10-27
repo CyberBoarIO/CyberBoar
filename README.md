@@ -93,9 +93,9 @@ installation. Managed settings and OS permissions can protect deployment configu
 an OS sandbox is needed for a process-level boundary.
 
 See the [security model](docs/security-model.md) for path, shell, secret-detection and
-deployment limits. On native Windows, use Claude Code with Git Bash. Other agents
-require WSL or a Linux dev container; [PowerShell analysis](docs/powershell.md) is not
-connected to the production engine.
+deployment limits. On native Windows, use Claude Code (Git Bash or its PowerShell tool)
+or Codex CLI, whose PowerShell commands are analyzed as a [checked
+subset](docs/powershell.md). Other agents require WSL or a Linux dev container.
 
 ## Fleet use
 

@@ -7,8 +7,42 @@ protocol, audit schema and public Go packages under `pkg/`.
 
 ## [Unreleased]
 
+### Added
+
+- PowerShell analysis: the engine reads a checked subset of PowerShell, the
+  common file cmdlets and their aliases, programs, and the constructs that run
+  code, and applies the same policy rules as for Bash. Anything outside the
+  subset is treated as able to do anything. See [PowerShell support](docs/powershell.md).
+- Claude Code's `PowerShell` tool is checked on native Windows, with or without
+  Git Bash. Elsewhere it is still denied.
+- Codex CLI on native Windows, whose commands run in PowerShell. A command sent
+  to another shell, such as `cmd.exe` or Git Bash, is denied
+  (`adapter.windowsShell`). `apply` writes the hook as a `cmd.exe` command line
+  (`command` and `commandWindows`) for the user and managed scopes; the project
+  scope isn't available there. The hook guards Codex's managed directory
+  (`%ProgramData%\OpenAI\Codex`) and the user's PowerShell profile and module
+  folders, which Codex runs.
+- `explain --shell powershell` reads a command as PowerShell, and a policy test
+  case can set `shell: powershell`.
+
+### Changed
+
+- `apply --agent claude-code` no longer denies the whole `PowerShell` tool. It
+  mirrors every native `Bash(…)` rule as a `PowerShell(…)` rule, which also keeps
+  Claude Code from switching the tool off, and adds `PowerShell(Invoke-Expression *)`
+  under `denyInterpreters`. Re-run `apply` to install them.
+- `builtin.powershell` now denies Claude Code's PowerShell tool only outside
+  native Windows, and the Windows session briefing no longer tells the agent to
+  avoid it.
+- Source builds need Go 1.27.3, whose release fixes vulnerabilities in
+  `crypto/x509`; release binaries are built with it.
+
 ### Fixed
 
+- Shell startup files are guarded for every agent: `~/.profile`, bash's and
+  zsh's files (also in `$ZDOTDIR`), and the files `$BASH_ENV` and `$ENV` name.
+  Agents' shells run them before commands or at session start, outside the
+  hook's checks. Claude Code's native rules cover them too after `apply`.
 - Claude Code: custom agents, skills and commands, whose frontmatter can
   declare hooks that Claude Code runs without the CyberBoar hook seeing them,
   are guarded like settings files. That is `.claude/agents`, `.claude/skills`
@@ -19,6 +53,13 @@ protocol, audit schema and public Go packages under `pkg/`.
   writes native `Edit` denies for these folders at any depth; re-run `apply`
   to install them. Skills in folders below the project and folders added with
   `--add-dir` are still not guarded against shell writes.
+
+### Known limitations
+
+- PowerShell support is new and its real-agent testing on Windows is limited.
+  Windows PowerShell 5.1 commands are read with PowerShell 7's grammar.
+- Codex runs the user's PowerShell profiles; CyberBoar trusts them as the user's configuration and keeps agents from changing them.
+- Copilot CLI, Cursor and opencode remain unsupported on native Windows.
 
 ## [v1.0.0-rc.2] - 2026-10-20
 

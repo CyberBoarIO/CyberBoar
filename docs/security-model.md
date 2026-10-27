@@ -47,9 +47,15 @@ without executing anything.
   unless supplied in the analyzed command. Missing shell or working-directory
   information can make adapter decisions more restrictive.
 
-Native Windows support is limited to Claude Code with Git Bash. Unknown mounts and
-ambiguous Windows paths are denied. PowerShell is not analyzed by the production engine;
-see [system requirements](system-requirements.md).
+Native Windows support covers Claude Code (Git Bash and its PowerShell tool) and Codex
+CLI (PowerShell). Unknown mounts and ambiguous Windows paths are denied. PowerShell is
+analyzed as a [checked subset](powershell.md): constructs outside it are treated as
+able to do anything, and the user's PowerShell profiles, which Codex runs, are trusted
+as the user's configuration. See [system requirements](system-requirements.md).
+
+Shell startup files (`~/.bashrc`, `~/.zshrc` and the others the agents' shells read)
+are guarded, since what they hold runs outside the hook's checks. A program the agent
+starts can still write them, as it can any file.
 
 ## Secrets, MCP and network access
 
