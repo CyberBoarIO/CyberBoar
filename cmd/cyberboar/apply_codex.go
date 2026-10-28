@@ -80,6 +80,13 @@ func applyCodex(a applyArgs, stdout io.Writer, getenv func(string) string, fail,
 		return fail("%v", err)
 	}
 	if windows {
+		// The hook's command line needs the program without spaces, which a
+		// path such as C:\Program Files\… has in its 8.3 short name
+		if !codex.BareWindowsProgram(o.Command) {
+			if short, err := shortPathName(o.Command); err == nil && codex.BareWindowsProgram(short) {
+				o.Command = short
+			}
+		}
 		if err := codex.CheckWindows(o); err != nil {
 			return fail("%v", err)
 		}

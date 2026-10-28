@@ -186,11 +186,12 @@ func TestApplyManagedDropIn(t *testing.T) {
 	}
 }
 
-// On Windows Codex runs hooks with cmd.exe, so the hook is a command line in
-// double quotes, given as commandWindows too, in the user's .codex under
+// On Windows Codex runs hooks in PowerShell or cmd.exe, so the hook is a
+// command line both read alike: the program bare, the values in double
+// quotes. It is given as commandWindows too, in the user's .codex under
 // USERPROFILE, and managed requirements name windows_managed_dir. A project
-// hook, which finds the policy from the git root, can't be written for cmd,
-// and nor can a value cmd would change
+// hook, which finds the policy from the git root, can't be written for them,
+// and nor can a program path with spaces or a value either shell would change
 func TestApplyCodexWindows(t *testing.T) {
 	env := func(k string) string {
 		return map[string]string{"USERPROFILE": `C:\Users\dev`, "HOME": "/home/ignored", "ProgramData": `D:\ProgramData`}[k]
@@ -202,7 +203,7 @@ func TestApplyCodexWindows(t *testing.T) {
 		return code, out.String(), errb.String()
 	}
 	code, out, errs := run1("--scope", "user")
-	line := `\"C:\\cb\\cyberboar.exe\" hook --agent codex --policy \"`
+	line := `C:\\cb\\cyberboar.exe hook --agent codex --policy \"`
 	if code != 0 || !strings.Contains(out, `C:\Users\dev\.codex\hooks.json`) || strings.Count(out, line) != 2 || strings.Contains(out, `'C:`) {
 		t.Errorf("user scope: exit %d %s\n%s", code, errs, out)
 	}
@@ -217,8 +218,16 @@ func TestApplyCodexWindows(t *testing.T) {
 	if code, _, errs := run1("--scope", "project"); code != 2 || !strings.Contains(errs, "--scope user") {
 		t.Errorf("project scope: exit %d %s", code, errs)
 	}
-	if code, _, errs := run1("--scope", "user", "--audit", `C:\logs\%USERNAME%.jsonl`); code != 1 || !strings.Contains(errs, "cmd.exe") {
-		t.Errorf("percent sign: exit %d %s", code, errs)
+	for _, audit := range []string{`C:\logs\%USERNAME%.jsonl`, `C:\logs\$env.jsonl`, "C:\\logs\\`n.jsonl"} {
+		if code, _, errs := run1("--scope", "user", "--audit", audit); code != 1 || !strings.Contains(errs, "command line on Windows") {
+			t.Errorf("%s: exit %d %s", audit, code, errs)
+		}
+	}
+	// Here no short name is found, as for a volume without them
+	var out2, errb bytes.Buffer
+	code = h.run([]string{"apply", "--agent", "codex", "--policy", baseline, "--command", `C:\Program Files\CyberBoar\cyberboar.exe`, "--scope", "user"}, nil, &out2, &errb)
+	if code != 1 || !strings.Contains(errb.String(), "no spaces") {
+		t.Errorf("program path with a space: exit %d %s", code, errb.String())
 	}
 }
 

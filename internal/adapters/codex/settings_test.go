@@ -85,6 +85,25 @@ func TestHookCommandQuoting(t *testing.T) {
 	}
 }
 
+// On Windows the line must work in PowerShell, where a quoted first word is a
+// string, and in cmd.exe, which has no call operator: the program goes bare
+func TestHookCommandWindows(t *testing.T) {
+	o := FragmentOptions{Scope: ScopeUser, Command: `C:\Users\Łukasz\cb\cyberboar.exe`, Policy: `C:\my policies\p.yaml`, Deadline: "5s", Windows: true}
+	got := HookCommand(o)
+	want := `C:\Users\Łukasz\cb\cyberboar.exe hook --agent codex --policy "C:\my policies\p.yaml" --deadline "5s"`
+	if got != want || CheckWindows(o) != nil {
+		t.Errorf("HookCommand = %s (%v)", got, CheckWindows(o))
+	}
+	for _, program := range []string{`C:\Program Files\cb.exe`, `"C:\cb.exe"`, `C:\a&b\cb.exe`, `C:\$x\cb.exe`, `C:\(x)\cb.exe`, `C:\a'b\cb.exe`} {
+		if o := (FragmentOptions{Scope: ScopeUser, Command: program, Policy: `C:\p.yaml`, Deadline: "5s", Windows: true}); CheckWindows(o) == nil {
+			t.Errorf("program %s accepted", program)
+		}
+	}
+	if !BareWindowsProgram(`C:\PROGRA~1\CYBERB~1\CYBERB~1.EXE`) {
+		t.Error("an 8.3 short path refused")
+	}
+}
+
 func TestTOMLString(t *testing.T) {
 	if got := tomlString("a\"b\\c\nd\x7f"); got != `"a\"b\\c\u000Ad\u007F"` {
 		t.Errorf("tomlString = %s", got)

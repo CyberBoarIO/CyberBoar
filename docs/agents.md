@@ -192,23 +192,35 @@ See the [official hook configuration notes](https://learn.chatgpt.com/docs/hooks
 
 #### Codex on Windows
 
-On native Windows, Codex runs hook commands with `cmd.exe` and the model's commands in
-PowerShell. Use the user scope (`%USERPROFILE%\.codex\hooks.json`, or under
+On native Windows, Codex runs hook commands and the model's commands in the session's
+shell, PowerShell (`pwsh -NoProfile -Command`), and runs hooks with `cmd.exe /C` when
+it has no session shell. Use the user scope (`%USERPROFILE%\.codex\hooks.json`, or under
 `CODEX_HOME`) or the managed scope (`%ProgramData%\OpenAI\Codex\requirements.toml`);
 the Git-root form above needs a POSIX shell, so `apply` refuses `--scope project`
-there. Write absolute paths in double quotes, and give the same line as
+there. The line must work in both shells: write the program's absolute path
+**without** quotes, since PowerShell reads a quoted first word as a string, not a
+command, and put the other paths in double quotes. Give the same line as
 `commandWindows`:
 
 ```json
 {
   "type": "command",
-  "command": "\"C:\\Tools\\cyberboar.exe\" hook --agent codex --policy \"C:\\Users\\dev\\.cyberboar\\policy.yaml\" --deadline \"5s\"",
-  "commandWindows": "\"C:\\Tools\\cyberboar.exe\" hook --agent codex --policy \"C:\\Users\\dev\\.cyberboar\\policy.yaml\" --deadline \"5s\"",
+  "command": "C:\\Tools\\cyberboar.exe hook --agent codex --policy \"C:\\Users\\dev\\.cyberboar\\policy.yaml\" --deadline \"5s\"",
+  "commandWindows": "C:\\Tools\\cyberboar.exe hook --agent codex --policy \"C:\\Users\\dev\\.cyberboar\\policy.yaml\" --deadline \"5s\"",
   "timeout": 10
 }
 ```
 
-A path can't contain `"` or `%` (which cmd.exe expands) or end in `\`. Codex starts
+The program's path may hold only letters, digits and `_ . ~ - \ :`, with no spaces.
+For a path with spaces, such as `C:\Program Files\…`, `apply` writes its 8.3 short
+name (`C:\PROGRA~1\…`) when the volume keeps short names, and refuses it otherwise.
+The other paths can't contain quotes, `$` or `` ` `` (which PowerShell expands), `%`
+(which cmd.exe expands), or end in `\`.
+
+The hook answers a deny as JSON with exit code 0. `pwsh -Command` turns a program's
+exit code 2 into 1, which Codex treats as a failed hook. Codex runs the tool call when
+a hook fails, so a hook that can't start, crashes or times out lets the call run. Check
+that denied calls appear in the audit log. Codex starts
 PowerShell with the user's profiles unless the model asks otherwise; the hook guards the
 PowerShell profile and module folders (see [Profiles and
 modules](powershell.md#profiles-and-modules)), and denies commands sent to another

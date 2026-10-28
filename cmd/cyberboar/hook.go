@@ -7,18 +7,27 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"cyberboar.dev/cyberboar/internal/adapters/claudecode"
+	"cyberboar.dev/cyberboar/internal/adapters/codex"
 	"cyberboar.dev/cyberboar/internal/engine"
 	"cyberboar.dev/cyberboar/internal/hook"
 	"cyberboar.dev/cyberboar/pkg/brand"
 )
 
 // runHook must fail closed on everything, flag errors included, because any
-// exit code other than 2 lets Claude Code run the tool call
+// exit code other than 2 lets Claude Code run the tool call. Codex is the
+// exception: its deny is the JSON answer with exit 0 (codex.Adapter.Respond)
 func runHook(h host, fs *flag.FlagSet, args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
+	// Read before parsing, which a flag error stops
+	forCodex := agentArg(args) == "codex"
 	denyNow := func(reason string) int {
-		out := claudecode.Respond(engine.Verdict{Decision: engine.Deny, Rule: hook.RuleHookSetup, Reason: reason}, brand.Name+": ")
+		v := engine.Verdict{Decision: engine.Deny, Rule: hook.RuleHookSetup, Reason: reason}
+		out := claudecode.Respond(v, brand.Name+": ")
+		if forCodex {
+			out = codex.Adapter{}.Respond(v, brand.Name+": ")
+		}
 		// Exit 2 denies whether or not the agent reads the answer.
 		_, _ = stdout.Write(out.Stdout)
 		_, _ = io.WriteString(stderr, out.Stderr)
@@ -29,12 +38,19 @@ func runHook(h host, fs *flag.FlagSet, args []string, stdin io.Reader, stdout, s
 			return
 		}
 		// The panic may have come from writing to stdout, so the reason goes
-		// to stderr alone, and a panic there too still leaves exit 2
+		// to stderr alone, and a panic there too still leaves exit 2. Codex
+		// needs the answer on stdout, so it gets exit 0 only once that is written
 		code = 2
 		defer func() { _ = recover() }()
-		out := claudecode.Respond(engine.Verdict{Decision: engine.Deny, Rule: hook.RuleHookSetup,
-			Reason: "internal error in the hook, so the tool call is blocked"}, brand.Name+": ")
-		_, _ = io.WriteString(stderr, out.Stderr)
+		v := engine.Verdict{Decision: engine.Deny, Rule: hook.RuleHookSetup,
+			Reason: "internal error in the hook, so the tool call is blocked"}
+		if forCodex {
+			if _, err := stdout.Write(codex.Adapter{}.Respond(v, brand.Name+": ").Stdout); err == nil {
+				code = 0
+			}
+			return
+		}
+		_, _ = io.WriteString(stderr, claudecode.Respond(v, brand.Name+": ").Stderr)
 	}()
 
 	fs.SetOutput(io.Discard)
@@ -84,6 +100,7 @@ func runHook(h host, fs *flag.FlagSet, args []string, stdin io.Reader, stdout, s
 	if r.Verdict.Rule == hook.RuleHookSetup {
 		// Configuration errors deny with exit 2 before reading agent input,
 		// including when the agent's ordinary deny uses another exit code
+		// (Codex excepted, see runHook)
 		return denyNow(r.Verdict.Reason)
 	}
 	if _, err := stdout.Write(r.Stdout); err != nil {
@@ -94,4 +111,29 @@ func runHook(h host, fs *flag.FlagSet, args []string, stdin io.Reader, stdout, s
 	}
 	_, _ = io.WriteString(stderr, r.Stderr)
 	return r.Exit
+}
+
+// agentArg returns the --agent value as the flag package will read it, the
+// last one given, without parsing the other flags
+func agentArg(args []string) string {
+	agent := ""
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--" || !strings.HasPrefix(a, "-") {
+			break
+		}
+		name, value, hasValue := strings.Cut(strings.TrimPrefix(strings.TrimPrefix(a, "-"), "-"), "=")
+		if !hasValue {
+			// Every hook flag takes a value
+			if i+1 == len(args) {
+				break
+			}
+			i++
+			value = args[i]
+		}
+		if name == "agent" {
+			agent = value
+		}
+	}
+	return agent
 }

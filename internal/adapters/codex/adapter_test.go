@@ -32,8 +32,9 @@ func TestRespondNeverAsksOrAllows(t *testing.T) {
 		if err := json.Unmarshal(out.Stdout, &got); err != nil {
 			t.Fatal(err)
 		}
-		if out.Exit != 2 || got.HSO.Event != "PreToolUse" || got.HSO.Decision != "deny" || !strings.HasPrefix(got.HSO.Reason, "cb: because") ||
-			!strings.Contains(out.Stderr, "because") {
+		// Exit 0: under PowerShell, a hook's exit 2 reaches Codex as 1, a failed hook
+		if out.Exit != 0 || got.HSO.Event != "PreToolUse" || got.HSO.Decision != "deny" || !strings.HasPrefix(got.HSO.Reason, "cb: because") ||
+			out.Stderr != "" {
 			t.Errorf("%s: %+v %+v", d, out, got)
 		}
 		if d == engine.Ask && !strings.Contains(got.HSO.Reason, "can't ask") {
