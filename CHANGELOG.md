@@ -5,7 +5,13 @@ and enforcement. Stable releases follow [Semantic Versioning](https://semver.org
 starting with `v1.0.0`. The v1 compatibility contract covers the policy format, CLI,
 protocol, audit schema and public Go packages under `pkg/`.
 
-## [Unreleased]
+## [v1.0.0-rc.3] - 2026-10-28
+
+Third release candidate for CyberBoar 1.0. It adds PowerShell analysis, checks
+Claude Code's PowerShell tool and Codex CLI on native Windows, and guards shell
+startup files for every agent. Claude Code users re-run `apply --agent claude-code`
+to install the new native rules. Tested on Windows 11 with Claude Code 2.1.312,
+Codex CLI 0.165.0 and PowerShell 7.4.22.
 
 ### Added
 
