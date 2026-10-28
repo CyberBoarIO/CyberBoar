@@ -2,6 +2,7 @@ package hook_test
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -72,10 +73,13 @@ type panickingReader struct{}
 
 func (panickingReader) Read([]byte) (int, error) { panic("boom") }
 
+// assertDenied asserts a deny by rule that exits 2, or for Codex exits 0
+// with its JSON deny, which survives PowerShell (codex.Adapter.Respond)
 func assertDenied(t *testing.T, r hook.Result, rule string) {
 	t.Helper()
-	if r.Exit != 2 || r.Verdict.Decision != engine.Deny || r.Verdict.Rule != rule {
-		t.Fatalf("want deny by %s with exit 2, got exit %d %s by %s (%s)", rule, r.Exit, r.Verdict.Decision, r.Verdict.Rule, r.Verdict.Reason)
+	answered := r.Exit == 2 || (r.Exit == 0 && bytes.Contains(r.Stdout, []byte(`"permissionDecision":"deny"`)))
+	if !answered || r.Verdict.Decision != engine.Deny || r.Verdict.Rule != rule {
+		t.Fatalf("want deny by %s with exit 2 or a JSON deny, got exit %d %s by %s (%s)", rule, r.Exit, r.Verdict.Decision, r.Verdict.Rule, r.Verdict.Reason)
 	}
 }
 

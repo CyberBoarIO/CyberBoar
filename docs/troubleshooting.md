@@ -23,6 +23,7 @@ retain the policy and agent version involved.
 |---|---|
 | Every call is denied | Check the error reason, policy path/schema, signature, expiry and `minimumVersion`. Development builds meet no version floor. |
 | A denied operation runs | Verify scope, hook loading, Codex trust and audit event. Review agent hook failure and visibility limits. |
+| A denied Claude Code file read or edit has no audit event | `apply` also writes native `Read`/`Edit` deny rules as a fallback. Claude Code applies them before it runs the hook, so the call is denied without reaching it: no audit event and no tripwire count. |
 | An ask rule blocks without prompting | Codex, Cursor and opencode receive deny for ask; Copilot also denies in headless mode. |
 | Cursor shell commands with relative paths are denied | Cursor's shell keeps its directory between calls and reports it only when the call sets a working directory. Start the command with `cd /absolute/project/path &&`. |
 | Copilot in VS Code doesn't run the hook | Trust the workspace, keep `chat.useHooks` on and start a new chat. Run `apply` again if CyberBoar 1.0.0-rc.1 wrote the hook: VS Code's Local agent skips its `exec` form. **Chat: Configure Hooks** lists the files VS Code loaded; the **GitHub Copilot Chat Hooks** output channel shows each run. |

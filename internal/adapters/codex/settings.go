@@ -71,7 +71,7 @@ type FragmentOptions struct {
 // A project-scope policy is found from the git root, as the Codex docs recommend
 func HookCommand(o FragmentOptions) string {
 	q := quoter(o)
-	cmd := q(o.Command) + " hook --agent codex --policy " + policyArg(o)
+	cmd := program(o) + " hook --agent codex --policy " + policyArg(o)
 	if o.Audit != "" {
 		cmd += " --audit " + q(o.Audit)
 	}
@@ -94,7 +94,7 @@ func policyArg(o FragmentOptions) string {
 
 // BriefCommand returns the shell command line for the SessionStart briefing
 func BriefCommand(o FragmentOptions) string {
-	cmd := quoter(o)(o.Command) + " brief --agent codex --policy " + policyArg(o)
+	cmd := program(o) + " brief --agent codex --policy " + policyArg(o)
 	if o.PubKey != "" {
 		cmd += " --pubkey " + quoter(o)(o.PubKey)
 	}
@@ -102,8 +102,8 @@ func BriefCommand(o FragmentOptions) string {
 }
 
 // quoter returns how a value is quoted in the hook's command line: for a
-// POSIX shell, or on Windows in double quotes, which cmd.exe and the
-// program's own argument parsing both take literally (CheckWindows)
+// POSIX shell, or on Windows in double quotes, which PowerShell, cmd.exe and
+// the program's own argument parsing all take literally (CheckWindows)
 func quoter(o FragmentOptions) func(string) string {
 	if o.Windows {
 		return func(s string) string { return `"` + s + `"` }
@@ -111,18 +111,45 @@ func quoter(o FragmentOptions) func(string) string {
 	return adapters.ShellQuote
 }
 
-// CheckWindows reports a hook that can't be installed on Windows: Codex runs
-// it with `cmd.exe /C`, where a value in double quotes stays literal unless
-// it holds a quote, a percent sign (cmd expands %VAR% there) or a line
-// break, or ends in a backslash, which would escape the closing quote. There
-// is no git root to find a project's policy from either
+// program returns the hook's executable as its command line starts. On
+// Windows it stays unquoted: PowerShell reads a quoted first word as a
+// string, not a command (CheckWindows)
+func program(o FragmentOptions) string {
+	if o.Windows {
+		return o.Command
+	}
+	return adapters.ShellQuote(o.Command)
+}
+
+// bareProgram matches the program paths that PowerShell and cmd.exe both
+// read as one plain word
+var bareProgram = regexp.MustCompile(`^[\p{L}\p{N}_.~:\\-]+$`)
+
+// BareWindowsProgram reports whether path can start the hook's command line
+// on Windows unquoted (CheckWindows)
+func BareWindowsProgram(path string) bool {
+	return bareProgram.MatchString(path)
+}
+
+// CheckWindows reports a hook that can't be installed on Windows. Codex runs
+// it in the session's shell, PowerShell (pwsh -NoProfile -Command), and
+// without one with `cmd.exe /C "…"`. The program must be a plain word, since
+// PowerShell reads a quoted first word as a string, and cmd.exe can't take
+// the call operator (&) that would make it a command. The other values go in
+// double quotes, which stay literal in both unless they hold a quote
+// (PowerShell also counts “ ” „), a $ or ` (PowerShell expands them), a % (cmd
+// expands %VAR%) or a line break, or end in a backslash, which would escape
+// the closing quote. There is no git root to find a project's policy from either
 func CheckWindows(o FragmentOptions) error {
 	if o.Scope == ScopeProject {
-		return errors.New("--scope project is not supported for Codex on Windows, which runs hooks with cmd.exe, where the policy can't be found from the git root; use --scope user")
+		return errors.New("--scope project is not supported for Codex on Windows, which runs hooks in PowerShell or cmd.exe, where the policy can't be found from the git root; use --scope user")
 	}
-	for _, v := range []string{o.Command, o.Policy, o.Audit, o.State, o.PubKey, o.Deadline} {
-		if strings.ContainsAny(v, "\"%\r\n") || strings.HasSuffix(v, `\`) {
-			return fmt.Errorf("%q can't be written into a cmd.exe command line (no \", %%, line breaks or a trailing \\)", v)
+	if !BareWindowsProgram(o.Command) {
+		return fmt.Errorf("%q can't start a Codex hook on Windows, where PowerShell and cmd.exe run it: put %s.exe in a folder whose path has only letters, digits and _ . ~ - (no spaces), or pass that path with --command", o.Command, brand.Name)
+	}
+	for _, v := range []string{o.Policy, o.Audit, o.State, o.PubKey, o.Deadline} {
+		if strings.ContainsAny(v, "\"“”„$`%\r\n") || strings.HasSuffix(v, `\`) {
+			return fmt.Errorf("%q can't be written into a Codex hook command line on Windows (no quotes, $, `, %%, line breaks or a trailing \\)", v)
 		}
 	}
 	return nil

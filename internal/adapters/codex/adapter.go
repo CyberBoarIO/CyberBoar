@@ -144,6 +144,9 @@ func PowerShellDirs(home, documents string) []string {
 // Respond turns a verdict into hook output. Codex treats an "ask" answer as a
 // failed hook and runs the tool, so ask is answered as deny. Allow produces
 // no output, leaving Codex's own approval flow in charge
+// A deny is the JSON decision with exit 0: Codex runs hooks in the session's
+// shell, which on Windows is PowerShell, and pwsh -Command turns a program's
+// exit code 2 into 1, which Codex takes for a failed hook and runs the tool
 // A verdict's Notice is sent as systemMessage, Codex's message for the user
 func (Adapter) Respond(v engine.Verdict, prefix string) adapters.Output {
 	var reason string
@@ -164,7 +167,7 @@ func (Adapter) Respond(v engine.Verdict, prefix string) adapters.Output {
 		out["systemMessage"] = v.Notice // for the user
 	}
 	body, _ := json.Marshal(out)
-	return adapters.Output{Stdout: append(body, '\n'), Stderr: reason + "\n", Exit: 2}
+	return adapters.Output{Stdout: append(body, '\n')}
 }
 
 //go:embed tools.yaml

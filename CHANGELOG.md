@@ -17,9 +17,11 @@ protocol, audit schema and public Go packages under `pkg/`.
   Git Bash. Elsewhere it is still denied.
 - Codex CLI on native Windows, whose commands run in PowerShell. A command sent
   to another shell, such as `cmd.exe` or Git Bash, is denied
-  (`adapter.windowsShell`). `apply` writes the hook as a `cmd.exe` command line
-  (`command` and `commandWindows`) for the user and managed scopes; the project
-  scope isn't available there. The hook guards Codex's managed directory
+  (`adapter.windowsShell`). `apply` writes the hook as a command line that
+  works in both PowerShell, where Codex runs hooks in the session's shell, and
+  `cmd.exe` (`command` and `commandWindows`). The program's path goes in without
+  quotes, so a path with spaces needs an 8.3 short name. This covers the user and
+  managed scopes; the project scope isn't available there. The hook guards Codex's managed directory
   (`%ProgramData%\OpenAI\Codex`) and the user's PowerShell profile and module
   folders, which Codex runs.
 - `explain --shell powershell` reads a command as PowerShell, and a policy test
@@ -34,6 +36,10 @@ protocol, audit schema and public Go packages under `pkg/`.
 - `builtin.powershell` now denies Claude Code's PowerShell tool only outside
   native Windows, and the Windows session briefing no longer tells the agent to
   avoid it.
+- Codex: the hook answers a deny as JSON with exit code 0 instead of exit code 2,
+  for every deny including configuration errors. Under PowerShell, Codex sees
+  exit code 2 as 1, a failed hook, and runs the tool call. Re-running `apply` is
+  not needed for this change.
 - Source builds need Go 1.27.3, whose release fixes vulnerabilities in
   `crypto/x509`; release binaries are built with it.
 
@@ -43,6 +49,8 @@ protocol, audit schema and public Go packages under `pkg/`.
   zsh's files (also in `$ZDOTDIR`), and the files `$BASH_ENV` and `$ENV` name.
   Agents' shells run them before commands or at session start, outside the
   hook's checks. Claude Code's native rules cover them too after `apply`.
+  The `builtin.guarded` reason no longer calls every guarded file CyberBoar's
+  configuration.
 - Claude Code: custom agents, skills and commands, whose frontmatter can
   declare hooks that Claude Code runs without the CyberBoar hook seeing them,
   are guarded like settings files. That is `.claude/agents`, `.claude/skills`
@@ -53,6 +61,9 @@ protocol, audit schema and public Go packages under `pkg/`.
   writes native `Edit` denies for these folders at any depth; re-run `apply`
   to install them. Skills in folders below the project and folders added with
   `--add-dir` are still not guarded against shell writes.
+- On Windows, the reason for a refused workspace root, such as an agent started
+  in the home folder, shows the path as `C:\Users\…` instead of `/c/Users/…` and
+  says to start the agent in a project folder.
 
 ### Known limitations
 
