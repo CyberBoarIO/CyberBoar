@@ -379,6 +379,19 @@ func TestDuplicateDriveRefused(t *testing.T) {
 	assertDeny(t, Evaluate(context.Background(), c, a), RuleInvalidAction)
 }
 
+// A workspace root that holds the home directory is refused, and the reason
+// shows it as the user knows it on Windows, not in the engine's /c/... form
+func TestWindowsHomeWorkspaceReason(t *testing.T) {
+	c := mustCompile(t, emptyPolicy(policy.DenyListed))
+	a := Action{Tool: ToolRead, Path: `C:\Users\dev\README.md`, Cwd: `C:\Users\dev`, Home: `C:\Users\dev`, Workspaces: []string{`C:\Users\dev`},
+		Platform: PlatformWindows, Drives: map[string]string{"C": t.TempDir()}}
+	v := Evaluate(context.Background(), c, a)
+	assertDeny(t, v, RuleInvalidAction)
+	if !strings.Contains(v.Reason, `workspace root C:\Users\dev is`) || !strings.Contains(v.Reason, "start the agent in a project folder") {
+		t.Errorf("reason = %q", v.Reason)
+	}
+}
+
 // An unresolved link or directory cycle cannot be approved without checking
 // the files it might expose, even if an earlier protected file would ask
 func TestContainingAskDeniesIncompleteWalk(t *testing.T) {

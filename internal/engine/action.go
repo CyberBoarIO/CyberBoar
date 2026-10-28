@@ -78,8 +78,9 @@ type Action struct {
 	Protected []string
 	// Guarded are the absolute paths of the files that decide whether and how
 	// CyberBoar runs (builtin.guarded): the agent's settings files that
-	// install the hook, the policy, its signature and key, the hook binary
-	// and the audit log. They need not exist. The agent's file tools may read
+	// install the hook, the policy, its signature and key, the hook binary,
+	// the audit log, and the startup files the agent's shell runs outside
+	// the hook. They need not exist. The agent's file tools may read
 	// them but not write them. The shell may not touch them at all, nor
 	// delete, move or replace a directory holding one. They are optional, and
 	// only file and shell actions use them

@@ -211,7 +211,7 @@ check "listing every server's resources is denied" "[ \$(count deny list_mcp_res
 check "a call to a tool that doesn't exist reaches the plugin as invalid" "[ \$(count allow invalid -) -ge 1 ]"
 check "the subagent call is seen" "[ \$(count allow task -) -ge 1 ]"
 check "no hook setup or internal errors" "[ \$(count - - error.) -eq 0 ]"
-check "the model is told why" "result tools 'blocked by policy rule files.deny' && result tools 'installs or configures' && result tools \"can't ask for confirmation\""
+check "the model is told why" "result tools 'blocked by policy rule files.deny' && result tools 'can change how the agent' && result tools \"can't ask for confirmation\""
 check "src/ok.txt and src/patched.txt were written, .env.prod was not" "[ -f '$proj/src/ok.txt' ] && [ -f '$proj/src/patched.txt' ] && [ ! -e '$proj/.env.prod' ]"
 check "the plugin is unchanged" "[ \"\$(sha256sum '$plugin')\" = '$plugin_sum' ] && [ ! -e '$proj/.opencode' ]"
 check "without the hook binary every call is blocked" "result nohook 'could not run' && [ ! -e '$proj/src/unhooked.txt' ]"

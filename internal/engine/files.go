@@ -12,6 +12,7 @@ import (
 	"cyberboar.dev/cyberboar/internal/engine/osfs"
 	"cyberboar.dev/cyberboar/internal/fold"
 	"cyberboar.dev/cyberboar/internal/policy"
+	"cyberboar.dev/cyberboar/internal/winpath"
 	"cyberboar.dev/cyberboar/pkg/brand"
 )
 
@@ -73,6 +74,13 @@ type fileEnv struct {
 // root, or that contains the home directory, would widen what the workspace rules cover
 func prepareFileEnv(a Action) (fileEnv, error) {
 	env := fileEnv{fs: a.fs()}
+	// show gives a path back in the form the user knows: C:\x on Windows, not /c/x
+	show := func(p string) string {
+		if env.fs.Windows {
+			return winpath.FromGitBash(p)
+		}
+		return p
+	}
 	home := cleanPath(a.Home, env.fs.Windows)
 	homeRes, err := resolvePath(env.fs, a.Home)
 	if err != nil {
@@ -83,16 +91,16 @@ func prepareFileEnv(a Action) (fileEnv, error) {
 	for _, ws := range a.Workspaces {
 		wsRes, err := resolvePath(env.fs, ws)
 		if err != nil {
-			return env, fmt.Errorf("workspace root %q: %v", ws, err)
+			return env, fmt.Errorf("workspace root %s: %v", show(ws), err)
 		}
 		forms := appendUnique(nil, cleanPath(ws, env.fs.Windows), wsRes)
 		for _, r := range forms {
 			if env.fs.Windows && isDriveRoot(r) {
-				return env, fmt.Errorf("workspace root %q is a drive's root", ws)
+				return env, fmt.Errorf("workspace root %s is a drive's root: start the agent in a project folder", show(ws))
 			}
 			for _, h := range env.homes {
 				if isSameOrAncestor(r, h) {
-					return env, fmt.Errorf("workspace root %q is /, the home directory, or contains it", ws)
+					return env, fmt.Errorf("workspace root %s is /, the home directory, or contains it: start the agent in a project folder", show(ws))
 				}
 			}
 		}
@@ -101,14 +109,14 @@ func prepareFileEnv(a Action) (fileEnv, error) {
 	for _, p := range a.Protected {
 		res, err := resolvePath(env.fs, p)
 		if err != nil {
-			return env, fmt.Errorf("protected directory %q: %v", p, err)
+			return env, fmt.Errorf("protected directory %s: %v", show(p), err)
 		}
 		env.protected = appendUnique(env.protected, cleanPath(p, env.fs.Windows), res)
 	}
 	for _, p := range a.Guarded {
 		res, err := resolvePath(env.fs, p)
 		if err != nil {
-			return env, fmt.Errorf("guarded path %q: %v", p, err)
+			return env, fmt.Errorf("guarded path %s: %v", show(p), err)
 		}
 		env.guarded = appendUnique(env.guarded, cleanPath(p, env.fs.Windows), res)
 	}
@@ -143,7 +151,7 @@ func (e fileEnv) guardRule(display string, candidates []string, how change) (Ver
 			default:
 				continue
 			}
-			return deny(RuleGuarded, fmt.Sprintf("%s installs or configures %s (the agent's hook settings, the policy or the hook itself), "+
+			return deny(RuleGuarded, fmt.Sprintf("%s can change how the agent or %s runs (the agent's settings and hooks, shell startup files, the policy or the hook itself), "+
 				"which agents may not change, so this is blocked. To look at a file, use the agent's file tool; ask the user to make any change; %s",
 				what, brand.Name, noRetry)), true
 		}
