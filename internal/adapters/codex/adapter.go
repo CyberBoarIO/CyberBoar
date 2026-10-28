@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -22,6 +23,8 @@ import (
 	"cyberboar.dev/cyberboar/internal/adapters"
 	"cyberboar.dev/cyberboar/internal/adapters/edits"
 	"cyberboar.dev/cyberboar/internal/engine"
+	"cyberboar.dev/cyberboar/internal/winpath"
+	"cyberboar.dev/cyberboar/pkg/brand"
 )
 
 // RuleRemoteEnvironment denies a call that runs in a remote environment,
@@ -74,18 +77,37 @@ func (Adapter) Name() string { return "codex" }
 // model's per-command `workdir` is a different thing, which the hook input
 // doesn't carry
 func (Adapter) Parse(data []byte, getenv func(string) string) (*adapters.Call, error) {
+	return parse(data, getenv, runtime.GOOS, documentsDir)
+}
+
+// parse is Parse for the operating system goos, a runtime.GOOS value
+// documents returns the user's Documents folder on Windows, or "" if it
+// can't be found
+func parse(data []byte, getenv func(string) string, goos string, documents func() string) (*adapters.Call, error) {
 	in, err := ParseInput(data)
 	if err != nil {
 		return nil, err
 	}
 	c := &adapters.Call{Session: in.SessionID, ToolUseID: in.ToolUseID, AgentID: in.AgentID, AgentType: in.AgentType,
 		Mode: in.PermissionMode, Cwd: in.Cwd, Project: in.Cwd, Tool: in.ToolName}
-	c.Actions, c.Err = Actions(in, getenv("HOME"), getenv("SHELL"), getenv("CDPATH") != "")
+	env := Env{Home: getenv("HOME"), Shell: getenv("SHELL"), CDPath: getenv("CDPATH") != ""}
+	managed := ManagedDir
+	if goos == "windows" {
+		// Codex finds the home through Windows, not HOME, and runs its
+		// commands in PowerShell whatever SHELL says
+		env = Env{Windows: true, Home: getenv("USERPROFILE")}
+		managed = WindowsManagedDir(getenv("ProgramData"))
+	}
+	c.Actions, c.Err = Actions(in, env)
 	codexHome := getenv("CODEX_HOME")
 	if codexHome == "" {
-		codexHome = adapters.Under(false, getenv("HOME"), ".codex")
+		codexHome = adapters.Under(env.Windows, env.Home, ".codex")
 	}
-	adapters.Guard(c.Actions, ConfigFiles(codexHome, in.Cwd)...)
+	adapters.Guard(c.Actions, ConfigFiles(env.Windows, codexHome, in.Cwd, managed)...)
+	adapters.Guard(c.Actions, adapters.StartupFiles(env.Windows, env.Home, getenv)...)
+	if env.Windows {
+		adapters.Guard(c.Actions, PowerShellDirs(env.Home, documents())...)
+	}
 	// The transcript supplies trusted command arguments, so it must stay read-only
 	// It may live outside CODEX_HOME, for example when resuming a moved session
 	if in.TranscriptPath != nil {
@@ -96,18 +118,35 @@ func (Adapter) Parse(data []byte, getenv func(string) string) (*adapters.Call, e
 
 // ConfigFiles returns the Codex paths agents may not change (builtin.guarded)
 // They include the user's session transcripts, hook settings in the user's and
-// project's Codex directories, and the managed directory
-func ConfigFiles(codexHome, project string) []string {
+// project's Codex directories, and the managed directory. windows says the
+// paths are Windows paths
+func ConfigFiles(windows bool, codexHome, project, managed string) []string {
 	var out []string
-	for _, dir := range []string{codexHome, adapters.Under(false, project, ".codex")} {
-		out = append(out, adapters.Under(false, dir, "hooks.json"), adapters.Under(false, dir, "config.toml"))
+	for _, dir := range []string{codexHome, adapters.Under(windows, project, ".codex")} {
+		out = append(out, adapters.Under(windows, dir, "hooks.json"), adapters.Under(windows, dir, "config.toml"))
 	}
-	return append(out, adapters.Under(false, codexHome, "sessions"), adapters.Under(false, codexHome, "archived_sessions"), ManagedDir)
+	return append(out, adapters.Under(windows, codexHome, "sessions"), adapters.Under(windows, codexHome, "archived_sessions"), managed)
+}
+
+// PowerShellDirs returns the folders of the user's PowerShell profiles and
+// modules on Windows, for PowerShell 7 and Windows PowerShell. Codex runs
+// commands in a login shell unless the model asks otherwise, so the profiles
+// run before every command, and a module there loads when one of its commands
+// is named. They are in the Documents folder, which may be redirected, so
+// documents comes from Windows; without it, the one in home is assumed
+func PowerShellDirs(home, documents string) []string {
+	if documents == "" {
+		documents = adapters.Under(true, home, "Documents")
+	}
+	return []string{adapters.Under(true, documents, "PowerShell"), adapters.Under(true, documents, "WindowsPowerShell")}
 }
 
 // Respond turns a verdict into hook output. Codex treats an "ask" answer as a
 // failed hook and runs the tool, so ask is answered as deny. Allow produces
 // no output, leaving Codex's own approval flow in charge
+// A deny is the JSON decision with exit 0: Codex runs hooks in the session's
+// shell, which on Windows is PowerShell, and pwsh -Command turns a program's
+// exit code 2 into 1, which Codex takes for a failed hook and runs the tool
 // A verdict's Notice is sent as systemMessage, Codex's message for the user
 func (Adapter) Respond(v engine.Verdict, prefix string) adapters.Output {
 	var reason string
@@ -128,7 +167,7 @@ func (Adapter) Respond(v engine.Verdict, prefix string) adapters.Output {
 		out["systemMessage"] = v.Notice // for the user
 	}
 	body, _ := json.Marshal(out)
-	return adapters.Output{Stdout: append(body, '\n'), Stderr: reason + "\n", Exit: 2}
+	return adapters.Output{Stdout: append(body, '\n')}
 }
 
 //go:embed tools.yaml
@@ -161,11 +200,27 @@ var classification = sync.OnceValues(func() (map[string]toolSpec, error) {
 	return adapters.LoadTools(toolsYAML, func(_ string, s toolSpec) error { return s.valid() })
 })
 
+// Env is what the adapter takes from the hook's environment
+type Env struct {
+	// Home is the user's home: HOME, or USERPROFILE on Windows
+	Home string
+	// Shell is the hook's $SHELL, which is the shell Codex uses when the model
+	// names none. Codex on Windows ignores it and uses PowerShell
+	Shell string
+	// CDPath says CDPATH is set, so `cd NAME` may land elsewhere
+	CDPath bool
+	// Windows says Codex runs on native Windows: paths are Windows paths and
+	// commands run in PowerShell
+	Windows bool
+}
+
 // Actions maps a hook input to the engine actions to evaluate
 // No actions and no error means the tool touches nothing CyberBoar governs
-// userShell is the hook's $SHELL, which is the shell Codex uses when the model names none
-func Actions(in *Input, home, userShell string, cdPath bool) ([]engine.Action, error) {
-	base := engine.Action{Cwd: in.Cwd, Home: home, Workspaces: []string{in.Cwd}}
+func Actions(in *Input, env Env) ([]engine.Action, error) {
+	base := engine.Action{Cwd: in.Cwd, Home: env.Home, Workspaces: []string{in.Cwd}}
+	if env.Windows {
+		base.Platform = engine.PlatformWindows
+	}
 	mcp := func(server, tool string) engine.Action {
 		a := base
 		a.Tool, a.MCP, a.Content = engine.ToolMCP, engine.MCPCall{Server: server, Tool: tool}, adapters.JSONText(in.ToolInput)
@@ -227,7 +282,7 @@ func Actions(in *Input, home, userShell string, cdPath bool) ([]engine.Action, e
 		if err != nil {
 			return nil, err
 		}
-		actions, err := shellActions(in, cmd, base, userShell, cdPath)
+		actions, err := shellActions(in, cmd, base, env)
 		if err != nil {
 			return nil, err
 		}
@@ -263,7 +318,12 @@ func Actions(in *Input, home, userShell string, cdPath bool) ([]engine.Action, e
 	return out, nil
 }
 
-func shellActions(in *Input, cmd string, base engine.Action, userShell string, cdPath bool) ([]engine.Action, error) {
+// RuleWindowsShell denies a command the model sends to a shell other than
+// PowerShell on native Windows, such as cmd or Git Bash, which the hook
+// can't check there
+const RuleWindowsShell = "adapter.windowsShell"
+
+func shellActions(in *Input, cmd string, base engine.Action, env Env) ([]engine.Action, error) {
 	call, err := lookupExecCall(in, cmd)
 	if err != nil {
 		return nil, err
@@ -280,26 +340,67 @@ func shellActions(in *Input, cmd string, base engine.Action, userShell string, c
 	}
 	cwd := base.Cwd
 	if call.Workdir != nil && *call.Workdir != "" {
-		if filepath.IsAbs(*call.Workdir) {
-			cwd = *call.Workdir
-		} else {
-			cwd = base.Cwd + "/" + *call.Workdir // not cleaned, because the engine resolves it like the kernel
+		if cwd, err = joinDir(env.Windows, base.Cwd, *call.Workdir); err != nil {
+			return nil, err
 		}
 	}
-	shell := userShell
-	if call.Shell != nil && *call.Shell != "" {
-		shell = *call.Shell
-	}
 	a := base
-	a.Tool, a.Cwd, a.Command, a.CDPath = engine.ToolShell, cwd, adapters.ShellCommand(shell, cmd), cdPath
-	writes, err := shellPatchActions(cmd, base, cwd)
+	a.Tool, a.Cwd, a.CDPath = engine.ToolShell, cwd, env.CDPath
+	switch {
+	case !env.Windows:
+		shell := env.Shell
+		if call.Shell != nil && *call.Shell != "" {
+			shell = *call.Shell
+		}
+		a.Command = adapters.ShellCommand(shell, cmd)
+	case call.Shell != nil && *call.Shell != "" && !isPowerShell(*call.Shell):
+		return nil, &adapters.Error{Rule: RuleWindowsShell, Msg: fmt.Sprintf("on native Windows %s checks Codex commands in PowerShell only, "+
+			"and this one runs in %s, so it is blocked; run it without `shell`, in PowerShell", brand.DisplayName, *call.Shell)}
+	default:
+		// Codex starts the user's profile unless the model asks for no login
+		// shell. It is the user's own configuration and agents may not write
+		// it (PowerShellDirs), so its names are taken as PowerShell's own
+		a.Command, a.Shell = cmd, engine.ShellPowerShell
+	}
+	writes, err := shellPatchActions(cmd, base, cwd, env.Windows)
 	if err != nil {
 		return nil, err
 	}
 	return append([]engine.Action{a}, writes...), nil
 }
 
-func shellPatchActions(cmd string, base engine.Action, cwd string) ([]engine.Action, error) {
+// isPowerShell reports whether Codex reads the shell the model named as
+// PowerShell: pwsh or powershell, alone or as a path's file name with or
+// without its extension, spelled as Codex matches it
+func isPowerShell(shell string) bool {
+	name := shell[strings.LastIndexAny(shell, `\/`)+1:]
+	if i := strings.LastIndexByte(name, '.'); i > 0 {
+		name = name[:i]
+	}
+	return name == "pwsh" || name == "powershell"
+}
+
+// joinDir returns rel taken from dir, as Codex joins a command's workdir
+// onto the session cwd: an absolute rel replaces dir. A Windows path that
+// depends on a drive's current directory or names no drive is refused
+func joinDir(windows bool, dir, rel string) (string, error) {
+	if !windows {
+		if filepath.IsAbs(rel) {
+			return rel, nil
+		}
+		return dir + "/" + rel, nil // not cleaned, because the engine resolves it like the kernel
+	}
+	_, abs, err := winpath.Path(rel)
+	switch {
+	case err != nil:
+		return "", adapters.Invalid("the command's directory %q can't be checked: %v", rel, err)
+	case abs:
+		return rel, nil
+	}
+	return strings.TrimRight(dir, `\/`) + `\` + rel, nil
+}
+
+func shellPatchActions(cmd string, base engine.Action, cwd string, windows bool) ([]engine.Action, error) {
 	// Codex itself applies `apply_patch <<EOF ...` run through the shell,
 	// in the command's directory or, after `cd DIR &&`, in DIR
 	if strings.Contains(cmd, beginPatch) {
@@ -309,12 +410,13 @@ func shellPatchActions(cmd string, base engine.Action, cwd string) ([]engine.Act
 		w := base
 		w.Cwd = cwd
 		patch, dir, ok := edits.ShellPatch(cmd)
-		switch {
-		case ok && strings.HasPrefix(dir, "/"):
-			w.Cwd = dir
-		case ok && dir != "":
-			w.Cwd = cwd + "/" + dir // not cleaned, because the engine resolves it like the kernel
-		case !ok:
+		if ok && dir != "" {
+			var err error
+			if w.Cwd, err = joinDir(windows, cwd, dir); err != nil {
+				return nil, err
+			}
+		}
+		if !ok {
 			// Codex doesn't apply this form itself, so the paths are
 			// checked, but what the patch would leave in the files can't be
 			patch = cmd

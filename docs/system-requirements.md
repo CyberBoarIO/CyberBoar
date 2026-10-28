@@ -2,7 +2,7 @@
 
 CyberBoar runs on the developer's machine. Download the binary for its operating system
 and CPU; there is no universal macOS or Windows executable. Prebuilt binaries do not
-need Go. Source builds require **Go 1.27.2 or later**.
+need Go. Source builds require **Go 1.27.3 or later**.
 
 ## Operating systems and architectures
 
@@ -30,11 +30,12 @@ Windows ARM64 remains unverified.
 | Environment | Requirements |
 |---|---|
 | macOS / Linux | A supported agent and its hook/plugin interface. Shell analysis uses Bash semantics. |
-| Native Windows | Claude Code with Git for Windows / Git Bash. Unknown mounts and ambiguous paths are denied. |
+| Native Windows | Claude Code, through its Bash tool with Git for Windows / Git Bash and its PowerShell tool, or the PowerShell tool alone without Git Bash. Codex CLI, whose commands run in PowerShell 7 (`pwsh`) or Windows PowerShell. Unknown mounts and ambiguous paths are denied. |
 | WSL / Linux dev container | Install the Linux binary and agent inside that environment. |
 
-Codex, Copilot CLI, Cursor and opencode are denied on native Windows because PowerShell
-analysis is not connected to the engine. Cursor CLI passed the real-agent harness;
+PowerShell is analyzed as a [checked subset](powershell.md). Copilot CLI, Cursor and
+opencode are denied on native Windows, where their adapters don't read PowerShell calls
+yet. Cursor CLI passed the real-agent harness;
 Cursor editor sessions remain unverified. Review [Agent setup](agents.md) and the [capability
 matrix](capability-matrix.md) for versions, confirmation behavior and hook failure
 limits.

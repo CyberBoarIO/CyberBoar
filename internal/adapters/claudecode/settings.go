@@ -131,9 +131,7 @@ func BuildFragment(p *policy.Policy, o FragmentOptions) Fragment {
 	}
 	f := Fragment{Settings: map[string]any{"hooks": hooks}}
 	deny, ask := f.permissionRules(p, o.Scope)
-	// The bare tool name removes the PowerShell tool from Claude's context,
-	// which the hook would deny on every call anyway.
-	deny = dedupe(append(append(deny, guardRules(o)...), "PowerShell"))
+	deny = dedupe(append(deny, guardRules(o)...))
 	perms := map[string]any{}
 	if len(deny) > 0 {
 		perms["deny"] = toAny(deny)
@@ -178,6 +176,19 @@ var inlineCode = []string{
 	"ruby -e", "php -r", "pwsh -c", "pwsh -Command", "osascript -e",
 }
 
+// psInlineCode are the PowerShell commands that run a string as code, added
+// to inlineCode for the PowerShell tool. Claude Code matches aliases (iex)
+// with the cmdlet's rule.
+var psInlineCode = []string{"Invoke-Expression"}
+
+// shellRules returns the rules for a command pattern in both of Claude's
+// shell tools. A PowerShell rule takes the same shape as a Bash one, and its
+// presence keeps the PowerShell tool on: without it, Claude Code turns the
+// tool off for a session whose settings deny anything in Bash.
+func shellRules(pat string) []string {
+	return []string{"Bash(" + pat + " *)", "PowerShell(" + pat + " *)"}
+}
+
 func (f *Fragment) permissionRules(p *policy.Policy, scope Scope) (deny, ask []string) {
 	addFile := func(list *[]string, pat string) {
 		cc := nativePath(pat, scope)
@@ -194,7 +205,7 @@ func (f *Fragment) permissionRules(p *policy.Policy, scope Scope) (deny, ask []s
 			f.note("command pattern %q (pipeline, quoting or ?/[ ] wildcards) has no native equivalent; only the hook enforces it", pat)
 			return
 		}
-		*list = append(*list, "Bash("+pat+" *)")
+		*list = append(*list, shellRules(pat)...)
 	}
 	for _, pat := range p.Spec.Commands.Deny {
 		addCmd(&deny, pat)
@@ -204,7 +215,10 @@ func (f *Fragment) permissionRules(p *policy.Policy, scope Scope) (deny, ask []s
 	}
 	if p.Spec.Commands.InterpretersDenied() {
 		for _, c := range inlineCode {
-			deny = append(deny, "Bash("+c+" *)")
+			deny = append(deny, shellRules(c)...)
+		}
+		for _, c := range psInlineCode {
+			deny = append(deny, "PowerShell("+c+" *)")
 		}
 		f.note("denyInterpreters: native rules cover only common spellings (%s and others); the hook covers the rest", strings.Join(inlineCode[:3], ", "))
 	}
@@ -234,11 +248,19 @@ func (f *Fragment) permissionRules(p *policy.Policy, scope Scope) (deny, ask []s
 
 // guardRules returns the rules that keep Claude's own file tools away from
 // what installs the hook, as builtin.guarded does in the hook. That is every
-// Claude Code settings file, the policy and its signature, the signing key,
+// Claude Code settings file, the agents, skills, commands and plugins that
+// can run hooks of their own, the policy and its signature, the signing key,
 // the audit log and the hook binary. One Edit of .claude/settings.local.json
-// would switch the hook off.
+// would switch the hook off. The rules match these folders at any depth,
+// including skills below the project, which the hook can't list in advance.
 func guardRules(o FragmentOptions) []string {
-	rules := []string{"Edit(//**/.claude/settings.json)", "Edit(//**/.claude/settings.local.json)"}
+	rules := []string{"Edit(//**/.claude/settings.json)", "Edit(//**/.claude/settings.local.json)",
+		"Edit(//**/.claude/agents/**)", "Edit(//**/.claude/skills/**)", "Edit(//**/.claude/commands/**)",
+		"Edit(//**/.claude/plugins/**)"}
+	// Shell startup files, which run outside the hook (adapters.StartupFiles)
+	for _, name := range adapters.StartupNames() {
+		rules = append(rules, "Edit(~/"+name+")")
+	}
 	files := []string{o.Policy, o.Policy + ".sig", o.PubKey, o.Audit, o.Command}
 	for _, f := range files {
 		if pat, ok := nativeFile(f); ok {

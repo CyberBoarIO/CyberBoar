@@ -196,7 +196,11 @@ func (c *Compiled) evalShell(a Action) Verdict {
 	if err != nil {
 		return invalidAction(err)
 	}
-	an, err := shell.AnalyzeWith(a.Command, a.Home, shell.Options{Cwd: a.Cwd, CwdUnknown: a.CwdUnknown, CDPath: a.CDPath, Persistent: a.ShellPersists, FS: env.fs, Mounts: a.Mounts})
+	analyze := shell.AnalyzeWith
+	if a.Shell == ShellPowerShell {
+		analyze = shell.AnalyzePowerShell
+	}
+	an, err := analyze(a.Command, a.Home, shell.Options{Cwd: a.Cwd, CwdUnknown: a.CwdUnknown, CDPath: a.CDPath, Persistent: a.ShellPersists, FS: env.fs, Mounts: a.Mounts})
 	switch {
 	case errors.Is(err, shell.ErrTooLarge):
 		return deny(RuleCommandTooLarge, fmt.Sprintf("the command is longer than %d bytes and cannot be checked, so it is blocked; %s", shell.MaxBytes, noRetry))
@@ -313,7 +317,7 @@ func (c *Compiled) evalShell(a Action) Verdict {
 	case len(an.Commands) == 0:
 		return Verdict{Decision: Allow, Rule: RuleNoCommand, Reason: "the command line runs no commands"}
 	case cmdsListed:
-		id := c.allowRule(an.Commands[0].Layers[0])
+		id := c.allowName(an.Commands[0])
 		return Verdict{Decision: Allow, Rule: id, Reason: "every command is allowed by the policy's allow list"}
 	default:
 		return allowNoRule()
@@ -418,8 +422,8 @@ func variableHint(shown string, persistent bool) string {
 // since ask rules name commands that may run after confirmation
 func (c *Compiled) unlisted(an *shell.Analysis) ([]shell.Elem, bool) {
 	for _, cmd := range an.Commands {
-		for _, layer := range cmd.Layers {
-			if c.allowRule(layer) != "" {
+		for i, layer := range cmd.Layers {
+			if i <= cmd.Aliases && c.allowName(cmd) != "" || c.allowRule(layer) != "" {
 				continue
 			}
 			asked := false
@@ -438,6 +442,17 @@ func (c *Compiled) unlisted(an *shell.Analysis) ([]shell.Elem, bool) {
 		}
 	}
 	return nil, false
+}
+
+// allowName returns the first allow rule that certainly matches cmd by one
+// of its names (the first layer and its Aliases), or ""
+func (c *Compiled) allowName(cmd shell.Command) string {
+	for _, layer := range cmd.Layers[:min(cmd.Aliases+1, len(cmd.Layers))] {
+		if id := c.allowRule(layer); id != "" {
+			return id
+		}
+	}
+	return ""
 }
 
 // allowRule returns the first allow rule that certainly matches argv, or ""

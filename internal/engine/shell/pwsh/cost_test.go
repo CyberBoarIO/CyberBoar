@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"cyberboar.dev/cyberboar/internal/engine/shell"
+	"cyberboar.dev/cyberboar/internal/engine/shell/limits"
 	"cyberboar.dev/cyberboar/internal/engine/shell/pwsh"
 )
 
@@ -27,7 +27,7 @@ func TestParseCostIsLinear(t *testing.T) {
 			n := (size - len(tc.prefix) - len(tc.suffix)) / len(tc.unit)
 			return tc.prefix + strings.Repeat(tc.unit, n) + tc.suffix
 		}
-		small, large := line(shell.MaxBytes/4), line(shell.MaxBytes)
+		small, large := line(limits.MaxBytes/4), line(limits.MaxBytes)
 		var smallTime, largeTime time.Duration
 		var smallBytes, largeBytes uint64
 		for i := range 3 {

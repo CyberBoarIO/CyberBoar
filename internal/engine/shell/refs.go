@@ -387,7 +387,11 @@ func (a *analyzer) wordRefs(e Elem, d dir, glob globOpts, printing bool, add fun
 		pattern, ok := e.Text, true
 		if a.windows {
 			var refused string
-			if pattern, ok, refused = a.winGlob(e.Text); refused != "" {
+			winGlob := a.winGlob
+			if a.powershell {
+				winGlob = func(p string) (string, bool, string) { return a.psWinGlob(p, d) }
+			}
+			if pattern, ok, refused = winGlob(e.Text); refused != "" {
 				add(FileRef{Display: e.Text, Refused: refused})
 				return
 			}
@@ -422,7 +426,10 @@ func (a *analyzer) wordRefs(e Elem, d dir, glob globOpts, printing bool, add fun
 
 // pathRef resolves a literal path against the working directory.
 func (a *analyzer) pathRef(p string, d dir) FileRef {
-	if a.windows {
+	switch {
+	case a.windows && a.powershell:
+		return a.psWinRef(p, d)
+	case a.windows:
 		return a.winPathRef(p, d)
 	}
 	switch {
@@ -596,8 +603,8 @@ func (a *analyzer) expandGlob(pattern string, d dir, o globOpts) (matches []stri
 		for _, dirPath := range current {
 			if !hasUnescapedMeta(seg) {
 				name := unescapeGlob(seg)
-				if a.windows {
-					name = gitBashNames(name) // bash expands globs itself
+				if a.windows && !a.powershell {
+					name = gitBashNames(name) // bash expands globs itself; PowerShell uses Win32 names
 				}
 				p := joinDir(dirPath, name)
 				if _, err := a.fs.Lstat(p); err == nil || !last {
@@ -616,7 +623,7 @@ func (a *analyzer) expandGlob(pattern string, d dir, o globOpts) (matches []stri
 			for _, e := range entries {
 				n := e.Name()
 				shown := n
-				if a.windows {
+				if a.windows && !a.powershell {
 					shown = gitBashView(n)
 				}
 				if strings.HasPrefix(shown, ".") && !strings.HasPrefix(seg, ".") && !o.dotglob {

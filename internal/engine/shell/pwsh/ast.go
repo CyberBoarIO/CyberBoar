@@ -384,6 +384,13 @@ type Variable struct {
 // Name returns the variable's name without its scope or drive
 func (v *Variable) Name() string { return unqualified(v.Path) }
 
+// Drive returns the drive the variable is read from, "env" for $env:PATH and
+// "c" for ${c:\x}, or "" for a plain variable or one with only a scope
+func (v *Variable) Drive() string {
+	_, drive := splitVariablePath(v.Path)
+	return drive
+}
+
 // SubExpression is $(...)
 type SubExpression struct {
 	Extent
@@ -529,6 +536,9 @@ func (*Index) commandElement()                 {}
 
 func (*Attribute) attribute()      {}
 func (*TypeConstraint) attribute() {}
+
+// Children returns n's child nodes in the order Inspect visits them
+func Children(n Node) []Node { return children(n) }
 
 // Inspect walks the tree in depth-first order. It calls f(n) and, if f
 // returns true, walks n's children in source order

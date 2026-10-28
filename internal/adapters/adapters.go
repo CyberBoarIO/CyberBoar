@@ -9,10 +9,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
 	"cyberboar.dev/cyberboar/internal/engine"
+	"cyberboar.dev/cyberboar/internal/winpath"
 	"cyberboar.dev/cyberboar/pkg/brand"
 )
 
@@ -21,20 +23,22 @@ const (
 	RuleInvalidInput     = "error.invalidInput"
 	RuleUnclassifiedTool = "adapter.unclassifiedTool"
 	// RulePowerShell denies every call of an agent's PowerShell tool, whatever
-	// the policy says, because the engine doesn't analyze PowerShell yet
+	// the policy says, where the engine doesn't analyze PowerShell: outside
+	// native Windows
 	RulePowerShell = "builtin.powershell"
 )
 
-// PowerShell returns the denial of a call to an agent's PowerShell tool, and
-// what the user is told about it. tool is the agent's name for that tool, and
-// bash names the tool the agent should use instead, such as "the Bash tool (Git Bash)"
+// PowerShell returns the denial of a call to an agent's PowerShell tool
+// outside native Windows, and what the user is told about it. tool is the
+// agent's name for that tool, and bash names the tool the agent should use
+// instead, such as "the Bash tool"
 func PowerShell(tool, bash string) (err *Error, notice string) {
 	name := brand.DisplayName
-	err = &Error{Rule: RulePowerShell, Msg: fmt.Sprintf("%s can't check PowerShell yet, so every command for the %s tool is blocked, whatever it does. "+
-		"Run the command with %s instead, where it is checked. If it can't be done there, stop and tell the user that %s blocks PowerShell",
+	err = &Error{Rule: RulePowerShell, Msg: fmt.Sprintf("%s checks PowerShell only on native Windows, so here every command for the %s tool is blocked, whatever it does. "+
+		"Run the command with %s instead, where it is checked. If it can't be done there, stop and tell the user that %s blocks PowerShell here",
 		name, tool, bash, name)}
-	notice = fmt.Sprintf("%s blocked a command for the %s tool: %s can't check PowerShell yet, so every PowerShell command is blocked. "+
-		"The agent was told to use %s instead, where commands are checked. Without it, use WSL or a Linux dev container.", name, tool, name, bash)
+	notice = fmt.Sprintf("%s blocked a command for the %s tool: %s checks PowerShell only on native Windows, so here every PowerShell command is blocked. "+
+		"The agent was told to use %s instead, where commands are checked.", name, tool, name, bash)
 	return err, notice
 }
 
@@ -271,6 +275,65 @@ func SplitMCP(rest string) []engine.MCPCall {
 		}
 	}
 	return out
+}
+
+// startupNames are the startup files in the home directory that bash and sh
+// read as login or interactive shells, and run when a login shell exits
+var startupNames = []string{".profile", ".bash_profile", ".bash_login", ".bashrc", ".bash_logout"}
+
+// zshStartupNames are zsh's, which it reads from $ZDOTDIR, or the home directory
+var zshStartupNames = []string{".zshenv", ".zprofile", ".zshrc", ".zlogin", ".zlogout"}
+
+// StartupNames returns the names of the shell startup files in the home
+// directory, as StartupFiles guards them when ZDOTDIR is unset
+func StartupNames() []string { return slices.Concat(startupNames, zshStartupNames) }
+
+// StartupFiles returns the shell startup files the agents' shells run
+// outside the hook's checks: before a command, at session start or when a
+// login shell exits. They are bash's and sh's in home, zsh's in home and
+// $ZDOTDIR, and the files $BASH_ENV and $ENV name. What an agent writes
+// there would run in later commands and sessions, so it may not write them
+// (Guard). windows says home is a Windows path, as Git Bash's is on Windows
+func StartupFiles(windows bool, home string, getenv func(string) string) []string {
+	if home == "" {
+		return nil
+	}
+	var out []string
+	for _, f := range startupNames {
+		out = append(out, Under(windows, home, f))
+	}
+	dirs := []string{home}
+	if z := absPath(windows, getenv("ZDOTDIR")); z != "" {
+		dirs = append(dirs, z)
+	}
+	for _, d := range dirs {
+		for _, f := range zshStartupNames {
+			out = append(out, Under(windows, d, f))
+		}
+	}
+	for _, v := range []string{"BASH_ENV", "ENV"} {
+		if p := absPath(windows, getenv(v)); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// absPath returns p if it is absolute, on Windows also in Git Bash's form
+// (/c/x), and "" otherwise: a guarded path must be absolute, and a shell
+// reads a relative one from wherever it starts
+func absPath(windows bool, p string) string {
+	if windows {
+		p = winpath.FromGitBash(p)
+		if _, err := winpath.Abs(p); err != nil {
+			return ""
+		}
+		return p
+	}
+	if !strings.HasPrefix(p, "/") {
+		return ""
+	}
+	return p
 }
 
 // Guard adds paths, the files that install the hook, to the Guarded list of

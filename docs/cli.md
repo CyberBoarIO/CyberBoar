@@ -48,7 +48,8 @@ Command-specific behavior:
 - `hook` exits 0 (no objection, or an answer in the agent's JSON) or 2 (deny), never 1. Every
   error, a bad flag and `--help` included, is a deny with exit 2: any other status lets the agent run
   the tool. With `--agent cursor` a policy deny is a JSON answer with exit 0, which is what Cursor
-  reads; set-up errors still exit 2.
+  reads; set-up errors still exit 2. With `--agent codex` every deny, set-up errors included, is
+  a JSON answer with exit 0: on Windows, Codex runs hooks in PowerShell, which turns exit 2 into 1.
 - `brief` always exits 0: a briefing is advice and must never stop a session from starting.
 - `explain` exits 0 whatever the decision; read it from the output or `--json`.
 - `ship` and `pull` with a nonzero interval, from `--every` or the policy, run until SIGINT or
@@ -221,9 +222,9 @@ user's own setting.
 |---|---|---|---|
 | `--agent NAME` | none | `claude-code` | `claude-code`, `codex`, `copilot-cli`, `cursor` or `opencode` |
 | `--policy FILE` | `CYBERBOAR_POLICY` | none | The policy the hook will read |
-| `--scope SCOPE` | none | `user` | `user`, `project`, `local` (Claude Code only) or `managed` (not opencode). `project` needs the policy inside the project |
+| `--scope SCOPE` | none | `user` | `user`, `project`, `local` (Claude Code only) or `managed` (not opencode). `project` needs the policy inside the project, and isn't available for Codex on Windows |
 | `--dir DIR` | none | the working directory | The project, for `project` and `local` |
-| `--managed-dir DIR` | none | the agent's machine-wide directory, e.g. `/etc/claude-code`, `/etc/codex` | Where `managed` writes |
+| `--managed-dir DIR` | none | the agent's machine-wide directory, e.g. `/etc/claude-code`, `/etc/codex`, on Windows `%ProgramData%\OpenAI\Codex` for Codex | Where `managed` writes |
 | `--command FILE` | none | this binary; `cyberboar` on `PATH` for `project` | The executable the hook runs |
 | `--audit FILE` | none | none | The hook's audit log (made absolute) |
 | `--state DIR` | none | none | The hook's `--state` (made absolute); without it the hook uses its default |
@@ -262,10 +263,18 @@ See [Policy regression tests](policy-tests.md).
 Shows the decision the policy makes for one action, and the rule that made it. Give
 exactly one of `--command`, `--read`, `--write`, `--list`, `--mcp`.
 
+`explain` doesn't know the files the hook protects for itself and for the agent: its
+audit log and state (`builtin.self`) and the agent's settings, hooks and shell startup
+files (`builtin.guarded`). The hook can deny such an action, or name one of those rules
+where `explain` names a policy rule: `Select-String -Path *` in a folder that holds the
+audit log is `builtin.self` in the hook and `files.deny[0]` in `explain` if `*` also
+matches `.env`.
+
 | Flag | Env | Default | Meaning |
 |---|---|---|---|
 | `--policy FILE` | `CYBERBOAR_POLICY` | none | The policy. Required |
 | `--command LINE` | none | none | A shell command line |
+| `--shell NAME` | none | `""` (bash) | The language of `--command`: empty for bash, or `powershell` ([PowerShell support](powershell.md)) |
 | `--read PATH` | none | none | A path the agent reads |
 | `--write PATH` | none | none | A path the agent writes |
 | `--list PATH` | none | none | A path whose names the agent lists |

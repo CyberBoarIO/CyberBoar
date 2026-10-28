@@ -25,9 +25,10 @@ open. The version is part of the filename; copy the actual name from the release
 
 The full filename follows `cyberboar_<version>_<os>_<arch>.tar.gz` (or `.zip` on
 Windows). Check the [system requirements](system-requirements.md) for minimum OS
-versions and limitations. Native Windows currently supports
-**Claude Code with Git for Windows / Git Bash only**; install Git for Windows
-before trying the agent. In WSL use the matching *Linux* binary.
+versions and limitations. Native Windows currently supports **Claude Code** (its Bash
+tool needs Git for Windows / Git Bash; its PowerShell tool works without it) and
+**Codex CLI** (PowerShell). The steps below use Claude Code; for Codex see [Agent
+setup](agents.md#codex-cli). In WSL use the matching *Linux* binary.
 
 ## 2. Download, verify, and install a released binary
 
@@ -124,7 +125,7 @@ details](system-requirements.md#download-and-operating-system-trust).
 
 ## Build from source
 
-You need **Go 1.27.2 or later** and a checkout of CyberBoar's source. Run these commands
+You need **Go 1.27.3 or later** and a checkout of CyberBoar's source. Run these commands
 **from the repository root**:
 
 ```sh

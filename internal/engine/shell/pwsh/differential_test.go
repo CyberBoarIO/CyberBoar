@@ -17,7 +17,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"cyberboar.dev/cyberboar/internal/engine/shell"
+	"cyberboar.dev/cyberboar/internal/engine/shell/limits"
 )
 
 var update = flag.Bool("update", false, "rewrite "+goldenPath+" from PowerShell (with CYBERBOAR_PWSH_DIFF=1)")
@@ -309,7 +309,7 @@ func writeGolden(t *testing.T, version string, inputs []string, results []pwshRe
 // TestPowerShellDifferential describes
 func compareResults(t *testing.T, inputs []string, results []pwshResult, label string) {
 	t.Helper()
-	var same, refused, limits, bothRejected, overAccepted int
+	var same, refused, overLimit, bothRejected, overAccepted int
 	for i, in := range inputs {
 		sb, err := Parse(in)
 		var pe *Error
@@ -326,8 +326,8 @@ func compareResults(t *testing.T, inputs []string, results []pwshResult, label s
 			if testing.Verbose() {
 				t.Logf("refused: %q: %v", in, err)
 			}
-		case errors.Is(err, shell.ErrTooComplex) || errors.Is(err, shell.ErrTooLarge):
-			limits++
+		case errors.Is(err, limits.ErrTooComplex) || errors.Is(err, limits.ErrTooLarge):
+			overLimit++
 		case err != nil:
 			t.Errorf("%q: rejected, PowerShell accepts: %v\n  pwsh: %s", in, err, results[i].AST)
 		default:
@@ -339,7 +339,7 @@ func compareResults(t *testing.T, inputs []string, results []pwshResult, label s
 		}
 	}
 	t.Logf("%scompared %d inputs: %d same, %d refused, %d over limits, %d rejected by both, %d rejected only by PowerShell",
-		label, len(inputs), same, refused, limits, bothRejected, overAccepted)
+		label, len(inputs), same, refused, overLimit, bothRejected, overAccepted)
 }
 
 // pwshFragments are what mutations insert: the characters and short

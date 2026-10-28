@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -71,13 +72,46 @@ func TestHookMisconfigurationDenies(t *testing.T) {
 		if code != 2 || !strings.Contains(out, `"permissionDecision":"deny"`) {
 			t.Errorf("%v: want deny with exit 2, got exit %d stdout %q", args, code, out)
 		}
+		// Codex gets the deny as JSON with exit 0, which survives PowerShell
+		codexArgs := append([]string{"hook", "--agent", "codex"}, args[1:]...)
+		if slices.Contains(args, "--agent") {
+			continue // the last --agent counts
+		}
+		if code, out, _ := call(t, lsSrc, codexArgs...); code != 0 || !strings.Contains(out, `"permissionDecision":"deny"`) {
+			t.Errorf("%v: want deny with exit 0, got exit %d stdout %q", codexArgs, code, out)
+		}
 	}
 	// A signing key that can't be read denies for every agent, before the input is read
 	missing := filepath.Join(t.TempDir(), "nonexistent.pub")
 	for agent := range agents {
 		code, out, errs := call(t, lsSrc, "hook", "--agent", agent, "--policy", baseline, "--pubkey", missing)
+		if agent == "codex" {
+			code, errs = code+2, out
+		}
 		if code != 2 || !strings.Contains(out, `"permissionDecision":"deny"`) || !strings.Contains(errs, "signing key can't be read") {
 			t.Errorf("%s with a missing key: exit %d stdout %q stderr %q", agent, code, out, errs)
+		}
+	}
+}
+
+func TestAgentArg(t *testing.T) {
+	for _, c := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--agent", "codex"}, "codex"},
+		{[]string{"-agent=codex"}, "codex"},
+		{[]string{"--policy", "p.yaml", "--agent", "codex", "--deadline", "5s"}, "codex"},
+		{[]string{"--agent", "codex", "--agent", "cursor"}, "cursor"},
+		{[]string{"--policy", "--agent", "codex"}, ""}, // --agent is the policy's value
+		{[]string{"--no-such-flag", "x", "--agent", "codex"}, "codex"},
+		{[]string{"extra", "--agent", "codex"}, ""},
+		{[]string{"--", "--agent", "codex"}, ""},
+		{[]string{"--agent"}, ""},
+		{nil, ""},
+	} {
+		if got := agentArg(c.args); got != c.want {
+			t.Errorf("agentArg(%q) = %q, want %q", c.args, got, c.want)
 		}
 	}
 }
@@ -174,6 +208,15 @@ func TestExplainCommand(t *testing.T) {
 			t.Errorf("Windows paths on %s: exit %d\n%s", runtime.GOOS, code, out)
 		}
 	}
+	// PowerShell: cat is Get-Content, shown as a second name of the command
+	code, out, _ = call(t, "", "explain", "--policy", baseline, "--platform", "windows", "--cwd", `C:\work\repo`,
+		"--home", `C:\Users\dev`, "--shell", "powershell", "--verbose", "--command", `cat .env`)
+	if code != 0 || !strings.HasPrefix(out, "DENY  (files.deny[0])") || !strings.Contains(out, "↳ [0] Get-Content .env") {
+		t.Errorf("--shell powershell: exit %d\n%s", code, out)
+	}
+	if code, _, _ := call(t, "", "explain", "--policy", baseline, "--shell", "powershell", "--read", "a"); code != 2 {
+		t.Errorf("--shell with --read: exit %d", code)
+	}
 }
 
 func TestExplainVerboseAliases(t *testing.T) {
@@ -241,7 +284,7 @@ func TestBinaryExitCodes(t *testing.T) {
 
 func TestHookCodexProtocol(t *testing.T) {
 	in := `{"hook_event_name":"PreToolUse","tool_name":"Bash","cwd":"/work/repo","session_id":"s","turn_id":"1","tool_use_id":"c","model":"m","permission_mode":"default","transcript_path":null,"tool_input":{"command":"cat .env"}}`
-	if code, out, errs := call(t, in, "hook", "-agent", "codex", "--policy", baseline); code != 2 || !strings.Contains(out, `"deny"`) || errs == "" {
+	if code, out, errs := call(t, in, "hook", "-agent", "codex", "--policy", baseline); code != 0 || !strings.Contains(out, `"deny"`) || errs != "" {
 		t.Errorf("codex deny: exit %d stdout %q stderr %q", code, out, errs)
 	}
 	plan := strings.Replace(strings.Replace(in, `"Bash"`, `"update_plan"`, 1), `{"command":"cat .env"}`, `{"plan":[]}`, 1)

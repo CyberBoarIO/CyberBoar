@@ -2,10 +2,12 @@ package codex
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -30,8 +32,9 @@ func TestRespondNeverAsksOrAllows(t *testing.T) {
 		if err := json.Unmarshal(out.Stdout, &got); err != nil {
 			t.Fatal(err)
 		}
-		if out.Exit != 2 || got.HSO.Event != "PreToolUse" || got.HSO.Decision != "deny" || !strings.HasPrefix(got.HSO.Reason, "cb: because") ||
-			!strings.Contains(out.Stderr, "because") {
+		// Exit 0: under PowerShell, a hook's exit 2 reaches Codex as 1, a failed hook
+		if out.Exit != 0 || got.HSO.Event != "PreToolUse" || got.HSO.Decision != "deny" || !strings.HasPrefix(got.HSO.Reason, "cb: because") ||
+			out.Stderr != "" {
 			t.Errorf("%s: %+v %+v", d, out, got)
 		}
 		if d == engine.Ask && !strings.Contains(got.HSO.Reason, "can't ask") {
@@ -136,13 +139,108 @@ func TestReadLineSkipsOverlongLines(t *testing.T) {
 // Codex reports MCP names in its own form, so every split says so
 func TestMCPCallsHaveCodexNames(t *testing.T) {
 	in := &Input{HookEventName: "PreToolUse", Cwd: "/work", ToolName: "mcp__fs_srv__write_file", ToolInput: json.RawMessage(`{}`)}
-	actions, err := Actions(in, "/home/dev", "/bin/bash", false)
+	actions, err := Actions(in, Env{Home: "/home/dev", Shell: "/bin/bash"})
 	if err != nil || len(actions) == 0 {
 		t.Fatalf("%d actions, %v", len(actions), err)
 	}
 	for _, a := range actions {
 		if a.Tool != engine.ToolMCP || a.MCP.Names != engine.NamesCodex {
 			t.Errorf("action %+v", a.MCP)
+		}
+	}
+}
+
+// On native Windows Codex runs commands in PowerShell: they are analysed as
+// PowerShell with Windows paths, a shell other than PowerShell is refused,
+// and the user's PowerShell folders, Codex's settings and the managed
+// directory are guarded
+func TestWindows(t *testing.T) {
+	c, err := engine.Compile(loadPolicy(t, "baseline.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	transcript := filepath.Join(t.TempDir(), "rollout.jsonl")
+	run := func(t *testing.T, args map[string]any, documents string) (*adapters.Call, engine.Verdict) {
+		t.Helper()
+		js, _ := json.Marshal(args)
+		line, _ := json.Marshal(map[string]any{"type": "response_item", "payload": map[string]any{
+			"type": "function_call", "name": "exec_command", "call_id": "c1", "arguments": string(js)}})
+		if err := os.WriteFile(transcript, append(line, '\n'), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		input, _ := json.Marshal(map[string]any{"hook_event_name": "PreToolUse", "session_id": "s", "cwd": `C:\work\repo`,
+			"transcript_path": transcript, "tool_use_id": "c1", "tool_name": "Bash", "tool_input": map[string]any{"command": args["cmd"]}})
+		getenv := func(k string) string {
+			return map[string]string{"USERPROFILE": `C:\Users\dev`, "HOME": "/home/ignored", "SHELL": "/bin/bash"}[k]
+		}
+		call, err := parse(input, getenv, "windows", func() string { return documents })
+		if err != nil {
+			t.Fatal(err)
+		}
+		if call.Err != nil {
+			return call, engine.Verdict{}
+		}
+		var vs []engine.Verdict
+		for _, a := range call.Actions {
+			// The transcript is this machine's file, not a Windows path, as it
+			// would be on Windows; the engine refuses it in a Windows action
+			a.Guarded = slices.DeleteFunc(slices.Clone(a.Guarded), func(p string) bool { return p == transcript })
+			vs = append(vs, engine.Evaluate(context.Background(), c, a))
+		}
+		v, _ := engine.Strictest(vs)
+		return call, v
+	}
+	for _, tc := range []struct {
+		name      string
+		args      map[string]any
+		documents string
+		decision  engine.Decision
+		rule      string
+	}{
+		{"secret", map[string]any{"cmd": "Get-Content .env"}, "", engine.Deny, "files.deny[0]"},
+		{"harmless", map[string]any{"cmd": "Get-ChildItem; git status"}, "", engine.Allow, ""},
+		{"pwsh by path", map[string]any{"cmd": "Get-ChildItem", "shell": `C:\Program Files\PowerShell\7\pwsh.exe`}, "", engine.Allow, ""},
+		{"login shell", map[string]any{"cmd": "Get-ChildItem", "login": true}, "", engine.Allow, ""},
+		{"workdir", map[string]any{"cmd": "Get-Content ..\\.env", "workdir": "src"}, "", engine.Deny, "files.deny[0]"},
+		{"profile", map[string]any{"cmd": `Set-Content C:\Users\dev\Documents\PowerShell\profile.ps1 x`}, "", engine.Deny, engine.RuleGuarded},
+		{"redirected module", map[string]any{"cmd": `Set-Content D:\OneDrive\Documents\WindowsPowerShell\Modules\m\m.psm1 x`}, `D:\OneDrive\Documents`, engine.Deny, engine.RuleGuarded},
+		{"hooks", map[string]any{"cmd": `Set-Content C:\Users\dev\.codex\hooks.json '{}'`}, "", engine.Deny, engine.RuleGuarded},
+		{"managed", map[string]any{"cmd": `Set-Content C:\ProgramData\OpenAI\Codex\requirements.toml x`}, "", engine.Deny, engine.RuleGuarded},
+		{"startup file", map[string]any{"cmd": `Add-Content C:\Users\dev\.bashrc x`}, "", engine.Deny, engine.RuleGuarded},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			call, v := run(t, tc.args, tc.documents)
+			if call.Err != nil {
+				t.Fatalf("refused: %v", call.Err)
+			}
+			if a := call.Actions[0]; a.Shell != engine.ShellPowerShell || a.Platform != engine.PlatformWindows || a.Home != `C:\Users\dev` {
+				t.Errorf("action %+v", a)
+			}
+			if v.Decision != tc.decision || (tc.rule != "" && v.Rule != tc.rule) {
+				t.Errorf("%s by %s (%s); want %s %s", v.Decision, v.Rule, v.Reason, tc.decision, tc.rule)
+			}
+		})
+	}
+	for name, args := range map[string]map[string]any{
+		"cmd":                    {"cmd": "dir", "shell": `C:\Windows\System32\cmd.exe`},
+		"git bash":               {"cmd": "ls", "shell": `C:\Program Files\Git\bin\bash.exe`},
+		"drive-relative workdir": {"cmd": "dir", "workdir": `D:x`},
+		"rooted workdir":         {"cmd": "dir", "workdir": `\x`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if call, _ := run(t, args, ""); call.Err == nil {
+				t.Errorf("accepted: %+v", call.Actions)
+			}
+		})
+	}
+}
+
+func TestIsPowerShell(t *testing.T) {
+	for shell, want := range map[string]bool{"pwsh": true, "powershell": true, `C:\Program Files\PowerShell\7\pwsh.exe`: true,
+		`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`: true, "/usr/bin/pwsh": true,
+		"cmd": false, "PWSH.EXE": false, `C:\x\pwsh-preview.exe`: false, "bash": false} {
+		if got := isPowerShell(shell); got != want {
+			t.Errorf("isPowerShell(%q) = %v", shell, got)
 		}
 	}
 }

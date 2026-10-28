@@ -3,11 +3,17 @@ package claudecode
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io/fs"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"slices"
+	"strings"
 	"testing"
 
+	"cyberboar.dev/cyberboar/internal/adapters"
 	"cyberboar.dev/cyberboar/internal/adapters/claudecode/gitbash"
 	"cyberboar.dev/cyberboar/internal/engine"
 )
@@ -114,6 +120,56 @@ func TestWindowsWithoutMounts(t *testing.T) {
 	}
 }
 
+// On native Windows the PowerShell tool's command is analysed as PowerShell,
+// also without Git Bash, where Claude Code has no Bash tool. Elsewhere it is
+// denied and the agent is sent to the Bash tool
+func TestPowerShellTool(t *testing.T) {
+	noGit := gitbash.Env{Getenv: func(string) string { return "" },
+		LookPath: func(string) (string, error) { return "", exec.ErrNotFound },
+		ReadFile: func(string) ([]byte, error) { return nil, fs.ErrNotExist },
+		Exists:   func(string) bool { return false }}
+	getenv := func(k string) string {
+		return map[string]string{"USERPROFILE": `C:\Users\dev`, "CLAUDE_PROJECT_DIR": `C:\work\repo`}[k]
+	}
+	c, err := engine.Compile(loadPolicy(t, "baseline.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		command, rule string
+		decision      engine.Decision
+	}{
+		{"Get-Content .env", "files.deny[0]", engine.Deny},
+		{"gc .\\src\\..\\.env", "files.deny[0]", engine.Deny},
+		{"Invoke-Expression 'Get-Content .env'", "", engine.Deny},
+		{"Get-ChildItem src; git status", "", engine.Allow},
+	} {
+		input, _ := json.Marshal(map[string]any{"hook_event_name": "PreToolUse", "tool_name": "PowerShell", "cwd": `C:\work\repo`,
+			"tool_input": map[string]any{"command": tc.command}})
+		call, err := parse(input, getenv, "windows", noGit)
+		if err != nil || call.Err != nil || len(call.Actions) != 1 {
+			t.Fatalf("%s: call %+v, err %v", tc.command, call, err)
+		}
+		a := call.Actions[0]
+		if a.Shell != engine.ShellPowerShell || a.Command != tc.command || a.Platform != engine.PlatformWindows || a.ShellPersists {
+			t.Errorf("%s: action %+v", tc.command, a)
+		}
+		v := engine.Evaluate(context.Background(), c, a)
+		if v.Decision != tc.decision || (tc.rule != "" && v.Rule != tc.rule) {
+			t.Errorf("%s: %s by %s (%s); want %s %s", tc.command, v.Decision, v.Rule, v.Reason, tc.decision, tc.rule)
+		}
+	}
+
+	input := []byte(`{"hook_event_name":"PreToolUse","tool_name":"PowerShell","cwd":"/work/repo","tool_input":{"command":"Get-ChildItem"}}`)
+	for _, goos := range []string{"linux", "darwin"} {
+		call, err := parse(input, func(string) string { return "" }, goos, noGit)
+		var ae *adapters.Error
+		if err != nil || !errors.As(call.Err, &ae) || ae.Rule != adapters.RulePowerShell || !strings.Contains(ae.Msg, "Bash tool") || call.Notice == "" {
+			t.Errorf("%s: call %+v, err %v", goos, call, err)
+		}
+	}
+}
+
 func TestSettingsFiles(t *testing.T) {
 	win := SettingsFiles(Env{Windows: true, Home: `C:\Users\dev`, ProjectDir: `C:\work\repo\`}, `D:\claude`, "windows")
 	want := []string{
@@ -121,14 +177,65 @@ func TestSettingsFiles(t *testing.T) {
 		`D:\claude\settings.json`, `D:\claude\settings.local.json`,
 		`C:\work\repo\.claude\settings.json`, `C:\work\repo\.claude\settings.local.json`,
 		`C:\Program Files\ClaudeCode`, `C:\ProgramData\ClaudeCode`,
+		`C:\Users\dev\.claude\plugins`, `C:\Users\dev\.claude\agents`, `C:\Users\dev\.claude\skills`, `C:\Users\dev\.claude\commands`,
+		`D:\claude\plugins`, `D:\claude\agents`, `D:\claude\skills`, `D:\claude\commands`,
+		`C:\work\repo\.claude\agents`, `C:\work\repo\.claude\skills`, `C:\work\repo\.claude\commands`,
 	}
 	if !slices.Equal(win, want) {
 		t.Errorf("Windows: %q\nwant %q", win, want)
 	}
 	posix := SettingsFiles(Env{Home: "/home/dev", ProjectDir: "/work/repo"}, "", "darwin")
 	if !slices.Contains(posix, "/work/repo/.claude/settings.local.json") || !slices.Contains(posix, "/home/dev/.claude/settings.json") ||
-		slices.Contains(posix, "/settings.json") || !slices.Contains(posix, "/Library/Application Support/ClaudeCode") {
+		slices.Contains(posix, "/settings.json") || !slices.Contains(posix, "/Library/Application Support/ClaudeCode") ||
+		!slices.Contains(posix, "/work/repo/.claude/skills") || !slices.Contains(posix, "/home/dev/.claude/plugins") ||
+		slices.Contains(posix, "/plugins") || slices.Contains(posix, "/work/repo/.claude/plugins") {
 		t.Errorf("POSIX: %q", posix)
+	}
+}
+
+// Claude Code loads agents, skills and commands from the project's
+// .claude and those of the folders above it up to the git work tree
+func TestProjectDirs(t *testing.T) {
+	root := t.TempDir()
+	project := filepath.Join(root, "repo", "packages", "web")
+	if err := os.MkdirAll(project, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	windows := runtime.GOOS == "windows"
+	if got := projectDirs(Env{Windows: windows, ProjectDir: project}); !slices.Equal(got, []string{project}) {
+		t.Errorf("outside a work tree: %q", got)
+	}
+	if err := os.WriteFile(filepath.Join(root, "repo", ".git"), []byte("gitdir: elsewhere\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{project, filepath.Join(root, "repo", "packages"), filepath.Join(root, "repo")}
+	if got := projectDirs(Env{Windows: windows, ProjectDir: project + string(filepath.Separator)}); !slices.Equal(got, want) {
+		t.Errorf("in a work tree: %q\nwant %q", got, want)
+	}
+	files := SettingsFiles(Env{Windows: windows, ProjectDir: project}, "", runtime.GOOS)
+	if !slices.Contains(files, filepath.Join(root, "repo", ".claude", "agents")) || slices.Contains(files, filepath.Join(root, "repo", ".claude", "settings.json")) {
+		t.Errorf("SettingsFiles: %q", files)
+	}
+}
+
+func TestParent(t *testing.T) {
+	for _, tc := range []struct {
+		windows   bool
+		dir, want string
+	}{
+		{false, "/work/repo", "/work"},
+		{false, "/work", "/"},
+		{false, "/", ""},
+		{true, `C:\work\repo`, `C:\work`},
+		{true, `C:\work\`, `C:\`},
+		{true, `C:\`, ""},
+		{true, `\\server\share\repo`, `\\server\share`},
+		{true, `\\server\share`, ""},
+		{true, `\\server`, ""},
+	} {
+		if got := parent(tc.windows, tc.dir); got != tc.want {
+			t.Errorf("parent(%q) = %q, want %q", tc.dir, got, tc.want)
+		}
 	}
 }
 

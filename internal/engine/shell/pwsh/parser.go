@@ -7,12 +7,12 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	"cyberboar.dev/cyberboar/internal/engine/shell"
+	"cyberboar.dev/cyberboar/internal/engine/shell/limits"
 )
 
 // Error reports a command line this package can't read, because of a syntax
 // error, a construct it refuses (Refused) or a limit
-// It wraps shell.ErrUnparseable, or shell.ErrTooLarge or shell.ErrTooComplex for a
+// It wraps limits.ErrUnparseable, or limits.ErrTooLarge or limits.ErrTooComplex for a
 // limit, so the engine treats it as it treats bash it can't analyze
 type Error struct {
 	Offset  int // in UTF-16 units, as PowerShell counts
@@ -34,7 +34,7 @@ func (e *Error) Unwrap() error {
 	if e.limit != nil {
 		return e.limit
 	}
-	return shell.ErrUnparseable
+	return limits.ErrUnparseable
 }
 
 // maxNesting bounds the parser's recursion. Each level of parentheses, braces
@@ -44,14 +44,14 @@ const maxNesting = 200
 
 // Parse parses a PowerShell command line as PowerShell's
 // Parser.ParseInput does, into a ScriptBlock. It fails, wrapping
-// shell.ErrUnparseable, on anything PowerShell would report as an error and
+// limits.ErrUnparseable, on anything PowerShell would report as an error and
 // on constructs this package refuses to analyze (see docs/powershell.md)
 // Whatever PowerShell would run is either read the way PowerShell reads it,
-// or not at all. Input over shell.MaxBytes, or with more than
-// shell.MaxCommands commands, fails with the shell package's limit errors
+// or not at all. Input over limits.MaxBytes, or with more than
+// limits.MaxCommands commands, fails with the shell package's limit errors
 func Parse(src string) (sb *ScriptBlock, err error) {
-	if len(src) > shell.MaxBytes {
-		return nil, &Error{Msg: "command line is too large", limit: shell.ErrTooLarge}
+	if len(src) > limits.MaxBytes {
+		return nil, &Error{Msg: "command line is too large", limit: limits.ErrTooLarge}
 	}
 	if !utf8.ValidString(src) {
 		return nil, &Error{Msg: "command line is not valid UTF-8"}
@@ -96,7 +96,7 @@ func (p *parser) refuse(t *token, msg string) {
 func (p *parser) enter(t *token) {
 	p.depth++
 	if p.depth > maxNesting {
-		panic(&Error{Offset: t.pos, Msg: "nested too deeply", limit: shell.ErrTooComplex})
+		panic(&Error{Offset: t.pos, Msg: "nested too deeply", limit: limits.ErrTooComplex})
 	}
 }
 
@@ -104,8 +104,8 @@ func (p *parser) leave() { p.depth-- }
 
 func (p *parser) counted(at int) {
 	p.commands++
-	if p.commands > shell.MaxCommands {
-		panic(&Error{Offset: at, Msg: "too many commands", limit: shell.ErrTooComplex})
+	if p.commands > limits.MaxCommands {
+		panic(&Error{Offset: at, Msg: "too many commands", limit: limits.ErrTooComplex})
 	}
 }
 

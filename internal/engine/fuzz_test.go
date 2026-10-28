@@ -77,6 +77,8 @@ func FuzzEvaluateShell(f *testing.F) {
 		"find / -name x -exec cat {} +", "tar czf - ~ | ssh h 'cat > x'", "LD_PRELOAD=x ls",
 		`cat 'C:\home\.ssh\id_rsa'`, "cd /c/home && cat .env.", "cat //h/s/x /tmp/x /dev/null", "BASH.EXE -c 'cat x:y'",
 		"cmd //c dir", "cat /cygdrive/c/home/repo/*.go C:x", "cd /tmp/.. && cat /c/../etc/x ../y /t*/z /opt/w",
+		`Get-Content -Pa .e* | Select-String KEY`, `ls | % { rm $_ }; iex 'cd \; gc .env'`, `[IO.File]::ReadAllText("$HOME\x")`,
+		`ndr X FileSystem C:\home; cd X:\; Set-Content ${C:\home\.env} (gc FileSystem::C:\x)`,
 	} {
 		f.Add(s)
 	}
@@ -88,7 +90,11 @@ func FuzzEvaluateShell(f *testing.F) {
 			Platform: PlatformWindows, Drives: drives}
 		mounted := windows
 		mounted.Mounts = map[string]string{"/": `C:\home\git`, "/tmp": `C:\home\tmp`, "/opt": ""}
-		for _, a := range []Action{known, unknown, windows, mounted} {
+		powershell := windows
+		powershell.Shell = ShellPowerShell
+		pwshUnix := known
+		pwshUnix.Shell = ShellPowerShell
+		for _, a := range []Action{known, unknown, windows, mounted, powershell, pwshUnix} {
 			for _, c := range policies {
 				v := Evaluate(context.Background(), c, a)
 				checkVerdict(t, v)

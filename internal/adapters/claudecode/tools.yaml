@@ -5,7 +5,8 @@
 #
 # Per tool, one or more of:
 #   shell:       input field holding a bash command line
-#   powershell:  input field holding a PowerShell command (analysed as foreign code)
+#   powershell:  input field holding a PowerShell command line (analysed on native
+#                Windows, denied elsewhere)
 #   read:        input fields holding paths the tool reads (contents; directories are
 #                checked with what they contain)
 #   write:       input fields holding paths the tool creates or changes

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"cyberboar.dev/cyberboar/internal/adapters"
@@ -109,5 +111,29 @@ func TestIsDir(t *testing.T) {
 		if got := adapters.IsDir(path); got != isDir {
 			t.Errorf("IsDir(%q) = %v, want %v", path, got, isDir)
 		}
+	}
+}
+
+// The startup files are bash's and sh's in the home directory, zsh's there
+// and in an absolute ZDOTDIR, and absolute BASH_ENV and ENV; a relative one
+// can't be guarded and is left out. On Windows Git Bash's form is read
+func TestStartupFiles(t *testing.T) {
+	env := func(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
+	got := adapters.StartupFiles(false, "/home/dev", env(map[string]string{"ZDOTDIR": "/home/dev/.config/zsh", "BASH_ENV": "rel.sh", "ENV": "/etc/shrc.local"}))
+	for _, want := range []string{"/home/dev/.bashrc", "/home/dev/.profile", "/home/dev/.bash_logout", "/home/dev/.zshenv",
+		"/home/dev/.config/zsh/.zshrc", "/home/dev/.config/zsh/.zlogout", "/etc/shrc.local"} {
+		if !slices.Contains(got, want) {
+			t.Errorf("no %s in %q", want, got)
+		}
+	}
+	if slices.Contains(got, "rel.sh") {
+		t.Errorf("relative BASH_ENV guarded: %q", got)
+	}
+	win := adapters.StartupFiles(true, `C:\Users\dev`, env(map[string]string{"BASH_ENV": "/c/Users/dev/env.sh", "ZDOTDIR": "zsh"}))
+	if !slices.Contains(win, `C:\Users\dev\.bashrc`) || !slices.Contains(win, `C:\Users\dev\env.sh`) || slices.ContainsFunc(win, func(p string) bool { return strings.HasPrefix(p, "zsh") }) {
+		t.Errorf("Windows: %q", win)
+	}
+	if got := adapters.StartupFiles(false, "", env(nil)); got != nil {
+		t.Errorf("no home: %q", got)
 	}
 }

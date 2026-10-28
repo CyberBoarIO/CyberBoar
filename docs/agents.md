@@ -19,15 +19,14 @@ setup and current validation limits.
 
 | Agent (`--agent`) | macOS / Linux | Native Windows | `ask` behavior |
 |---|---|---|---|
-| Claude Code (`claude-code`) | Available | Git Bash only | Native confirmation |
-| Codex CLI (`codex`) | Available | Use WSL or a Linux container | Deny |
+| Claude Code (`claude-code`) | Available | Git Bash and the PowerShell tool | Native confirmation |
+| Codex CLI (`codex`) | Available | PowerShell; user and managed scope | Deny |
 | GitHub Copilot CLI and Copilot in VS Code (`copilot-cli`) | Available | Use WSL or a Linux container | Native confirmation; deny in headless mode |
 | Cursor (`cursor`) | Available; CLI validated with a real agent, editor validation pending | Use WSL / Remote-WSL or a Linux container | Deny |
 | opencode (`opencode`) | Available through a plugin | Use WSL or a Linux container | Deny |
 
-Use the Linux binary inside WSL or a Linux container. A human can use PowerShell to
-install CyberBoar on Windows; this does not mean the engine analyzes PowerShell tool
-calls. See [PowerShell status](powershell.md).
+For the other agents on Windows, use the Linux binary inside WSL or a Linux container.
+PowerShell commands are analyzed as a [checked subset](powershell.md).
 
 ## Select a scope
 
@@ -68,8 +67,8 @@ logging is enabled. An agent refusing a request on its own does not prove the ho
 
 The examples below are project-level configurations for macOS/Linux, or for the Linux
 binary inside WSL/a Linux container. Start with a validated `.cyberboar/policy.yaml` in
-the project root and `cyberboar` on the agent's `PATH`. Native Windows users should use
-Claude Code with Git Bash and an executable path to `cyberboar.exe` instead.
+the project root and `cyberboar` on the agent's `PATH`. On native Windows, use an
+executable path to `cyberboar.exe`; for Codex see [Codex on Windows](#codex-on-windows).
 
 Back up existing files. **Merge these handlers into existing hook arrays; do not replace
 unrelated hooks or settings.** Use only one CyberBoar installation per scope to avoid
@@ -128,15 +127,14 @@ later** for `onFailure: block`; older versions can run tools when the hook fails
         ]
       }
     ]
-  },
-  "permissions": {
-    "deny": ["PowerShell"]
   }
 }
 ```
 
-Keep `PowerShell` denied: the engine does not analyze that tool. Ensure no active
-settings set `disableAllHooks`. Review the handlers in `/hooks`, restart/reload Claude
+The hook checks Claude Code's `PowerShell` tool on native Windows and denies it
+elsewhere. If your settings deny any `Bash(…)` command, also add a `PowerShell(…)` rule
+(such as the same command), or Claude Code turns the PowerShell tool off; `apply` writes
+these rules for you. Ensure no active settings set `disableAllHooks`. Review the handlers in `/hooks`, restart/reload Claude
 Code as required, and test enforcement in a new session.
 
 ### Codex CLI
@@ -191,6 +189,42 @@ replace `.cyberboar/policy.yaml` with
 `\"$(git rev-parse --show-toplevel)/.cyberboar/policy.yaml\"` inside the JSON string.
 This requires Git and a Git worktree; the escaped quotes preserve paths with spaces.
 See the [official hook configuration notes](https://learn.chatgpt.com/docs/hooks#config-shape).
+
+#### Codex on Windows
+
+On native Windows, Codex runs hook commands and the model's commands in the session's
+shell, PowerShell (`pwsh -NoProfile -Command`), and runs hooks with `cmd.exe /C` when
+it has no session shell. Use the user scope (`%USERPROFILE%\.codex\hooks.json`, or under
+`CODEX_HOME`) or the managed scope (`%ProgramData%\OpenAI\Codex\requirements.toml`);
+the Git-root form above needs a POSIX shell, so `apply` refuses `--scope project`
+there. The line must work in both shells: write the program's absolute path
+**without** quotes, since PowerShell reads a quoted first word as a string, not a
+command, and put the other paths in double quotes. Give the same line as
+`commandWindows`:
+
+```json
+{
+  "type": "command",
+  "command": "C:\\Tools\\cyberboar.exe hook --agent codex --policy \"C:\\Users\\dev\\.cyberboar\\policy.yaml\" --deadline \"5s\"",
+  "commandWindows": "C:\\Tools\\cyberboar.exe hook --agent codex --policy \"C:\\Users\\dev\\.cyberboar\\policy.yaml\" --deadline \"5s\"",
+  "timeout": 10
+}
+```
+
+The program's path may hold only letters, digits and `_ . ~ - \ :`, with no spaces.
+For a path with spaces, such as `C:\Program Files\…`, `apply` writes its 8.3 short
+name (`C:\PROGRA~1\…`) when the volume keeps short names, and refuses it otherwise.
+The other paths can't contain quotes, `$` or `` ` `` (which PowerShell expands), `%`
+(which cmd.exe expands), or end in `\`.
+
+The hook answers a deny as JSON with exit code 0. `pwsh -Command` turns a program's
+exit code 2 into 1, which Codex treats as a failed hook. Codex runs the tool call when
+a hook fails, so a hook that can't start, crashes or times out lets the call run. Check
+that denied calls appear in the audit log. Codex starts
+PowerShell with the user's profiles unless the model asks otherwise; the hook guards the
+PowerShell profile and module folders (see [Profiles and
+modules](powershell.md#profiles-and-modules)), and denies commands sent to another
+shell, such as `cmd.exe` or Git Bash.
 
 ### GitHub Copilot CLI
 

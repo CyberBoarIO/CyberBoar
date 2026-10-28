@@ -8,7 +8,6 @@
 package shell
 
 import (
-	"errors"
 	"fmt"
 	"maps"
 	"path"
@@ -19,14 +18,15 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 
 	"cyberboar.dev/cyberboar/internal/engine/osfs"
+	"cyberboar.dev/cyberboar/internal/engine/shell/limits"
 )
 
 // Limits. Anything beyond them is refused, not truncated
 const (
-	MaxBytes    = 64 << 10 // command line size
-	MaxDepth    = 8        // nesting of code in code: sh -c 'eval "…"'
-	MaxCommands = 256      // simple commands, including nested ones
-	maxUnwrap   = 16       // wrappers around one command: sudo nice timeout …
+	MaxBytes    = limits.MaxBytes    // command line size
+	MaxDepth    = limits.MaxDepth    // nesting of code in code: sh -c 'eval "…"'
+	MaxCommands = limits.MaxCommands // simple commands, including nested ones
+	maxUnwrap   = 16                 // wrappers around one command: sudo nice timeout …
 )
 
 // Errors Analyze returns for a command line it can't read in full: longer
@@ -34,9 +34,9 @@ const (
 // or past MaxDepth, MaxCommands or the wrapper limit. The engine denies each
 // Literals also uses ErrTooLarge and ErrTooComplex for its expansion limits
 var (
-	ErrTooLarge    = errors.New("command line is too large to analyze")
-	ErrUnparseable = errors.New("command line is not valid shell syntax")
-	ErrTooComplex  = errors.New("command line is too complex to analyze")
+	ErrTooLarge    = limits.ErrTooLarge
+	ErrUnparseable = limits.ErrUnparseable
+	ErrTooComplex  = limits.ErrTooComplex
 )
 
 // Command is one simple command. Layers are the argv forms to check: as
@@ -44,6 +44,10 @@ var (
 // A layer of a single Many element means "could be anything"
 type Command struct {
 	Layers [][]Elem
+	// Aliases is the number of layers after the first that are the same
+	// command by another name: a PowerShell alias's cmdlet (rm is
+	// Remove-Item). An allow rule for any of these names allows them all
+	Aliases int
 }
 
 // Code is one place where text on the command line becomes code
@@ -80,7 +84,10 @@ type analyzer struct {
 	home      string
 	fs        osfs.FS
 	windows   bool // paths are read as Git Bash on Windows does (fs.Windows)
-	mounts    map[string]string
+	// powershell: the words being read come from PowerShell, which has no
+	// mounts (powershell.go). Bash code it starts is read as bash again
+	powershell bool
+	mounts     map[string]string
 	// Set on a second pass when the command line may change HOME (so ~,
 	// $HOME and a bare cd are unknown) or CDPATH/cdable_vars (so `cd name`
 	// may go elsewhere than ./name). saw* record what the first pass found
@@ -203,8 +210,9 @@ func (a *analyzer) script(src string, depth int, start dir) ([]int, error) {
 		return nil, fmt.Errorf("%w: %v", ErrUnparseable, err)
 	}
 	// Each script knows only its own variables
-	saved, savedAt := a.vars, a.varsAt
-	defer func() { a.vars, a.varsAt = saved, savedAt }()
+	saved, savedAt, savedPS := a.vars, a.varsAt, a.powershell
+	defer func() { a.vars, a.varsAt, a.powershell = saved, savedAt, savedPS }()
+	a.powershell = false
 	a.vars = nil
 	lv := a.knownVars(f)
 	a.varsAt = lv.at

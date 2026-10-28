@@ -19,7 +19,7 @@ CGO_ENABLED=0 go build -trimpath -o "$build_dir/cyberboar.exe" ./cmd/cyberboar
 "$build_dir/cyberboar.exe" version
 "$build_dir/cyberboar.exe" check examples/baseline.yaml
 # Installer paths use the host separator and must reject other volumes
-go test -count=1 -v -run '^(TestProjectPolicyComponents|TestAbsoluteApplyPaths|TestSignSerialExpiry|TestSignReplacesSymlinkWithoutChangingTarget|TestSettingsBackupDoesNotFollowSymlink)$' ./cmd/cyberboar/
+go test -count=1 -v -run '^(TestProjectPolicyComponents|TestAbsoluteApplyPaths|TestSignSerialExpiry|TestSignReplacesSymlinkWithoutChangingTarget|TestSettingsBackupDoesNotFollowSymlink|TestShortPathName)$' ./cmd/cyberboar/
 # Native Python's PATH can select Windows' WSL bash shim
 CYBERBOAR_TEST_BASH="$(cygpath -w "$BASH")" python -m unittest discover -s test/release -p 'test_*.py' -v
 go test -count=1 -v ./internal/winpath/ ./internal/engine/osfs/ ./internal/adapters/claudecode/gitbash/

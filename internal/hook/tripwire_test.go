@@ -2,15 +2,18 @@ package hook_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
 
 	"cyberboar.dev/cyberboar/internal/adapters"
 	"cyberboar.dev/cyberboar/internal/adapters/claudecode"
+	"cyberboar.dev/cyberboar/internal/adapters/codex"
 	"cyberboar.dev/cyberboar/internal/engine"
 	"cyberboar.dev/cyberboar/internal/hook"
 	"cyberboar.dev/cyberboar/internal/hook/tripwire"
@@ -75,6 +78,40 @@ func TestTripwireLocksSession(t *testing.T) {
 	}
 	if r := h.run(bash("s1", "ls")); r.Exit != 0 {
 		t.Fatalf("after unlock: exit %d, %s by %s", r.Exit, r.Verdict.Decision, r.Verdict.Rule)
+	}
+}
+
+// A locked Codex session is denied with the JSON answer and exit 0, like
+// every Codex deny: PowerShell would turn exit 2 into a failed hook
+func TestTripwireLocksCodexSession(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("POSIX adapter fixtures")
+	}
+	repo := filepath.Join(t.TempDir(), "repo")
+	if err := os.MkdirAll(repo, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	policy, state := policyFile(t, sessionPolicy("{tripwire: {}}"), nil), t.TempDir()
+	run := func(session, file string) hook.Result {
+		t.Helper()
+		in, err := json.Marshal(map[string]any{"hook_event_name": "PreToolUse", "session_id": session, "tool_name": "apply_patch", "cwd": repo,
+			"tool_input": map[string]any{"command": "*** Begin Patch\n*** Add File: " + file + "\n+x\n*** End Patch\n"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return hook.Run(context.Background(), strings.NewReader(string(in)), hook.Options{Adapter: codex.Adapter{},
+			PolicyPath: policy, Getenv: func(k string) string { return map[string]string{"HOME": "/home/dev"}[k] }, StateDir: state})
+	}
+	for range 3 {
+		assertDenied(t, run("s1", ".env"), "files.deny[0]")
+	}
+	r := run("s1", "notes.txt")
+	assertDenied(t, r, tripwire.RuleLocked)
+	if r.Exit != 0 || len(r.Stderr) != 0 {
+		t.Errorf("locked: exit %d, stderr %q; want the JSON deny alone", r.Exit, r.Stderr)
+	}
+	if r := run("s2", "notes.txt"); r.Verdict.Decision != engine.Allow {
+		t.Errorf("another session: %s by %s (%s)", r.Verdict.Decision, r.Verdict.Rule, r.Verdict.Reason)
 	}
 }
 

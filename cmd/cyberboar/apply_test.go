@@ -186,6 +186,51 @@ func TestApplyManagedDropIn(t *testing.T) {
 	}
 }
 
+// On Windows Codex runs hooks in PowerShell or cmd.exe, so the hook is a
+// command line both read alike: the program bare, the values in double
+// quotes. It is given as commandWindows too, in the user's .codex under
+// USERPROFILE, and managed requirements name windows_managed_dir. A project
+// hook, which finds the policy from the git root, can't be written for them,
+// and nor can a program path with spaces or a value either shell would change
+func TestApplyCodexWindows(t *testing.T) {
+	env := func(k string) string {
+		return map[string]string{"USERPROFILE": `C:\Users\dev`, "HOME": "/home/ignored", "ProgramData": `D:\ProgramData`}[k]
+	}
+	h := host{getenv: env, goos: "windows", now: time.Now}
+	run1 := func(args ...string) (int, string, string) {
+		var out, errb bytes.Buffer
+		code := h.run(append([]string{"apply", "--agent", "codex", "--policy", baseline, "--command", `C:\cb\cyberboar.exe`}, args...), nil, &out, &errb)
+		return code, out.String(), errb.String()
+	}
+	code, out, errs := run1("--scope", "user")
+	line := `C:\\cb\\cyberboar.exe hook --agent codex --policy \"`
+	if code != 0 || !strings.Contains(out, `C:\Users\dev\.codex\hooks.json`) || strings.Count(out, line) != 2 || strings.Contains(out, `'C:`) {
+		t.Errorf("user scope: exit %d %s\n%s", code, errs, out)
+	}
+	if !strings.Contains(out, `"commandWindows": "`+line) {
+		t.Errorf("no commandWindows:\n%s", out)
+	}
+	code, out, errs = run1("--scope", "managed", "--allow-unsigned")
+	if code != 0 || !strings.Contains(out, `D:\ProgramData\OpenAI\Codex\requirements.toml`) ||
+		!strings.Contains(out, `windows_managed_dir = "C:\\cb"`) || !strings.Contains(out, "command_windows = ") {
+		t.Errorf("managed scope: exit %d %s\n%s", code, errs, out)
+	}
+	if code, _, errs := run1("--scope", "project"); code != 2 || !strings.Contains(errs, "--scope user") {
+		t.Errorf("project scope: exit %d %s", code, errs)
+	}
+	for _, audit := range []string{`C:\logs\%USERNAME%.jsonl`, `C:\logs\$env.jsonl`, "C:\\logs\\`n.jsonl"} {
+		if code, _, errs := run1("--scope", "user", "--audit", audit); code != 1 || !strings.Contains(errs, "command line on Windows") {
+			t.Errorf("%s: exit %d %s", audit, code, errs)
+		}
+	}
+	// Here no short name is found, as for a volume without them
+	var out2, errb bytes.Buffer
+	code = h.run([]string{"apply", "--agent", "codex", "--policy", baseline, "--command", `C:\Program Files\CyberBoar\cyberboar.exe`, "--scope", "user"}, nil, &out2, &errb)
+	if code != 1 || !strings.Contains(errb.String(), "no spaces") {
+		t.Errorf("program path with a space: exit %d %s", code, errb.String())
+	}
+}
+
 func TestApplyCodex(t *testing.T) {
 	home := t.TempDir()
 	env := func(k string) string { return map[string]string{"HOME": home}[k] }
@@ -412,10 +457,10 @@ func TestApplyRefusesUnsupportedPlatform(t *testing.T) {
 	}
 }
 
-// On Windows, whoever installs the hook is told that the PowerShell tool will
-// be blocked, and why, before an agent runs into it
-func TestApplyWarnsAboutPowerShell(t *testing.T) {
-	for os, want := range map[string]bool{"windows": true, "linux": false} {
+// The settings keep Claude Code's PowerShell tool on, whose commands the hook
+// checks on Windows: they deny no whole tool and mirror the Bash rules
+func TestApplyKeepsPowerShell(t *testing.T) {
+	for _, os := range []string{"windows", "linux"} {
 		home := t.TempDir()
 		env := func(k string) string { return map[string]string{"HOME": home}[k] }
 		h := host{getenv: env, goos: os, now: time.Now}
@@ -423,8 +468,8 @@ func TestApplyWarnsAboutPowerShell(t *testing.T) {
 		if code := h.run([]string{"apply", "--policy", baseline, "--scope", "user", "--command", "/opt/cyberboar"}, nil, &out, &errb); code != 0 {
 			t.Fatalf("%s: apply: exit %d, stderr %q", os, code, errb.String())
 		}
-		if got := strings.Contains(out.String(), "PowerShell tool"); got != want {
-			t.Errorf("%s: warns about PowerShell: %v\n%s", os, got, out.String())
+		if s := out.String(); strings.Contains(s, `"PowerShell"`) || !strings.Contains(s, `"PowerShell(terraform apply *)"`) || strings.Contains(s, "PowerShell tool") {
+			t.Errorf("%s: PowerShell rules or notes:\n%s", os, s)
 		}
 	}
 }

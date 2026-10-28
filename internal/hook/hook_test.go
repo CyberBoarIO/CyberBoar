@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"runtime"
+	"slices"
 	"strings"
 	"testing"
 
@@ -30,7 +32,7 @@ var adapterCases = []struct {
 	check   func(t *testing.T, want string, r hook.Result) // the agent's hook contract
 }{
 	{casesPath, claudecode.Adapter{}, checkProtocol},
-	{"testdata/codex/cases.yaml", codex.Adapter{}, checkProtocol},
+	{"testdata/codex/cases.yaml", codex.Adapter{}, checkCodexProtocol},
 	{"testdata/copilot-cli/cases.yaml", copilot.Adapter{}, checkCopilotProtocol},
 	{"testdata/cursor/cases.yaml", cursor.Adapter{}, checkCursorProtocol},
 	{"testdata/opencode/cases.yaml", opencode.Adapter{}, checkOpencodeProtocol},
@@ -50,7 +52,10 @@ type hookCase struct {
 	Env      map[string]string `yaml:"env"`
 	Input    map[string]any    `yaml:"input"`
 	RawInput *string           `yaml:"rawInput"`
-	Expect   struct {
+	// GOOS lists the operating systems (runtime.GOOS values) the case runs
+	// on, for an adapter that reads the one it runs on. Empty means every one
+	GOOS   []string `yaml:"goos"`
+	Expect struct {
 		Decision       string `yaml:"decision"` // what the agent is told: deny | ask | none
 		Verdict        string `yaml:"verdict"`  // the engine verdict, when it differs (Codex: ask → deny)
 		Rule           string `yaml:"rule"`
@@ -109,6 +114,9 @@ func runCases(t *testing.T, casesPath string, adapter adapters.Adapter, check fu
 
 	for _, c := range cf.Cases {
 		t.Run(c.Name, func(t *testing.T) {
+			if len(c.GOOS) > 0 && !slices.Contains(c.GOOS, runtime.GOOS) {
+				t.Skipf("runs on %v only", c.GOOS)
+			}
 			pol, err := fixture.PolicyBytes(c.Policy, root)
 			if err != nil {
 				t.Fatal(err)
@@ -164,13 +172,28 @@ func runCases(t *testing.T, casesPath string, adapter adapters.Adapter, check fu
 // checkProtocol asserts the exact Claude Code hook contract for a decision.
 func checkProtocol(t *testing.T, want string, r hook.Result) {
 	t.Helper()
+	checkHookSpecificOutput(t, want, r, 2)
+}
+
+// checkCodexProtocol asserts Codex's contract: Claude Code's JSON, but a deny
+// exits 0 with nothing on stderr, since PowerShell turns a hook's exit 2 into
+// 1, which Codex treats as a failed hook
+func checkCodexProtocol(t *testing.T, want string, r hook.Result) {
+	t.Helper()
+	checkHookSpecificOutput(t, want, r, 0)
+}
+
+// checkHookSpecificOutput asserts the hookSpecificOutput answer, with a deny
+// exiting denyExit; a deny that exits 2 also gives its reason on stderr
+func checkHookSpecificOutput(t *testing.T, want string, r hook.Result, denyExit int) {
+	t.Helper()
 	if want == "none" {
 		if r.Exit != 0 || len(r.Stdout) != 0 || r.Stderr != "" {
 			t.Fatalf("want no answer, got exit %d stdout %q stderr %q", r.Exit, r.Stdout, r.Stderr)
 		}
 		return
 	}
-	wantExit := map[string]int{"deny": 2, "ask": 0}[want]
+	wantExit := map[string]int{"deny": denyExit, "ask": 0}[want]
 	if r.Exit != wantExit {
 		t.Errorf("want exit %d, got %d", wantExit, r.Exit)
 	}
@@ -190,8 +213,11 @@ func checkProtocol(t *testing.T, want string, r hook.Result) {
 	if out.HSO.Event != "PreToolUse" || out.HSO.Decision != want || out.HSO.Reason == "" {
 		t.Errorf("unexpected hook JSON %+v", out.HSO)
 	}
-	if want == "deny" && !strings.Contains(r.Stderr, out.HSO.Reason) {
+	switch {
+	case want == "deny" && denyExit == 2 && !strings.Contains(r.Stderr, out.HSO.Reason):
 		t.Errorf("deny reason not on stderr: %q", r.Stderr)
+	case want == "deny" && denyExit == 0 && r.Stderr != "":
+		t.Errorf("stderr %q beside a deny that exits 0", r.Stderr)
 	}
 	// The user sees systemMessage; it is there exactly when there is a notice.
 	switch msg := out.SystemMessage; {

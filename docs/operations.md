@@ -101,8 +101,9 @@ configured log denies the call. `spec.audit.sink` alone does not enable logging.
 | `time`, `agent`, `version` | Identify source and time. |
 | `session`, `toolUseId` | Correlate calls when supplied. |
 | `decision`, `rule`, `reason` | Inspect the decision and responsible rule. |
+| `tool` | The agent's own name for the tool. Codex calls its shell tool `Bash`, PowerShell on Windows included. |
 | `policyName`, `policySha256` | Identify the policy used. |
-| `actions` | Inspect inferred file, shell or MCP actions. |
+| `actions` | Inspect inferred file, shell or MCP actions. Empty when the call is refused before it is understood (an `error.*` or `adapter.*` rule). |
 | `actionsOmitted` | Detect a size-bounded, incomplete action list. |
 | `durationMs` | Observe decision latency. |
 

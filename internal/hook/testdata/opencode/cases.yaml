@@ -249,3 +249,4 @@ cases:
   - {name: "secrets: edit next to a token already there", policy: baseline, input: {tool: edit, args: {filePath: "deploy.sh", oldString: "T={{fake:github-pat}}\nN=1", newString: "T={{fake:github-pat}}\nN=2"}}, expect: {decision: none}}
   - {name: "secrets: patch adding a token", policy: baseline, input: {tool: apply_patch, args: {patchText: "*** Begin Patch\n*** Add File: src/c.go\n+const t = \"{{fake:github-pat}}\"\n*** End Patch\n"}}, expect: {decision: deny, rule: secrets.github-pat}}
   - {name: "secrets: bash with a token", policy: baseline, input: {tool: bash, args: {command: "export GH_TOKEN={{fake:github-pat}}"}}, expect: {decision: deny, rule: secrets.github-pat}}
+  - {name: "startup files: writing ~/.profile", policy: baseline, input: {tool: write, args: {filePath: "{{root}}/home/.profile", content: "x"}}, expect: {decision: deny, rule: builtin.guarded}}

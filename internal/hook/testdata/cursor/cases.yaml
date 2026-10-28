@@ -164,3 +164,4 @@ cases:
   - {name: "secrets: Write with a token", policy: baseline, input: {tool_name: Write, tool_input: {file_path: "{{root}}/proj/src/config.go", contents: "const token = \"{{fake:github-pat}}\"\n"}}, expect: {decision: deny, rule: secrets.github-pat}}
   - {name: "secrets: a token in any field of a write", policy: baseline, input: {tool_name: Write, tool_input: {file_path: "{{root}}/proj/deploy.sh", edits: [{new_text: "KEY={{fake:aws-access-token}}"}]}}, expect: {decision: deny, rule: secrets.aws-access-token}}
   - {name: "secrets: Shell with a token", policy: baseline, input: {tool_name: Shell, tool_input: {command: "export GH_TOKEN={{fake:github-pat}}", cwd: "{{root}}/proj"}}, expect: {decision: deny, rule: secrets.github-pat}}
+  - {name: "startup files: writing ~/.zshrc", policy: baseline, input: {tool_name: Write, tool_input: {file_path: "{{root}}/home/.zshrc", contents: "x"}}, expect: {decision: deny, rule: builtin.guarded}}

@@ -35,7 +35,7 @@ try {
     Invoke-Go test -count=1 -run 'Win' ./internal/engine/shell ./internal/adapters/claudecode
     Invoke-Go test -count=1 -run 'Windows' ./internal/engine
     Invoke-Go test -count=1 -run 'Lock' ./internal/endpoint/ship
-    Invoke-Go test -count=1 -run '^(TestProjectPolicyComponents|TestAbsoluteApplyPaths)$' ./cmd/cyberboar
+    Invoke-Go test -count=1 -run '^(TestProjectPolicyComponents|TestAbsoluteApplyPaths|TestShortPathName)$' ./cmd/cyberboar
 } finally {
     if (Test-Path $buildDir) {
         Remove-Item -LiteralPath $buildDir -Recurse -Force

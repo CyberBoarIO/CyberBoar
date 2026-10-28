@@ -5,6 +5,73 @@ and enforcement. Stable releases follow [Semantic Versioning](https://semver.org
 starting with `v1.0.0`. The v1 compatibility contract covers the policy format, CLI,
 protocol, audit schema and public Go packages under `pkg/`.
 
+## [Unreleased]
+
+### Added
+
+- PowerShell analysis: the engine reads a checked subset of PowerShell, the
+  common file cmdlets and their aliases, programs, and the constructs that run
+  code, and applies the same policy rules as for Bash. Anything outside the
+  subset is treated as able to do anything. See [PowerShell support](docs/powershell.md).
+- Claude Code's `PowerShell` tool is checked on native Windows, with or without
+  Git Bash. Elsewhere it is still denied.
+- Codex CLI on native Windows, whose commands run in PowerShell. A command sent
+  to another shell, such as `cmd.exe` or Git Bash, is denied
+  (`adapter.windowsShell`). `apply` writes the hook as a command line that
+  works in both PowerShell, where Codex runs hooks in the session's shell, and
+  `cmd.exe` (`command` and `commandWindows`). The program's path goes in without
+  quotes, so a path with spaces needs an 8.3 short name. This covers the user and
+  managed scopes; the project scope isn't available there. The hook guards Codex's managed directory
+  (`%ProgramData%\OpenAI\Codex`) and the user's PowerShell profile and module
+  folders, which Codex runs.
+- `explain --shell powershell` reads a command as PowerShell, and a policy test
+  case can set `shell: powershell`.
+
+### Changed
+
+- `apply --agent claude-code` no longer denies the whole `PowerShell` tool. It
+  mirrors every native `Bash(…)` rule as a `PowerShell(…)` rule, which also keeps
+  Claude Code from switching the tool off, and adds `PowerShell(Invoke-Expression *)`
+  under `denyInterpreters`. Re-run `apply` to install them.
+- `builtin.powershell` now denies Claude Code's PowerShell tool only outside
+  native Windows, and the Windows session briefing no longer tells the agent to
+  avoid it.
+- Codex: the hook answers a deny as JSON with exit code 0 instead of exit code 2,
+  for every deny including configuration errors. Under PowerShell, Codex sees
+  exit code 2 as 1, a failed hook, and runs the tool call. Re-running `apply` is
+  not needed for this change.
+- Source builds need Go 1.27.3, whose release fixes vulnerabilities in
+  `crypto/x509`; release binaries are built with it.
+
+### Fixed
+
+- Shell startup files are guarded for every agent: `~/.profile`, bash's and
+  zsh's files (also in `$ZDOTDIR`), and the files `$BASH_ENV` and `$ENV` name.
+  Agents' shells run them before commands or at session start, outside the
+  hook's checks. Claude Code's native rules cover them too after `apply`.
+  The `builtin.guarded` reason no longer calls every guarded file CyberBoar's
+  configuration.
+- Claude Code: custom agents, skills and commands, whose frontmatter can
+  declare hooks that Claude Code runs without the CyberBoar hook seeing them,
+  are guarded like settings files. That is `.claude/agents`, `.claude/skills`
+  and `.claude/commands` in `~/.claude`, `CLAUDE_CONFIG_DIR`, the project and
+  every folder above it up to its git work tree, and installed plugins in
+  `~/.claude/plugins`. Claude's file tools may read them, but not change them,
+  and the shell may not touch them. `apply`
+  writes native `Edit` denies for these folders at any depth; re-run `apply`
+  to install them. Skills in folders below the project and folders added with
+  `--add-dir` are still not guarded against shell writes.
+- On Windows, the reason for a refused workspace root, such as an agent started
+  in the home folder, shows the path as `C:\Users\…` instead of `/c/Users/…` and
+  says to start the agent in a project folder.
+
+### Known limitations
+
+- PowerShell support is new and its real-agent testing on Windows is limited.
+  Windows PowerShell 5.1 commands are read with PowerShell 7's grammar.
+- Codex runs the user's PowerShell profiles; CyberBoar trusts them as the user's configuration and keeps agents from changing them.
+- Copilot CLI, Cursor and opencode remain unsupported on native Windows.
+
 ## [v1.0.0-rc.2] - 2026-10-20
 
 Second release candidate for CyberBoar 1.0. It adds GitHub Copilot in VS Code and

@@ -6,6 +6,7 @@
 internal/engine/shell FuzzAnalyze
 internal/engine/shell FuzzLiterals
 internal/engine/shell FuzzFeedGraph
+internal/engine/shell FuzzAnalyzePowerShell
 internal/engine FuzzEvaluateShell
 internal/engine FuzzEvaluatePath
 internal/engine/shell/pwsh FuzzParsePowerShell
