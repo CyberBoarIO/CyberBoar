@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: "30 4 * * *"
   workflow_dispatch:
+    inputs:
+      log-level:
+        description: Renovate log level
+        type: choice
+        options: [info, debug]
+        default: info
   pull_request:
     paths: [".github/renovate.json5", ".github/workflows/renovate.yml"]
 
@@ -23,10 +29,14 @@ jobs:
         id: app
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.RENOVATE_APP_ID || secrets.RENOVATE_APP_ID }}
+          client-id: ${{ vars.RENOVATE_CLIENT_ID || secrets.RENOVATE_CLIENT_ID }}
           private-key: ${{ secrets.RENOVATE_APP_KEY }}
           permission-contents: write
           permission-pull-requests: write
+          # Renovate holds a PR until the branch's checks settle, and reports its own
+          # (renovate/stability-days) as a commit status
+          permission-statuses: write
+          permission-checks: read
           permission-issues: write
           permission-workflows: write
           permission-vulnerability-alerts: read
@@ -48,4 +58,4 @@ jobs:
           RENOVATE_PLATFORM_COMMIT: enabled
           RENOVATE_USERNAME: ${{ steps.app.outputs.app-slug }}[bot]
           RENOVATE_GIT_AUTHOR: "${{ steps.app.outputs.app-slug }}[bot] <${{ steps.bot.outputs.id }}+${{ steps.app.outputs.app-slug }}[bot]@users.noreply.github.com>"
-          LOG_LEVEL: info
+          LOG_LEVEL: ${{ inputs.log-level || 'info' }}
