@@ -1,6 +1,8 @@
 package shell
 
 import (
+	"errors"
+	"io/fs"
 	"path"
 	"slices"
 	"strings"
@@ -16,6 +18,10 @@ type dir struct {
 	// posix is the directory in Git Bash's own form when it was reached
 	// through one of its mounts (/tmp); "" when that is path (Windows only)
 	posix string
+	// alt is the other directory the shell may be in, when a cd's ".."
+	// left a symbolic link: path is the shell's logical reading, alt the
+	// kernel's (POSIX only)
+	alt string
 }
 
 var unknownDir = dir{}
@@ -283,14 +289,66 @@ func (p *cwdPass) cd(args []Elem, d dir) dir {
 		}
 		return p.a.winCd(t.Text, d)
 	case path.IsAbs(t.Text):
-		return dir{path: t.Text, known: true}
+		return p.a.posixCd(t.Text, dir{})
 	case p.a.cdUnsure && !startsDot(t.Text):
 		return unknownDir // CDPATH or cdable_vars may send it elsewhere
 	case !d.known:
 		return unknownDir
 	default:
-		return dir{path: d.path + "/" + t.Text, known: true}
+		return p.a.posixCd(t.Text, d)
 	}
+}
+
+// posixCd returns the directory `cd to` moves to from d (zero for an
+// absolute to). Shells apply ".." to the path as written (cd -L), so that
+// link/.. is the directory holding the link, where the kernel goes to the
+// target's parent. That is also where cd -P, set -P or zsh's chase_links
+// go, and bash when the logical directory doesn't exist, so where a ".."
+// leaves a link both readings are kept
+func (a *analyzer) posixCd(to string, d dir) dir {
+	full := to
+	next := dir{known: true}
+	if !path.IsAbs(to) {
+		full = d.path + "/" + to
+		if d.alt != "" {
+			next.alt = d.alt + "/" + to
+		}
+	}
+	if !hasDotDot(to) {
+		next.path = full
+		return next
+	}
+	if next.alt != "" {
+		return unknownDir // a third reading; not followed
+	}
+	next.path = path.Clean(full)
+	if a.dotDotLeavesLink(full) {
+		next.alt = full
+	}
+	return next
+}
+
+// dotDotLeavesLink reports a ".." in the absolute path p that follows a
+// symbolic link, or a name that can't be checked
+func (a *analyzer) dotDotLeavesLink(p string) bool {
+	cur := "/"
+	for _, c := range strings.Split(p, "/") {
+		switch c {
+		case "", ".":
+		case "..":
+			if cur == "/" {
+				continue
+			}
+			fi, err := a.fs.Lstat(cur)
+			if err != nil && !errors.Is(err, fs.ErrNotExist) || err == nil && fi.Mode()&fs.ModeSymlink != 0 {
+				return true
+			}
+			cur = path.Dir(cur)
+		default:
+			cur = joinDir(cur, c)
+		}
+	}
+	return false
 }
 
 // startsDot reports a cd argument bash never looks up in CDPATH

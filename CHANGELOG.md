@@ -5,6 +5,38 @@ and enforcement. Stable releases follow [Semantic Versioning](https://semver.org
 starting with `v1.0.0`. The v1 compatibility contract covers the policy format, CLI,
 protocol, audit schema and public Go packages under `pkg/`.
 
+## [Unreleased]
+
+### Fixed
+
+- A `cd` whose `..` leaves a symbolic link (`cd link/../other`) is followed as the
+  shell follows it, to the directory holding the link, and also as the kernel and
+  `cd -P` follow it, to the target's parent.
+- Globs match with bash's grammar, including character classes (`token[[:digit:]].txt`),
+  and by byte as in the C locale. A glob that the analysis can't match, with a collating
+  symbol (`[[.1.]]`) or a bracket expression for a name that isn't ASCII, counts as any path.
+- A `file:` URL is checked as the path curl opens: `%XX` decoded, the scheme in any case,
+  `file:/path`, and without its query and fragment. Before, `file:///…/%74oken.txt`
+  could read a denied `token.txt`.
+- PowerShell: `Start-Process -Environment` is checked as `$env:` assignments are, so
+  a variable that makes a program run code (`GIT_CONFIG_*`, `GIT_SSH_COMMAND`) is
+  inline code; a map known only at run time is treated as inline code too.
+- PowerShell: secrets are looked for in the strings as PowerShell reads them, so an
+  escape (``gh`p_…``) or strings joined with `+`, `-join` or `-f` no longer hide a
+  token from the check or from the audit log's redaction.
+- PowerShell: `Invoke-WebRequest` and `Invoke-RestMethod` check a `-Uri` that names a
+  local file, a `file:` URL or a drive path, which Windows PowerShell 5.1 reads. A
+  `-Form` value that may be a file object (`Get-ChildItem`'s output, a variable) asks
+  about the file it uploads.
+- PowerShell: `New-Item` checks a link's target (`-Value`, `-Target`) with what it
+  holds, as `ln`'s target is, so a link made and read in one command can't reach a
+  protected file.
+- PowerShell: a variable name given to `-OutVariable`, `-ErrorVariable` and the other
+  parameters that name one is checked as a variable written: `env:` sets an environment
+  variable and a drive path writes a file.
+- A glob that matches nothing is read as any other word, so an unquoted
+  `file:///…/token.txt?x` is checked as the file curl opens.
+
 ## [v1.0.0-rc.3] - 2026-10-28
 
 Third release candidate for CyberBoar 1.0. It adds PowerShell analysis, checks

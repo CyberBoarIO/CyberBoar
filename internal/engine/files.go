@@ -327,9 +327,10 @@ func (b *boundRules) checkPath(display, abs string, contents, accessed bool, how
 		}
 	}
 	candidates := appendUnique(nil, lexical, resolved)
-	if b.env.fs.Windows {
-		// Win32 applies ".." before following links, and programs under Git
-		// Bash may apply it after, as resolvePath does
+	if b.env.fs.Windows || strings.Contains(abs, "/..") {
+		// Win32 applies ".." before following links, and so do programs
+		// that clean a path before opening it, where the kernel and
+		// programs under Git Bash apply it after, as resolvePath does
 		// Both readings count
 		lexRes, err := resolvePath(b.env.fs, lexical)
 		if err != nil {

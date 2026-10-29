@@ -38,7 +38,7 @@ func (c *Compiled) evalSecrets(ctx context.Context, a Action) *Verdict {
 		found, err = findSecrets(ctx, a.Content, cfg.Ignore)
 		f = first(found)
 	default:
-		f, err = commandSecret(ctx, a.Command, cfg.Ignore)
+		f, err = commandSecret(ctx, a.Command, a.Shell, cfg.Ignore)
 	}
 	if err != nil {
 		if errors.Is(err, shell.ErrTooLarge) || errors.Is(err, shell.ErrTooComplex) {
@@ -77,14 +77,15 @@ const Unchecked = "unchecked"
 // An edit to a larger file is a finding of secrets.TooLong
 const MaxFile = 8 << 20
 
-// commandSecret returns the first secret in a command line, read both as
-// written and as bash reads it, which turns gh""p_x into ghp_x
-func commandSecret(ctx context.Context, command string, ignore []string) (*secrets.Finding, error) {
+// commandSecret returns the first secret in a command line in the language
+// lang (Action.Shell), read both as written and as the shell reads it,
+// which turns gh""p_x in bash and gh`p_x in PowerShell into ghp_x
+func commandSecret(ctx context.Context, command, lang string, ignore []string) (*secrets.Finding, error) {
 	found, err := findSecrets(ctx, command, ignore)
 	if err != nil || len(found) > 0 {
 		return first(found), err
 	}
-	texts, err := shellTexts(command)
+	texts, err := shellTexts(command, lang)
 	if err != nil {
 		return nil, err
 	}
@@ -96,11 +97,16 @@ func commandSecret(ctx context.Context, command string, ignore []string) (*secre
 	return nil, nil
 }
 
-// shellTexts returns what bash may make of a command line's words
+// shellTexts returns what the shell (bash, or PowerShell for lang
+// ShellPowerShell) may make of a command line's words
 // The first text has each word on a line of its own
 // The second runs the commands' arguments together, as printf %s%s gh p_x or echo -n in turn would print them
-func shellTexts(command string) ([]string, error) {
-	words, args, err := shell.Literals(command)
+func shellTexts(command, lang string) ([]string, error) {
+	literals := shell.Literals
+	if lang == ShellPowerShell {
+		literals = shell.PowerShellLiterals
+	}
+	words, args, err := literals(command)
 	if err != nil {
 		return nil, err
 	}
@@ -217,10 +223,8 @@ func (a Action) displayPath() string {
 
 // Redact replaces the secrets in s, plain or encoded, with their rule's
 // name, for logs, whatever a policy says and ignoring no rule
-// With command set, s is a shell command line, and a secret only the shell would
-// see (split by quotes) replaces the whole line
-// Text whose scan can't finish is replaced whole too
-func Redact(ctx context.Context, s string, command bool) string {
+// Text whose scan can't finish is replaced whole
+func Redact(ctx context.Context, s string) string {
 	if s == "" {
 		return s
 	}
@@ -228,20 +232,28 @@ func Redact(ctx context.Context, s string, command bool) string {
 	if err != nil {
 		return "[REDACTED:unchecked]"
 	}
-	red := secrets.Redact(s, found)
-	if command {
-		texts, err := shellTexts(red)
-		if err != nil {
+	return secrets.Redact(s, found)
+}
+
+// RedactCommand is Redact for a command line in the language lang
+// (Action.Shell): a secret only the shell would see (split by quotes or
+// escapes) replaces the whole line
+func RedactCommand(ctx context.Context, command, lang string) string {
+	red := Redact(ctx, command)
+	if red == "" || red == "[REDACTED:unchecked]" {
+		return red
+	}
+	texts, err := shellTexts(red, lang)
+	if err != nil {
+		return "[REDACTED:unchecked]"
+	}
+	for _, text := range texts {
+		more, err := findSecrets(ctx, text, nil)
+		switch {
+		case err != nil:
 			return "[REDACTED:unchecked]"
-		}
-		for _, text := range texts {
-			more, err := findSecrets(ctx, text, nil)
-			switch {
-			case err != nil:
-				return "[REDACTED:unchecked]"
-			case len(more) > 0:
-				return "[REDACTED:" + more[0].Rule + "]"
-			}
+		case len(more) > 0:
+			return "[REDACTED:" + more[0].Rule + "]"
 		}
 	}
 	return red

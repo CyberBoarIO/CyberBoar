@@ -248,7 +248,7 @@ func appendAudit(path string, ev audit.Event, limit time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), limit)
 	defer cancel()
 	go func() {
-		ev.Reason = engine.Redact(ctx, ev.Reason, false)
+		ev.Reason = engine.Redact(ctx, ev.Reason)
 		done <- audit.AppendFile(path, ev)
 	}()
 	select {
@@ -317,7 +317,7 @@ func evaluate(ctx context.Context, stdin io.Reader, o Options, ev *audit.Event, 
 			{&ev.Session, call.Session}, {&ev.ToolUseID, call.ToolUseID}, {&ev.AgentID, call.AgentID}, {&ev.AgentType, call.AgentType},
 			{&ev.Mode, call.Mode}, {&ev.Cwd, call.Cwd}, {&ev.Tool, call.Tool}, {&ev.Project, call.Project},
 		} {
-			*f.to = engine.Redact(ctx, f.from, false)
+			*f.to = engine.Redact(ctx, f.from)
 		}
 	}
 	if !PlatformSupported(o.GOOS, o.Adapter.Name()) {
@@ -406,8 +406,8 @@ func decide(ctx context.Context, compiled *engine.Compiled, call *adapters.Call,
 	if ev != nil {
 		for _, a := range call.Actions {
 			// Each field is redacted before it is truncated, so no part of a secret is left at the cut
-			ev.Actions = append(ev.Actions, audit.Action{Tool: string(a.Tool), Command: audit.Truncate(engine.Redact(ctx, a.Command, true)),
-				Path: audit.Truncate(engine.Redact(ctx, a.Path, false)), Server: engine.Redact(ctx, a.MCP.Server, false), MCPTool: engine.Redact(ctx, a.MCP.Tool, false)})
+			ev.Actions = append(ev.Actions, audit.Action{Tool: string(a.Tool), Command: audit.Truncate(engine.RedactCommand(ctx, a.Command, a.Shell)),
+				Path: audit.Truncate(engine.Redact(ctx, a.Path)), Server: engine.Redact(ctx, a.MCP.Server), MCPTool: engine.Redact(ctx, a.MCP.Tool)})
 		}
 	}
 	if call.Err != nil {

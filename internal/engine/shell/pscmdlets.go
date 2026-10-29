@@ -72,7 +72,7 @@ var psCmdletSpecs = []struct {
 	{"Move-Item", "mv move mi", psPathParams + "Destination@ Force! PassThru!", "Path Destination", psModify, true},
 	{"Rename-Item", "ren rni", "Path@ LiteralPath=PSPath,LP@ NewName@ Force! PassThru! Credential", "Path NewName", psModify, true},
 	{"Copy-Item", "cp copy cpi", "Path*r LiteralPath=PSPath,LP@r Filter Include Exclude Credential Destination@m Container! Force! Recurse! PassThru! FromSession ToSession", "Path Destination", psRead, true},
-	{"New-Item", "ni mkdir md", "Path@ Name ItemType=Type Value Force! Credential", "Path", psWrite, true},
+	{"New-Item", "ni mkdir md", "Path@ Name ItemType=Type Value=Target Force! Credential", "Path", psWrite, true},
 	{"Get-ChildItem", "gci ls dir", psPathParams + "Recurse=s! Depth Force! Name! Attributes FollowSymlink! Directory=ad,d! File=af! Hidden=ah,h! ReadOnly=ar! System=as!", "Path Filter", psNames, true},
 	{"Get-Item", "gi", psPathParams + "Force! Stream", "Path", psNames, true},
 	{"Test-Path", "", psPathParams + "PathType=Type IsValid! OlderThan NewerThan", "Path", psNames, true},
@@ -165,7 +165,18 @@ func init() {
 	for _, s := range psPrintCmdlets {
 		psAddCmdlet(&psCmdlet{name: s.name, use: psPrint}, s.aliases)
 	}
+	for _, p := range common {
+		psCommonParams.list = append(psCommonParams.list, p.param)
+		for _, n := range p.keys {
+			psCommonParams.params[n] = p.param
+			psCommonParams.names = append(psCommonParams.names, n)
+		}
+	}
 }
+
+// psCommonParams has the common parameters alone, to find them among the
+// arguments of a cmdlet whose others aren't bound
+var psCommonParams = &psCmdlet{name: "common parameters", params: map[string]*psParam{}}
 
 func psAddCmdlet(c *psCmdlet, aliases string) {
 	psCmdlets[fold.String(c.name)] = c

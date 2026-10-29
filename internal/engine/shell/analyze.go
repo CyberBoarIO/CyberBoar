@@ -335,7 +335,11 @@ func (a *analyzer) innerDir(u unwrapResult, d dir) dir {
 		case path.IsAbs(e.Text):
 			d = dir{path: e.Text, known: true}
 		case d.known:
-			d = dir{path: joinDir(d.path, e.Text), known: true}
+			next := dir{path: joinDir(d.path, e.Text), known: true}
+			if d.alt != "" {
+				next.alt = joinDir(d.alt, e.Text)
+			}
+			d = next
 		}
 	}
 	return d

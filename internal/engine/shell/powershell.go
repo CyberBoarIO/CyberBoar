@@ -534,6 +534,18 @@ func (a *psAnalyzer) psCmdletCall(c *pwsh.Command, canon string, piped pwsh.Comm
 		a.cmds[id].Aliases = len(layers) - 1
 	}
 	spec, known := psCmdlets[fold.String(canon)]
+	var b psBound
+	bound := false
+	if known && spec.params != nil {
+		b, bound = psBind(spec, args)
+	}
+	varSpec, vars := spec, b
+	if !bound {
+		varSpec, vars = psCommonParams, psCommonVariables(args)
+	}
+	if err := a.psNamedVariables(varSpec, vars, d); err != nil {
+		return 0, nil, err
+	}
 	if !known {
 		// Verb-Noun the table doesn't know: every word may be a path, and so
 		// may what a pipeline gives it
@@ -560,8 +572,7 @@ func (a *psAnalyzer) psCmdletCall(c *pwsh.Command, canon string, piped pwsh.Comm
 		a.psGenericRefs(argv, d, psPrint, false)
 		return id, nil, a.psPrintCmdlet(id, spec.name, args)
 	}
-	b, ok := psBind(spec, args)
-	if !ok {
+	if !bound {
 		// Read every word as a path, as for an unknown command
 		a.psGenericRefs(argv, d, spec.use, piped != nil && spec.pipePaths)
 		return id, nil, a.psUnbound(id, canon)
@@ -569,6 +580,9 @@ func (a *psAnalyzer) psCmdletCall(c *pwsh.Command, canon string, piped pwsh.Comm
 	var inner []int
 	var err error
 	switch canon {
+	case "Invoke-WebRequest", "Invoke-RestMethod":
+		a.psWebURI(spec, b, d)
+		a.psWebForm(spec, b)
 	case "Invoke-Expression":
 		inner, err = a.psInvokeExpression(id, spec, b, depth, d)
 		return id, inner, err
@@ -600,6 +614,139 @@ func (a *psAnalyzer) psCmdletCall(c *pwsh.Command, canon string, piped pwsh.Comm
 	}
 	a.psBoundRefs(canon, spec, b, d, piped)
 	return id, nil, nil
+}
+
+// psVariableParams are the parameters that name a variable for the cmdlet
+// to set: the common ones, Tee-Object's and the web cmdlets'
+var psVariableParams = []string{"ErrorVariable", "WarningVariable", "InformationVariable", "OutVariable",
+	"PipelineVariable", "Variable", "SessionVariable", "ResponseHeadersVariable", "StatusCodeVariable"}
+
+// psNamedVariables checks the variables a cmdlet is told to set. A name
+// with a drive is set through it, as in ${C:\x} = …: env: sets an
+// environment variable, a FileSystem drive writes a file. A name only
+// known at run time could be any
+func (a *psAnalyzer) psNamedVariables(spec *psCmdlet, b psBound, d dir) error {
+	for _, param := range psVariableParams {
+		vals, _ := a.value(spec, b, param)
+		for _, e := range vals {
+			if e.Kind != Lit {
+				a.hidden = append(a.hidden, "a variable named at run time (-"+param+" "+e.Shown()+")")
+				continue
+			}
+			v := &pwsh.Variable{Path: strings.TrimPrefix(e.Text, "+")} // +name appends
+			if fold.String(v.Drive()) == "env" {
+				if err := a.psSetEnv(v.Name(), Elem{Kind: Many, Text: "*"}); err != nil {
+					return err
+				}
+				continue
+			}
+			a.psVariable(v, true, d)
+		}
+	}
+	return nil
+}
+
+// psCommonVariables finds the common parameters that name variables among
+// the arguments of a cmdlet whose other parameters aren't bound (a print
+// cmdlet, one the table doesn't list), for psNamedVariables
+func psCommonVariables(args []pwsh.CommandElement) psBound {
+	b := psBound{values: map[*psParam][]pwsh.CommandElement{}}
+	for i, e := range args {
+		p, ok := e.(*pwsh.CommandParameter)
+		if !ok {
+			continue
+		}
+		param := psCommonParams.param(p.Name)
+		switch {
+		case param == nil || !slices.Contains(psVariableParams, param.name):
+		case p.Argument != nil:
+			b.values[param] = append(b.values[param], p.Argument)
+		case i+1 < len(args):
+			b.values[param] = append(b.values[param], args[i+1])
+		}
+	}
+	return b
+}
+
+// psWebURI records the file Windows PowerShell 5.1's Invoke-WebRequest and
+// Invoke-RestMethod read for -Uri: a file: URL, or a drive or UNC path,
+// which .NET takes as one. A URI only known at run time may be one too,
+// unless it starts with http://, https:// or ftp://
+func (a *psAnalyzer) psWebURI(spec *psCmdlet, b psBound, d dir) {
+	vals, _ := a.value(spec, b, "Uri")
+	for _, e := range vals {
+		if e.Kind != Lit {
+			if !psRemoteURI(e.Text) {
+				a.psAdder(psRead)(FileRef{Display: e.Shown(), Shape: e.Shape, Src: e.Src})
+			}
+			continue
+		}
+		if p, ok := psFileURI(e.Text); ok {
+			a.psPathWord(Elem{Kind: Lit, Text: p}, d, false, psRead)
+		}
+	}
+}
+
+// psWebForm records the files -Form uploads: each value that is a file
+// object (Get-ChildItem's output), which only a string or a number is not
+func (a *psAnalyzer) psWebForm(spec *psCmdlet, b psBound) {
+	vals, ok := b.values[spec.params["form"]]
+	if !ok {
+		return
+	}
+	var h *pwsh.Hashtable
+	if len(vals) == 1 {
+		h, _ = vals[0].(*pwsh.Hashtable)
+	}
+	for i := 0; h == nil || i < len(h.Pairs); i++ {
+		if h == nil || a.psStatementValue(h.Pairs[i].Value).Kind == Many {
+			a.psAdder(psRead)(FileRef{Display: "the files -Form uploads"})
+			return
+		}
+	}
+}
+
+func psRemoteURI(s string) bool {
+	for _, scheme := range []string{"http://", "https://", "ftp://"} {
+		if len(s) >= len(scheme) && strings.EqualFold(s[:len(scheme)], scheme) {
+			return true
+		}
+	}
+	return false
+}
+
+// psFileURI returns the local path .NET's Uri reads s as: a drive or UNC
+// path as it is, or a file: URL's path, decoded as curl decodes it, with
+// a host other than localhost as a UNC server and file://C:/x as C:/x
+func psFileURI(s string) (string, bool) {
+	t := strings.ReplaceAll(s, `\`, "/")
+	if len(t) >= 3 && isASCIILetter(t[0]) && t[1] == ':' && t[2] == '/' || strings.HasPrefix(t, "//") {
+		return s, true
+	}
+	if len(s) < 5 || !strings.EqualFold(s[:5], "file:") {
+		return "", false
+	}
+	rest, host := s[5:], ""
+	if r, ok := strings.CutPrefix(rest, "//"); ok {
+		var path string
+		host, path, _ = strings.Cut(r, "/")
+		rest = "/" + path
+	}
+	p, ok := fileURLPath("file:" + rest)
+	if !ok {
+		return "", false
+	}
+	if len(p) >= 3 && p[0] == '/' && isASCIILetter(p[1]) && p[2] == ':' {
+		p = p[1:] // file:///C:/x
+	}
+	switch {
+	case host == "" || strings.EqualFold(host, "localhost"):
+	case len(host) == 2 && isASCIILetter(host[0]) && host[1] == ':':
+		p = host + p
+	default:
+		p = "//" + host + p
+	}
+	return p, true
 }
 
 // psUnbound handles a cmdlet whose arguments couldn't be bound: those that
@@ -820,8 +967,9 @@ func (a *psAnalyzer) psNewItem(spec *psCmdlet, b psBound, d dir) {
 			}
 		}
 		if link {
+			// What the link leads to is reached through it, as ln's target is
 			for _, e := range vals {
-				a.wordRefs(e, d, globOpts{}, true, a.psAdder(psPrint))
+				a.wordRefs(e, d, globOpts{}, false, a.psAdder(psRead))
 			}
 		}
 	}
@@ -961,6 +1109,11 @@ func (a *psAnalyzer) psStartProcess(id int, spec *psCmdlet, b psBound, d dir, de
 			d = a.psCdPath(wd[0].Text, d)
 		}
 	}
+	if env, ok := b.values[spec.params["environment"]]; ok {
+		if err := a.psStartEnv(env); err != nil {
+			return err
+		}
+	}
 	return a.psProgram(id, argv, d, depth)
 }
 
@@ -1055,17 +1208,45 @@ func (a *psAnalyzer) psAssignment(as *pwsh.Assignment) error {
 		a.psVariable(v, true, unknownDir)
 		return nil
 	}
-	value := Elem{Kind: Many, Text: "*"}
-	var right pwsh.Node = as.Right
+	return a.psSetEnv(v.Name(), a.psStatementValue(as.Right))
+}
+
+// psStatementValue is the value of the right side of an assignment or a
+// hashtable entry: one element, or any
+func (a *psAnalyzer) psStatementValue(st pwsh.Statement) Elem {
+	var right pwsh.Node = st
 	if p, ok := right.(*pwsh.Pipeline); ok && len(p.Elements) == 1 {
 		right = p.Elements[0]
 	}
 	if ce, ok := right.(*pwsh.CommandExpression); ok {
 		if els := a.psElems(ce.Expression); len(els) == 1 {
-			value = els[0]
+			return els[0]
 		}
 	}
-	return a.psSetEnv(v.Name(), value)
+	return Elem{Kind: Many, Text: "*"}
+}
+
+// psStartEnv checks the variables Start-Process -Environment sets for the
+// program it starts, as assignments to $env: are. A map or a name known
+// only at run time may set any variable, one a program reads as code too
+func (a *psAnalyzer) psStartEnv(vals []pwsh.CommandElement) error {
+	var h *pwsh.Hashtable
+	if len(vals) == 1 {
+		h, _ = vals[0].(*pwsh.Hashtable)
+	}
+	if h == nil {
+		return a.psForeign("Start-Process -Environment")
+	}
+	for _, kv := range h.Pairs {
+		key := a.psElems(kv.Key)
+		if len(key) != 1 || key[0].Kind != Lit {
+			return a.psForeign("Start-Process -Environment")
+		}
+		if err := a.psSetEnv(key[0].Text, a.psStatementValue(kv.Value)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // psSetEnv checks an environment variable set to value, for the programs
