@@ -9,9 +9,9 @@ import (
 
 // Values are what bash sees; a value that holds quotes or backslashes is
 // read again as code (the extra "ab$" and "cd"), which can only add words,
-// and printed as printf and echo -e would ("a\bb$")
+// and printed as printf and echo -e would ("a\bb$").
 // Assignments give their value, and so do variables they set; a here-document gives its
-// delimiter, not its body
+// delimiter, not its body.
 func TestLiteralsWords(t *testing.T) {
 	for src, want := range map[string][]string{
 		`export GH=gh''p_x "y"z`:                   {"ghp_x", "yz"},
@@ -42,7 +42,7 @@ func TestLiteralsWords(t *testing.T) {
 }
 
 // Arguments run together are what printf %s%s, or echo -n in turn, print;
-// options and redirection targets are left out
+// options and redirection targets are left out.
 func TestLiteralsArgs(t *testing.T) {
 	for src, want := range map[string]string{
 		`printf %s%s gh p_x > out`:           "%s%sghp_x",
@@ -74,7 +74,7 @@ func TestLiteralsExpansionLimits(t *testing.T) {
 	}
 }
 
-// The last accepted byte fits; the next byte is refused before it is appended
+// The last accepted byte fits; the next byte is refused before it is appended.
 func TestLiteralsByteBudgetBoundary(t *testing.T) {
 	l := literals{}
 	var b strings.Builder

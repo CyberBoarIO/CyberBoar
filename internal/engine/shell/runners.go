@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"maps"
 	"regexp"
 	"strings"
 )
@@ -12,7 +13,7 @@ import (
 // parsing got wrong is still a possible match (ask)
 
 func registerRunners() {
-	for name, fn := range map[string]wrapperFunc{
+	maps.Copy(wrappers, map[string]wrapperFunc{
 		// Run their operands as a command after options.
 		"strace":      runner(0, optSpec{short: "abeEIoOpPsSuUX"}),
 		"ltrace":      runner(0, optSpec{short: "aAeDFlLnopsSuwx"}),
@@ -54,13 +55,11 @@ func registerRunners() {
 		"jshell":     interpreter(interpSpec{}),
 		"irb":        interpreter(interpSpec{short: "I", none: []string{"v", "version"}}),
 		"pry":        interpreter(interpSpec{short: "e", code: []string{"e"}}),
-	} {
-		wrappers[name] = fn
-	}
+	})
 }
 
-// runner runs its operands, after skip positional words, as a command
-// With any of pidFlags it acts on an existing process and runs nothing
+// runner runs its operands, after skip positional words, as a command.
+// With any of pidFlags it acts on an existing process and runs nothing.
 func runner(skip int, spec optSpec, pidFlags ...string) wrapperFunc {
 	spec.short = strings.ReplaceAll(spec.short, " ", "")
 	return func(_ *analyzer, _ string, args []Elem) unwrapped {
@@ -77,7 +76,7 @@ func runner(skip int, spec optSpec, pidFlags ...string) wrapperFunc {
 
 func unknownRunner(*analyzer, string, []Elem) unwrapped { return unwrapped{unknown: true} }
 
-// wrapPerf is the wrapper for perf: `perf stat|record|trace … CMD` runs CMD
+// wrapPerf is the wrapper for perf: `perf stat|record|trace … CMD` runs CMD.
 func wrapPerf(a *analyzer, name string, args []Elem) unwrapped {
 	if len(args) == 0 || args[0].Kind != Lit {
 		return unwrapped{unknown: len(args) > 0}
@@ -89,7 +88,7 @@ func wrapPerf(a *analyzer, name string, args []Elem) unwrapped {
 	return unwrapped{}
 }
 
-// wrapEntr runs its operands when files change; with -s they are shell code
+// wrapEntr runs its operands when files change; with -s they are shell code.
 func wrapEntr(_ *analyzer, _ string, args []Elem) unwrapped {
 	p := parseOpts(args, optSpec{})
 	if p.has("s") {
@@ -113,7 +112,7 @@ func wrapSg(_ *analyzer, _ string, args []Elem) unwrapped {
 	return unwrapped{code: []codeRun{joinedCode("sg -c", rest)}}
 }
 
-// tmuxQuiet are tmux commands that neither run nor type commands
+// tmuxQuiet are tmux commands that neither run nor type commands.
 var tmuxQuiet = set("ls", "list-sessions", "list-windows", "list-panes", "list-clients", "list-keys",
 	"list-buffers", "kill-session", "kill-server", "kill-window", "kill-pane", "has-session", "has",
 	"attach", "attach-session", "a", "detach", "detach-client", "display-message", "display", "-V")
@@ -138,7 +137,7 @@ func wrapScreen(_ *analyzer, _ string, args []Elem) unwrapped {
 }
 
 // wrapSocat finds EXEC: (a command) and SYSTEM: (shell code) addresses, and
-// the files that file and socket addresses open
+// the files that file and socket addresses open.
 func wrapSocat(_ *analyzer, _ string, args []Elem) unwrapped {
 	var u unwrapped
 	for _, e := range args {
@@ -163,11 +162,11 @@ func wrapSocat(_ *analyzer, _ string, args []Elem) unwrapped {
 	return u
 }
 
-// socatFileAddrs are the socat address types whose value is a file path
+// socatFileAddrs are the socat address types whose value is a file path.
 var socatFileAddrs = set("FILE", "OPEN", "CREATE", "CREAT", "GOPEN", "PIPE", "NAMEDPIPE",
 	"UNIX", "UNIX-CONNECT", "UNIX-LISTEN", "UNIX-L", "UNIX-SENDTO", "UNIX-RECV", "UNIX-RECVFROM", "UNIX-CLIENT")
 
-// wrapNetcat is the wrapper for netcat: -e PROG runs a program, -c / --sh-exec shell code, --lua-exec Lua
+// wrapNetcat is the wrapper for netcat: -e PROG runs a program, -c / --sh-exec shell code, --lua-exec Lua.
 func wrapNetcat(_ *analyzer, name string, args []Elem) unwrapped {
 	var u unwrapped
 	for i := 0; i < len(args); i++ {
@@ -209,7 +208,7 @@ func wrapNetcat(_ *analyzer, name string, args []Elem) unwrapped {
 
 var sqliteShell = regexp.MustCompile(`(?m)^\s*\.(shell|system)\b\s*(.*)$`)
 
-// wrapSqlite finds .shell and .system dot-commands in its arguments
+// wrapSqlite finds .shell and .system dot-commands in its arguments.
 func wrapSqlite(_ *analyzer, _ string, args []Elem) unwrapped {
 	var u unwrapped
 	for _, e := range args {
@@ -226,7 +225,7 @@ func wrapSqlite(_ *analyzer, _ string, args []Elem) unwrapped {
 
 var sqlShellEscape = regexp.MustCompile(`\\!\s*(.*)|(?im)^\s*system\s+(.*)$`)
 
-// wrapSQLShell finds shell escapes (\! cmd, system cmd) in psql -c and mysql -e statements
+// wrapSQLShell finds shell escapes (\! cmd, system cmd) in psql -c and mysql -e statements.
 func wrapSQLShell(_ *analyzer, name string, args []Elem) unwrapped {
 	var u unwrapped
 	for _, e := range args {
@@ -241,7 +240,7 @@ func wrapSQLShell(_ *analyzer, name string, args []Elem) unwrapped {
 	return u
 }
 
-// wrapPager is the wrapper for less and more: `less +'!cmd'` runs a shell command at startup
+// wrapPager is the wrapper for less and more: `less +'!cmd'` runs a shell command at startup.
 func wrapPager(_ *analyzer, name string, args []Elem) unwrapped {
 	var u unwrapped
 	for _, e := range args {
@@ -258,7 +257,7 @@ func wrapPager(_ *analyzer, name string, args []Elem) unwrapped {
 	return u
 }
 
-// wrapMake is the wrapper for make: --eval adds makefile code; -f - reads a makefile from stdin
+// wrapMake is the wrapper for make: --eval adds makefile code; -f - reads a makefile from stdin.
 func wrapMake(_ *analyzer, name string, args []Elem) unwrapped {
 	// -j, -l and -O take a value only in the same word; -L takes none.
 	p := parseOpts(args, optSpec{short: "CEfIoW", optional: "jlO", long: set("directory", "eval", "file", "makefile",
@@ -274,7 +273,7 @@ func wrapMake(_ *analyzer, name string, args []Elem) unwrapped {
 	return unwrapped{unknown: p.ambiguous}
 }
 
-// wrapOpenSSL is the wrapper for openssl: -engine and -provider load a shared library into the process
+// wrapOpenSSL is the wrapper for openssl: -engine and -provider load a shared library into the process.
 func wrapOpenSSL(_ *analyzer, _ string, args []Elem) unwrapped {
 	for _, e := range args {
 		if e.Kind == Lit && (e.Text == "-engine" || e.Text == "-provider" || e.Text == "-provider-path") {

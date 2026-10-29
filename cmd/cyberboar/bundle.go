@@ -15,7 +15,7 @@ import (
 )
 
 // bundlePath is where a bundle lives under a static site's root, the path
-// `cyberboar pull` fetches (docs/protocol)
+// `cyberboar pull` fetches (docs/protocol).
 func bundlePath(root, name string) string {
 	return filepath.Join(root, "api", "v1", "bundles", name)
 }
@@ -29,7 +29,7 @@ func bundlePath(root, name string) string {
 // failed write leaves the site as it was. Only the renames that publish
 // them, one per bundle in the same directory, could stop halfway. Bundles of
 // policies no longer in the directory are then removed, so the generated
-// bundles match the policy directory
+// bundles match the policy directory.
 func runBundle(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	pubPath := fs.String("pubkey", h.getenv(envName("pubkey")), "public key the policies must be signed with (env "+envName("pubkey")+")")
@@ -85,7 +85,7 @@ func runBundle(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, std
 
 // publish writes bundles under site and removes the bundles of policies that
 // no longer exist. Every bundle is staged before any replaces the
-// one published, so after a failed write nothing is published
+// one published, so after a failed write nothing is published.
 func publish(site string, bundles []*bundle.Bundle, stage func(dir, name string, data []byte) (string, error), stdout io.Writer) error {
 	dir := bundlePath(site, "")
 	// #nosec G301 -- bundles are served to every endpoint, so they are public
@@ -133,7 +133,7 @@ func publish(site string, bundles []*bundle.Bundle, stage func(dir, name string,
 
 // stage writes a bundle to a synced temporary file in dir and returns its
 // name. The file is readable by all, because bundles are served to every
-// endpoint and so are public
+// endpoint and so are public.
 func stage(dir, name string, data []byte) (string, error) {
 	return atomicfile.Stage(dir, name, data, 0o644)
 }

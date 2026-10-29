@@ -36,7 +36,7 @@ func randFrom(r *rand.Rand, alphabet string, n int) string {
 
 const alnum = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-// fakes returns one made-up credential per rule secretstest knows
+// fakes returns one made-up credential per rule secretstest knows.
 func fakes() map[string]string {
 	m := map[string]string{}
 	for _, id := range secretstest.Rules() {
@@ -125,7 +125,7 @@ func TestNotSecrets(t *testing.T) {
 	}
 }
 
-// A "gitleaks:allow" comment is the agent's to write, so it allows nothing here
+// A "gitleaks:allow" comment is the agent's to write, so it allows nothing here.
 func TestGitleaksAllowCommentIgnored(t *testing.T) {
 	secret := fakes()["github-pat"]
 	if f := scan(t, "token = \""+secret+"\" # gitleaks"+":allow", nil); len(f) == 0 {
@@ -194,7 +194,7 @@ func BenchmarkScanFile(b *testing.B) {
 	}
 }
 
-// Secrets are found throughout long text
+// Secrets are found throughout long text.
 func TestFindsDeepInText(t *testing.T) {
 	r := rand.New(rand.NewPCG(7, 8))
 	secret := fakes()["private-key"]
@@ -209,7 +209,7 @@ func TestFindsDeepInText(t *testing.T) {
 	}
 }
 
-// Blank lines in PEM formatting do not change the key or exempt it from scanning
+// Blank lines in PEM formatting do not change the key or exempt it from scanning.
 func TestMultilinePrivateKey(t *testing.T) {
 	_, key, err := ed25519.GenerateKey(cryptorand.Reader)
 	if err != nil {
@@ -252,7 +252,7 @@ func TestMultilinePrivateKey(t *testing.T) {
 	}
 }
 
-// A rule can match a secret far from its keyword, including after a continuation line
+// A rule can match a secret far from its keyword, including after a continuation line.
 func TestFindsFarOnTheLine(t *testing.T) {
 	pad := strings.Repeat(" -s", 32<<10)
 	tok := "Zq8Xk2Lm" + "9Pw4Rt7Yv1Bn6Hj3" // split, so gitleaks doesn't flag this file

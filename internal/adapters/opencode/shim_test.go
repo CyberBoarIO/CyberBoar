@@ -13,7 +13,7 @@ import (
 )
 
 // fakeHook stands in for the hook command: it records its input, arguments
-// and directory, then answers as FAKE_MODE (or FAKE_BRIEF for the briefing) says
+// and directory, then answers as FAKE_MODE (or FAKE_BRIEF for the briefing) says.
 const fakeHook = `#!/bin/sh
 if [ "$1" = brief ]; then
   case "$FAKE_BRIEF" in
@@ -46,7 +46,7 @@ esac
 
 // driver loads the plugin like opencode does, runs the config hook (unless
 // told not to), one tool.execute.before and the system prompt transform, and
-// prints what happened
+// prints what happened.
 const driver = `import { pathToFileURL } from "node:url";
 const [shim, skipConfig] = process.argv.slice(2);
 const mod = await import(pathToFileURL(shim).href);
@@ -77,7 +77,7 @@ type shimResult struct {
 
 // runtimes are the JavaScript runtimes on this machine that can load the
 // plugin: opencode itself runs on Bun; Node behaves the same for the APIs the
-// shim uses
+// shim uses.
 func runtimes(t *testing.T) []string {
 	if runtime.GOOS == "windows" {
 		t.Skip("the fake hook is a POSIX shell script")
@@ -95,7 +95,7 @@ func runtimes(t *testing.T) []string {
 }
 
 // shimDir writes the fake hook and a plugin that runs it; for the project
-// scope the plugin sits in proj/.opencode/plugin
+// scope the plugin sits in proj/.opencode/plugin.
 func shimDir(t *testing.T, o opencode.ShimOptions, timeoutMs string) (dir, shim string) {
 	dir = t.TempDir()
 	hookPath := filepath.Join(dir, "fake hook")
@@ -142,7 +142,7 @@ func runShim(t *testing.T, js, dir, shim string, env []string, args ...string) s
 
 // The shim lets a call through only on exit 0 with exactly
 // {"decision":"none"}; every other answer, and every failure to get one,
-// blocks it
+// blocks it.
 func TestShimFailsClosed(t *testing.T) {
 	for _, js := range runtimes(t) {
 		dir, shim := shimDir(t, opencode.ShimOptions{Scope: opencode.ScopeUser, Policy: "/p.yaml", Deadline: "5s"}, "1000")
@@ -182,7 +182,7 @@ func TestShimFailsClosed(t *testing.T) {
 
 // The shim sends the call, the session directory, the worktree and what the
 // config hook reported; before the config hook runs it sends null for the
-// latter, which the hook refuses
+// latter, which the hook refuses.
 func TestShimInput(t *testing.T) {
 	for _, js := range runtimes(t) {
 		dir, shim := shimDir(t, opencode.ShimOptions{Scope: opencode.ScopeUser, Policy: "/p.yaml", Deadline: "5s"}, "")
@@ -210,7 +210,7 @@ func TestShimInput(t *testing.T) {
 }
 
 // A project-scope plugin runs the hook in the project root, which its
-// relative policy path is relative to; a user-scope one where opencode runs
+// relative policy path is relative to; a user-scope one where opencode runs.
 func TestShimDirectory(t *testing.T) {
 	for _, js := range runtimes(t) {
 		for _, scope := range []opencode.Scope{opencode.ScopeProject, opencode.ScopeUser} {
@@ -231,7 +231,7 @@ func TestShimDirectory(t *testing.T) {
 }
 
 // The briefing goes into the system prompt; when it can't be loaded the
-// model is told that calls are still checked
+// model is told that calls are still checked.
 func TestShimBriefing(t *testing.T) {
 	for _, js := range runtimes(t) {
 		dir, shim := shimDir(t, opencode.ShimOptions{Scope: opencode.ScopeUser, Policy: "/p.yaml", Deadline: "5s", Briefing: true}, "")

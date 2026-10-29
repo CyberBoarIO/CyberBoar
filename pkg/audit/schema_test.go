@@ -40,7 +40,7 @@ func readSchema(t *testing.T, file string) map[string]any {
 }
 
 // compile compiles the schema in file, with every schema in schema/ added
-// under its $id so references resolve without a network
+// under its $id so references resolve without a network.
 func compile(t *testing.T, file string) *jsonschema.Schema {
 	t.Helper()
 	c := jsonschema.NewCompiler()
@@ -70,7 +70,7 @@ func validate(sch *jsonschema.Schema, data []byte) error {
 	return sch.Validate(v)
 }
 
-// A product rename moves the schemas' $id with the API group
+// A product rename moves the schemas' $id with the API group.
 func TestSchemaIDs(t *testing.T) {
 	for _, f := range []string{eventSchema, batchSchema} {
 		id, _ := readSchema(t, f)["$id"].(string)
@@ -80,7 +80,7 @@ func TestSchemaIDs(t *testing.T) {
 	}
 }
 
-// The schemas must name exactly the fields of Event, Action, Endpoint and Batch
+// The schemas must name exactly the fields of Event, Action, Endpoint and Batch.
 func TestSchemaFieldsMatchTypes(t *testing.T) {
 	event := readSchema(t, eventSchema)
 	batch := readSchema(t, batchSchema)
@@ -117,15 +117,15 @@ func TestSchemaFieldsMatchTypes(t *testing.T) {
 	}
 }
 
-// beyondSchema are golden batches rejected for rules JSON Schema can't express
+// beyondSchema are golden batches rejected for rules JSON Schema can't express.
 var beyondSchema = map[string]bool{
 	"reject-duplicate-key.json":     true, // a parser keeps one of the two
 	"reject-key-case-in-event.json": true, // "Decision" is an unknown field to a schema
 	"reject-nested-too-deep.json":   true,
 }
 
-// Every golden batch a console must accept validates
-// Every one it must reject doesn't, unless the rule it breaks is beyond the schema
+// Every golden batch a console must accept validates.
+// Every one it must reject doesn't, unless the rule it breaks is beyond the schema.
 func TestSchemaGoldenBatches(t *testing.T) {
 	sch := compile(t, batchSchema)
 	files, err := filepath.Glob("../../testdata/protocol/events/*.json")
@@ -182,7 +182,7 @@ func TestSchemaMarshalledLines(t *testing.T) {
 	}
 }
 
-// The event schema rejects what ParseLine rejects
+// The event schema rejects what ParseLine rejects.
 func TestSchemaAgreesWithParseLine(t *testing.T) {
 	now := time.Now().UTC()
 	timestamp := now.Format(time.RFC3339Nano)

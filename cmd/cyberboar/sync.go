@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/ed25519"
-	"flag"
 	"fmt"
 	"time"
 
@@ -10,17 +9,6 @@ import (
 	"cyberboar.dev/cyberboar/internal/policy"
 	"cyberboar.dev/cyberboar/pkg/sign"
 )
-
-// flagWasSet distinguishes an explicit --every 0s from an omitted flag
-func flagWasSet(fs *flag.FlagSet, name string) bool {
-	set := false
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == name {
-			set = true
-		}
-	})
-	return set
-}
 
 func endpointPolicy(path string) (*policy.Policy, error) {
 	data, err := boundedfile.Read(path, policy.MaxSize)
@@ -31,7 +19,7 @@ func endpointPolicy(path string) (*policy.Policy, error) {
 }
 
 // installedPullInterval uses only a valid signed policy for scheduling. A
-// missing, expired or damaged local policy must not prevent pull repairing it
+// missing, expired or damaged local policy must not prevent pull repairing it.
 func installedPullInterval(path, name string, pub ed25519.PublicKey, now time.Time) (time.Duration, error) {
 	data, err := boundedfile.Read(path, policy.MaxSize)
 	if err != nil {

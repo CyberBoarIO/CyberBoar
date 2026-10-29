@@ -13,7 +13,7 @@ import (
 	"cyberboar.dev/cyberboar/internal/policy"
 )
 
-// Run builds the file's fixture and executes every case in f as a subtest
+// Run builds the file's fixture and executes every case in f as a subtest.
 func Run(t *testing.T, f *File) {
 	t.Helper()
 	root, err := f.BuildFixture()
@@ -35,7 +35,7 @@ func Run(t *testing.T, f *File) {
 				return
 			}
 
-			// A policy that failed to load leaves compiled nil; the engine must deny
+			// A policy that failed to load leaves compiled nil; the engine must deny.
 			var compiled *engine.Compiled
 			if err == nil {
 				if compiled, err = engine.Compile(pol); err != nil {
@@ -54,7 +54,7 @@ func Run(t *testing.T, f *File) {
 
 // engineAction returns the engine.Action a corpus action stands for. Edits,
 // insertions and patches each give the content the tools would have written
-// and the rewrite the engine checks it against
+// and the rewrite the engine checks it against.
 func (a *Action) engineAction() engine.Action {
 	content, rewrite := a.Content, engine.Rewrite(nil)
 	rewriteMoves := false
@@ -134,7 +134,7 @@ func checkVerdict(t *testing.T, want Expect, got engine.Verdict) {
 	}
 }
 
-// mcpNames reads a corpus action's mcp.names
+// mcpNames reads a corpus action's mcp.names.
 func mcpNames(s string) engine.MCPNames {
 	switch s {
 	case "opencode":

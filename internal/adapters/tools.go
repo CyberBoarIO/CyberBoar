@@ -7,7 +7,7 @@ import (
 )
 
 // LoadTools reads an adapter's tools.yaml, a version and a table of tool
-// names to specs, and checks each spec with valid
+// names to specs, and checks each spec with valid.
 func LoadTools[S any](data []byte, valid func(name string, spec S) error) (map[string]S, error) {
 	var t struct {
 		Version int          `yaml:"version"`
@@ -27,12 +27,12 @@ func LoadTools[S any](data []byte, valid func(name string, spec S) error) (map[s
 	return t.Tools, nil
 }
 
-// ClassificationFailed returns the denial of every tool when an adapter's tools.yaml didn't load
+// ClassificationFailed returns the denial of every tool when an adapter's tools.yaml didn't load.
 func ClassificationFailed(err error) *Error {
 	return &Error{Rule: RuleUnclassifiedTool, Msg: fmt.Sprintf("the tool classification failed to load (%v), so every tool is blocked", err)}
 }
 
-// Unclassified returns the denial of a tool the adapter doesn't know
+// Unclassified returns the denial of a tool the adapter doesn't know.
 func Unclassified(tool string) *Error {
 	return &Error{Rule: RuleUnclassifiedTool, Msg: fmt.Sprintf(
 		"the tool %s is not classified yet, so policy can't tell what it touches and it is blocked; do not attempt to reach the same result with another tool", tool)}

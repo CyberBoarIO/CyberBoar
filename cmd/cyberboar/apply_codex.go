@@ -13,7 +13,7 @@ import (
 )
 
 // applyCodex installs the hook into Codex. It writes hooks.json for the user
-// and project scopes and requirements.toml for the managed scope
+// and project scopes and requirements.toml for the managed scope.
 func applyCodex(a applyArgs, stdout io.Writer, getenv func(string) string, fail, usage func(string, ...any) int) int {
 	if err := checkDeadline(a.deadline, codex.HookTimeout, "Codex hook timeout", ": a timed-out hook fails open"); err != nil {
 		return usage("%v", err)

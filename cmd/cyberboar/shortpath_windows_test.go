@@ -11,7 +11,7 @@ import (
 )
 
 // apply falls back to the 8.3 short name for a Codex hook program whose path
-// has a space, such as one under C:\Program Files
+// has a space, such as one under C:\Program Files.
 func TestShortPathName(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "with space")
 	if err := os.Mkdir(dir, 0o700); err != nil {

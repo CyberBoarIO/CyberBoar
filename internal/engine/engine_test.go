@@ -38,7 +38,7 @@ func mustCompile(t *testing.T, p *policy.Policy) *Compiled {
 var readme = Action{Tool: ToolRead, Path: "README.md", Cwd: "/work/repo", Home: "/home/dev", Workspaces: []string{"/work/repo"}}
 
 // expiresAfterFirstCheck is a context that is live the first time Evaluate
-// asks and has expired every time after: the deadline passes while the policy is being evaluated
+// asks and has expired every time after: the deadline passes while the policy is being evaluated.
 type expiresAfterFirstCheck struct {
 	context.Context
 	checks int
@@ -56,7 +56,7 @@ func expiresDuringEvaluation() context.Context {
 	return &expiresAfterFirstCheck{Context: context.Background()}
 }
 
-// Every case here would allow if the fail-closed path were missing
+// Every case here would allow if the fail-closed path were missing.
 func TestFailClosed(t *testing.T) {
 	c := mustCompile(t, emptyPolicy(policy.DenyListed))
 
@@ -147,7 +147,7 @@ func TestStrictest(t *testing.T) {
 	}
 }
 
-// A directory too large to scan is denied in every containing mode
+// A directory too large to scan is denied in every containing mode.
 func TestContainingScanLimit(t *testing.T) {
 	root := t.TempDir()
 	for i := range 10 {
@@ -190,8 +190,8 @@ func TestContainingScanLimit(t *testing.T) {
 	assertDeny(t, v.verdict, RuleContainingLimit)
 }
 
-// Alias descendants count again because their lexical names need their own policy checks
-// The shared entry limit bounds that extra work
+// Alias descendants count again because their lexical names need their own policy checks.
+// The shared entry limit bounds that extra work.
 func TestContainingAliasScanLimit(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("engine paths differ from OS paths on Windows")
@@ -223,7 +223,7 @@ func TestContainingAliasScanLimit(t *testing.T) {
 
 // Entries found walking / are named /bin, not //bin, so absolute rules match
 // them. Reading / is denied by the built-in rules before any walk, so the
-// walk is called directly, with a rule for an entry it reaches before /dev
+// walk is called directly, with a rule for an entry it reaches before /dev.
 func TestContainingScanAtRoot(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("/ is not a directory on Windows")
@@ -243,8 +243,8 @@ func TestContainingScanAtRoot(t *testing.T) {
 }
 
 // The walk keys each directory by its resolved path, so one it can't
-// resolve can't be walked and is a deny finding
-// Reading such a directory fails earlier, so the walk is called directly, on a link loop
+// resolve can't be walked and is a deny finding.
+// Reading such a directory fails earlier, so the walk is called directly, on a link loop.
 func TestContainingScanUnresolvable(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("engine paths differ from OS paths on Windows")
@@ -263,7 +263,7 @@ func TestContainingScanUnresolvable(t *testing.T) {
 
 // A policy without deny or ask rules still has the built-in rules to
 // enforce, so a directory too large to walk is denied as it is under any
-// other policy: past the limit there may be a link to /proc/self/environ
+// other policy: past the limit there may be a link to /proc/self/environ.
 func TestContainingScanLimitWithoutRules(t *testing.T) {
 	root := t.TempDir()
 	for i := range 10 {
@@ -293,7 +293,7 @@ func TestContainingScanLimitWithoutRules(t *testing.T) {
 }
 
 // A directory the walk can't read could hold a link to /proc/self/environ,
-// so reading what holds it is denied in every containing mode
+// so reading what holds it is denied in every containing mode.
 func TestContainingUnreadable(t *testing.T) {
 	root := t.TempDir()
 	locked := filepath.Join(root, "locked")
@@ -318,7 +318,7 @@ func TestContainingUnreadable(t *testing.T) {
 	assertDeny(t, Evaluate(context.Background(), mustCompile(t, p), a), RuleContainingLimit)
 }
 
-// ~user expands to that user's home, like bash: the agent's own user name is another way to write ~
+// ~user expands to that user's home, like bash: the agent's own user name is another way to write ~.
 func TestTildeUserResolves(t *testing.T) {
 	u, err := user.Current()
 	if err != nil || u.HomeDir == "" || strings.ContainsAny(u.Username, `\ `) {
@@ -343,7 +343,7 @@ func TestTildeUserResolves(t *testing.T) {
 }
 
 // A name with a character Win32 forbids can't exist for Windows programs,
-// so it is never looked up, even where the file system underneath could hold it
+// so it is never looked up, even where the file system underneath could hold it.
 func TestWindowsForbiddenNameNotLookedUp(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("NTFS can't hold the fixture's name")
@@ -362,7 +362,7 @@ func TestWindowsForbiddenNameNotLookedUp(t *testing.T) {
 	}
 }
 
-// An MCP call involves no path, so on Windows, as on POSIX, it needs no home directory or working directory
+// An MCP call involves no path, so on Windows, as on POSIX, it needs no home directory or working directory.
 func TestWindowsMCPNeedsNoPaths(t *testing.T) {
 	c := mustCompile(t, emptyPolicy(policy.DenyListed))
 	a := Action{Tool: ToolMCP, MCP: MCPCall{Server: "github", Tool: "search"}, Platform: PlatformWindows}
@@ -371,7 +371,7 @@ func TestWindowsMCPNeedsNoPaths(t *testing.T) {
 	}
 }
 
-// Drive letters are case-insensitive: one given twice is refused rather than one of the two picked at random
+// Drive letters are case-insensitive: one given twice is refused rather than one of the two picked at random.
 func TestDuplicateDriveRefused(t *testing.T) {
 	c := mustCompile(t, emptyPolicy(policy.DenyListed))
 	a := Action{Tool: ToolRead, Path: `C:\w\README.md`, Cwd: `C:\w`, Home: `C:\Users\dev`, Workspaces: []string{`C:\w`},
@@ -380,7 +380,7 @@ func TestDuplicateDriveRefused(t *testing.T) {
 }
 
 // A workspace root that holds the home directory is refused, and the reason
-// shows it as the user knows it on Windows, not in the engine's /c/... form
+// shows it as the user knows it on Windows, not in the engine's /c/... form.
 func TestWindowsHomeWorkspaceReason(t *testing.T) {
 	c := mustCompile(t, emptyPolicy(policy.DenyListed))
 	a := Action{Tool: ToolRead, Path: `C:\Users\dev\README.md`, Cwd: `C:\Users\dev`, Home: `C:\Users\dev`, Workspaces: []string{`C:\Users\dev`},
@@ -393,7 +393,7 @@ func TestWindowsHomeWorkspaceReason(t *testing.T) {
 }
 
 // An unresolved link or directory cycle cannot be approved without checking
-// the files it might expose, even if an earlier protected file would ask
+// the files it might expose, even if an earlier protected file would ask.
 func TestContainingAskDeniesIncompleteWalk(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("engine paths differ from OS paths on Windows")
@@ -423,7 +423,7 @@ func TestContainingAskDeniesIncompleteWalk(t *testing.T) {
 }
 
 // A word longer than a file name can be, such as a long sed script, is no
-// file, so it is checked as a missing path, not denied as unresolvable
+// file, so it is checked as a missing path, not denied as unresolvable.
 func TestLongWordIsNoFile(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("engine paths differ from OS paths on Windows")

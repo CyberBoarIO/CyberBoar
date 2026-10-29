@@ -19,7 +19,7 @@ import (
 )
 
 // cli runs the command line with HOME in a temporary directory, the extra
-// environment given, and the clock now
+// environment given, and the clock now.
 type cli struct {
 	t        *testing.T
 	home     string
@@ -45,7 +45,7 @@ func (c *cli) run(stdin string, args ...string) int {
 	return runAt(c.now, args, strings.NewReader(stdin), &c.out, &c.err, env)
 }
 
-// enroll enrolls the CLI's machine with console
+// enroll enrolls the CLI's machine with console.
 func (c *cli) enroll(console *protocoltest.Console, policy string) {
 	c.t.Helper()
 	c.env[envName("enroll-token")] = console.Token(policy, 1)
@@ -55,7 +55,7 @@ func (c *cli) enroll(console *protocoltest.Console, policy string) {
 	}
 }
 
-// The hook's audit log reaches a console: hook -> file -> ship -> server
+// The hook's audit log reaches a console: hook -> file -> ship -> server.
 func TestHookAuditShipsToConsole(t *testing.T) {
 	console := protocoltest.New(t, "", nil)
 	c := newCLI(t)
@@ -122,7 +122,7 @@ func TestHookAuditShipsToConsole(t *testing.T) {
 }
 
 // ship warns when the audit log was rotated since its last run, since lines
-// the old log got after that run were never sent
+// the old log got after that run were never sent.
 func TestShipWarnsAboutRotation(t *testing.T) {
 	console := protocoltest.New(t, "", nil)
 	c := newCLI(t)
@@ -257,8 +257,8 @@ func TestSignedPolicyEndToEnd(t *testing.T) {
 	}
 }
 
-// --insecure-skip-verify talks TLS without checking the certificate
-// Enrolling that way needs the console's key, since nothing else would authenticate the console
+// --insecure-skip-verify talks TLS without checking the certificate.
+// Enrolling that way needs the console's key, since nothing else would authenticate the console.
 func TestShipSkipVerify(t *testing.T) {
 	console := protocoltest.New(t, "", nil)
 	c := newCLI(t)
@@ -303,7 +303,7 @@ func TestNextShipHonorsRetryAfter(t *testing.T) {
 	}
 }
 
-// overloadedConsole answers every batch with 503 and Retry-After: 90
+// overloadedConsole answers every batch with 503 and Retry-After: 90.
 func overloadedConsole(t *testing.T) *httptest.Server {
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Retry-After", "90")

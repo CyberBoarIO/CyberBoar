@@ -1,5 +1,5 @@
 // Package hook runs one agent hook invocation. It reads the tool call, decides
-// and answers, and it fails closed on every error
+// and answers, and it fails closed on every error.
 package hook
 
 import (
@@ -29,43 +29,44 @@ import (
 	"cyberboar.dev/cyberboar/pkg/sign"
 )
 
-// MaxInput bounds the hook input. Write and Edit carry file contents
+// MaxInput bounds the hook input. Write and Edit carry file contents.
 const MaxInput = 32 << 20
 
 // DefaultDeadline is the internal deadline. It must stay well below the
-// agent's hook timeout, because a hook killed by that timeout fails open
+// agent's hook timeout: some agents run a call whose hook that timeout
+// killed, and the others block it without the hook's reason.
 const DefaultDeadline = 5 * time.Second
 
-// AuditLimit bounds the audit write after the decision, so the hook answers within Deadline + AuditLimit
-// A local append takes microseconds
+// AuditLimit bounds the audit write after the decision, so the hook answers within Deadline + AuditLimit.
+// A local append takes microseconds.
 const AuditLimit = time.Second
 
-// Rule IDs for the hook's own denials, before or around the engine's
+// Rule IDs for the hook's own denials, before or around the engine's.
 const (
-	// RuleInputTooLarge denies a hook input over MaxInput
+	// RuleInputTooLarge denies a hook input over MaxInput.
 	RuleInputTooLarge = "error.inputTooLarge"
-	// RuleAudit denies a call whose audit event can't be written
+	// RuleAudit denies a call whose audit event can't be written.
 	RuleAudit = "error.audit"
-	// RuleNoAdapter denies when the hook has no agent adapter
+	// RuleNoAdapter denies when the hook has no agent adapter.
 	RuleNoAdapter = "error.noAdapter"
-	// RuleSignature denies every call while the policy isn't validly signed
+	// RuleSignature denies every call while the policy isn't validly signed.
 	RuleSignature = "error.policySignature"
-	// RulePolicyExpired denies every call once the signed policy's expiry has passed
+	// RulePolicyExpired denies every call once the signed policy's expiry has passed.
 	RulePolicyExpired = "error.policyExpired"
-	// RuleTripwireState denies when the tripwire is on and its state can't be read or written
+	// RuleTripwireState denies when the tripwire is on and its state can't be read or written.
 	RuleTripwireState = "error.tripwireState"
-	// RuleGuardedPath denies when the hook's own files can't be located
+	// RuleGuardedPath denies when the hook's own files can't be located.
 	RuleGuardedPath = "error.guardedPath"
 	// RuleVersion denies every call while the hook is older than the
-	// policy's minimumVersion, or has no release version to compare
+	// policy's minimumVersion, or has no release version to compare.
 	RuleVersion = "error.versionTooOld"
 	// RuleUnsupportedPlatform denies every call on an operating system whose
-	// path semantics the engine doesn't implement
+	// path semantics the engine doesn't implement.
 	RuleUnsupportedPlatform = "error.unsupportedPlatform"
 	// RuleHookSetup denies when the hook command itself can't start, because
-	// of bad flags or arguments or files it can't open
+	// of bad flags or arguments or files it can't open.
 	RuleHookSetup = "error.hookSetup"
-	// RuleNothingToCheck allows a call that touches nothing the policy governs
+	// RuleNothingToCheck allows a call that touches nothing the policy governs.
 	RuleNothingToCheck = "adapter.nothingToCheck"
 )
 
@@ -74,7 +75,7 @@ const (
 // agent. On native Windows, Claude Code runs commands in Git Bash or its
 // PowerShell tool, and Codex in PowerShell, which the engine analyzes. Its
 // adapters for Copilot CLI, Cursor and opencode don't read their PowerShell
-// calls on Windows yet
+// calls on Windows yet.
 var supported = map[string]map[string]bool{
 	"linux":   nil,
 	"darwin":  nil,
@@ -83,7 +84,7 @@ var supported = map[string]map[string]bool{
 
 // PlatformSupported reports whether the engine can check the agent's tool
 // calls on operating system goos (a runtime.GOOS value). Elsewhere the hook
-// denies every call
+// denies every call.
 func PlatformSupported(goos, agent string) bool {
 	agents, ok := supported[goos]
 	return ok && (agents == nil || agents[agent])
@@ -91,7 +92,7 @@ func PlatformSupported(goos, agent string) bool {
 
 // UnsupportedReason says why an agent can't be checked on operating system
 // goos and what to do instead. On Windows it names PowerShell, so a user
-// whose agent is blocked there knows the cause and the way out
+// whose agent is blocked there knows the cause and the way out.
 func UnsupportedReason(goos, agent string) string {
 	name := agent
 	if n, ok := agentNames[agent]; ok {
@@ -109,57 +110,57 @@ func UnsupportedReason(goos, agent string) string {
 	return fmt.Sprintf("%s does not support %s on %s yet, so every tool call is blocked; run the agent in WSL or on Linux or macOS", brand.DisplayName, name, goos)
 }
 
-// agentNames are the names users know the agents by
+// agentNames are the names users know the agents by.
 var agentNames = map[string]string{"claude-code": "Claude Code", "codex": "Codex", "copilot-cli": "Copilot CLI", "cursor": "Cursor", "opencode": "opencode"}
 
 // Options configure one run.
 type Options struct {
-	// Adapter is the agent's hook protocol. If nil, every call is denied
+	// Adapter is the agent's hook protocol. If nil, every call is denied.
 	Adapter adapters.Adapter
-	// PolicyPath is the policy file. A missing or invalid policy denies every call
+	// PolicyPath is the policy file. A missing or invalid policy denies every call.
 	PolicyPath string
 	// PublicKey, when set, makes a policy count only with a valid signature
-	// (PolicyPath + ".sig") that hasn't expired
-	// A policy that is unsigned, tampered with or expired denies every call
+	// (PolicyPath + ".sig") that hasn't expired.
+	// A policy that is unsigned, tampered with or expired denies every call.
 	PublicKey ed25519.PublicKey
-	// PublicKeyPath loads the required signing key within the decision deadline
-	// If set, it takes precedence over PublicKey; a read failure denies
+	// PublicKeyPath loads the required signing key within the decision deadline.
+	// If set, it takes precedence over PublicKey; a read failure denies.
 	PublicKeyPath string
-	// Getenv reads environment variables. If nil, os.Getenv is used
+	// Getenv reads environment variables. If nil, os.Getenv is used.
 	Getenv func(string) string
-	// GOOS is the operating system the hook runs on, as a runtime.GOOS value
+	// GOOS is the operating system the hook runs on, as a runtime.GOOS value.
 	// If empty, it is the one the hook was built for.
 	GOOS string
-	// AuditPath is the absolute path of the audit log
-	// If empty, no audit log is written. Agents may not touch it (builtin.self)
+	// AuditPath is the absolute path of the audit log.
+	// If empty, no audit log is written. Agents may not touch it (builtin.self).
 	AuditPath string
-	// StateDir is the hook's state directory, which holds the tripwire counts
-	// Agents may not touch it (builtin.self)
-	// If the policy's tripwire is on and StateDir is empty, every call is denied
+	// StateDir is the hook's state directory, which holds the tripwire counts.
+	// Agents may not touch it (builtin.self).
+	// If the policy's tripwire is on and StateDir is empty, every call is denied.
 	StateDir string
 	// Guarded lists further files agents may not change (builtin.guarded),
-	// such as the signing key and the hook binary
-	// The policy, its signature and the audit log are added from PolicyPath and AuditPath
+	// such as the signing key and the hook binary.
+	// The policy, its signature and the audit log are added from PolicyPath and AuditPath.
 	Guarded []string
-	// Deadline bounds the policy decision
-	// If zero, DefaultDeadline is used
+	// Deadline bounds the policy decision.
+	// If zero, DefaultDeadline is used.
 	Deadline time.Duration
-	// Version is compared with the policy's minimum and recorded in every audit event
-	// An unversioned build meets no minimum
+	// Version is compared with the policy's minimum and recorded in every audit event.
+	// An unversioned build meets no minimum.
 	Version string
-	// Now returns the current time. If nil, time.Now is used
+	// Now returns the current time. If nil, time.Now is used.
 	Now func() time.Time
 }
 
-// Result is the hook's answer plus the verdict behind it
+// Result is the hook's answer plus the verdict behind it.
 type Result struct {
 	adapters.Output
-	// Verdict is the decision the Output reports to the agent
+	// Verdict is the decision the Output reports to the agent.
 	Verdict engine.Verdict
 }
 
 // Run handles one PreToolUse invocation. It never panics and always returns
-// within the deadline plus AuditLimit
+// within the deadline plus AuditLimit.
 func Run(ctx context.Context, stdin io.Reader, o Options) Result {
 	if o.Adapter == nil {
 		// With no protocol to answer in, Claude Code's deny shape plus exit 2
@@ -240,15 +241,16 @@ func Run(ctx context.Context, stdin io.Reader, o Options) Result {
 	return Result{Output: o.Adapter.Respond(v, brand.Name+": "), Verdict: v}
 }
 
-// appendAudit appends ev to the audit log at path and gives up after limit
+// appendAudit appends ev to the audit log at path and gives up after limit.
 // On a hung filesystem, such as a stale network home directory, the write
-// would otherwise outlast the agent's hook timeout, which fails open
+// would otherwise outlast the agent's hook timeout, which fails open in
+// some agents.
 func appendAudit(path string, ev audit.Event, limit time.Duration) error {
 	done := make(chan error, 1)
 	ctx, cancel := context.WithTimeout(context.Background(), limit)
 	defer cancel()
 	go func() {
-		ev.Reason = engine.Redact(ctx, ev.Reason, false)
+		ev.Reason = engine.Redact(ctx, ev.Reason)
 		done <- audit.AppendFile(path, ev)
 	}()
 	select {
@@ -259,7 +261,7 @@ func appendAudit(path string, ev audit.Event, limit time.Duration) error {
 	}
 }
 
-// versionName describes version in a message
+// versionName describes version in a message.
 func versionName(version string) string {
 	if version == "" {
 		return "a build without a version"
@@ -267,7 +269,7 @@ func versionName(version string) string {
 	return "version " + version
 }
 
-// versionVerdict blocks a binary that does not meet the policy's floor
+// versionVerdict blocks a binary that does not meet the policy's floor.
 func versionVerdict(minimum, version string) engine.Verdict {
 	return deny(RuleVersion, fmt.Sprintf("the policy requires %s %s or later and this is %s, so every tool call is blocked until %s is upgraded",
 		brand.DisplayName, minimum, versionName(version), brand.DisplayName))
@@ -284,7 +286,7 @@ func deny(rule, reason string) engine.Verdict {
 	return engine.Verdict{Decision: engine.Deny, Rule: rule, Reason: reason}
 }
 
-// evaluate does everything that can take time or fail. Each failure is a deny
+// evaluate does everything that can take time or fail. Each failure is a deny.
 func evaluate(ctx context.Context, stdin io.Reader, o Options, ev *audit.Event, header *sign.Header) engine.Verdict {
 	loaded := o
 	if o.PublicKeyPath != "" {
@@ -317,7 +319,7 @@ func evaluate(ctx context.Context, stdin io.Reader, o Options, ev *audit.Event, 
 			{&ev.Session, call.Session}, {&ev.ToolUseID, call.ToolUseID}, {&ev.AgentID, call.AgentID}, {&ev.AgentType, call.AgentType},
 			{&ev.Mode, call.Mode}, {&ev.Cwd, call.Cwd}, {&ev.Tool, call.Tool}, {&ev.Project, call.Project},
 		} {
-			*f.to = engine.Redact(ctx, f.from, false)
+			*f.to = engine.Redact(ctx, f.from)
 		}
 	}
 	if !PlatformSupported(o.GOOS, o.Adapter.Name()) {
@@ -389,7 +391,7 @@ func evaluate(ctx context.Context, stdin io.Reader, o Options, ev *audit.Event, 
 // protected lists the hook's own files that agents may not touch
 // (builtin.self). They are the state directory, where an agent could undo a
 // lock by changing the tripwire counts, and the audit log, which an agent
-// could empty or fill with invented events for the console
+// could empty or fill with invented events for the console.
 func protected(o Options) []string {
 	var out []string
 	for _, p := range []string{o.StateDir, o.AuditPath} {
@@ -401,13 +403,13 @@ func protected(o Options) []string {
 }
 
 // decide evaluates the call's actions and returns the strictest verdict
-// windows reports whether the hook runs on Windows
+// windows reports whether the hook runs on Windows.
 func decide(ctx context.Context, compiled *engine.Compiled, call *adapters.Call, protected, guarded []string, windows bool, ev *audit.Event) engine.Verdict {
 	if ev != nil {
 		for _, a := range call.Actions {
 			// Each field is redacted before it is truncated, so no part of a secret is left at the cut
-			ev.Actions = append(ev.Actions, audit.Action{Tool: string(a.Tool), Command: audit.Truncate(engine.Redact(ctx, a.Command, true)),
-				Path: audit.Truncate(engine.Redact(ctx, a.Path, false)), Server: engine.Redact(ctx, a.MCP.Server, false), MCPTool: engine.Redact(ctx, a.MCP.Tool, false)})
+			ev.Actions = append(ev.Actions, audit.Action{Tool: string(a.Tool), Command: audit.Truncate(engine.RedactCommand(ctx, a.Command, a.Shell)),
+				Path: audit.Truncate(engine.Redact(ctx, a.Path)), Server: engine.Redact(ctx, a.MCP.Server), MCPTool: engine.Redact(ctx, a.MCP.Tool)})
 		}
 	}
 	if call.Err != nil {
@@ -434,7 +436,7 @@ func decide(ctx context.Context, compiled *engine.Compiled, call *adapters.Call,
 }
 
 // guardedPaths returns the absolute paths of the files in Options.Guarded,
-// the policy with its signature and lock file, the signing key and the audit log
+// the policy with its signature and lock file, the signing key and the audit log.
 func guardedPaths(o Options) ([]string, error) {
 	var out []string
 	for _, p := range slices.Concat(o.Guarded, []string{o.PolicyPath, o.PolicyPath + ".sig", o.PolicyPath + ".lock", o.PublicKeyPath, o.AuditPath}) {
@@ -450,7 +452,7 @@ func guardedPaths(o Options) ([]string, error) {
 	return out, nil
 }
 
-// lockedVerdict denies every call in a locked session
+// lockedVerdict denies every call in a locked session.
 func lockedVerdict(st tripwire.State) engine.Verdict {
 	last := ""
 	if n := len(st.Rules); n > 0 {
@@ -461,7 +463,7 @@ func lockedVerdict(st tripwire.State) engine.Verdict {
 		len(st.Denials), last, brand.Name))
 }
 
-// expiredError is a validly signed policy past its expiry
+// expiredError is a validly signed policy past its expiry.
 type expiredError struct {
 	name string
 	h    sign.Header
@@ -471,14 +473,14 @@ func (e *expiredError) Error() string {
 	return fmt.Sprintf("the policy %q expired at %s (signature serial %d)", e.name, e.h.Expires.Format(sign.TimeFormat), e.h.Serial)
 }
 
-// expiredVerdict denies trust after the signed expiry, including during a decision
+// expiredVerdict denies trust after the signed expiry, including during a decision.
 func expiredVerdict(e *expiredError) engine.Verdict {
 	return deny(RulePolicyExpired, fmt.Sprintf("%v, so every tool call is blocked until a newer signed policy is installed (`%s pull`)", e, brand.Name))
 }
 
 // loadPolicy returns nil for a missing, unreadable or invalid policy, and
 // sigErr when a public key is configured and the policy isn't validly signed
-// or has expired (an *expiredError)
+// or has expired (an *expiredError).
 func loadPolicy(o Options) (c *engine.Compiled, name, hash string, header sign.Header, sigErr error) {
 	if o.PolicyPath == "" {
 		return nil, "", "", header, nil
@@ -525,10 +527,10 @@ func loadPolicy(o Options) (c *engine.Compiled, name, hash string, header sign.H
 }
 
 // Brief answers a SessionStart hook with the policy's briefing
-// (spec.session.briefing). It never fails, because a briefing is advisory
-// With no valid policy, it tells the agent that every call will be denied
+// (spec.session.briefing). It never fails, because a briefing is advisory.
+// With no valid policy, it tells the agent that every call will be denied.
 // The answer has the shape o.Adapter's agent reads if the adapter is an
-// adapters.Briefer, and otherwise the one Claude Code and Codex share
+// adapters.Briefer, and otherwise the one Claude Code and Codex share.
 func Brief(o Options) []byte {
 	out := briefing.SessionStartOutput
 	if b, ok := o.Adapter.(adapters.Briefer); ok {

@@ -8,7 +8,7 @@
 // secret below the rule's entropy, or one an allowlist names, is not a
 // finding. Unlike gitleaks, a "gitleaks:allow" comment allows nothing,
 // since the agent writes the comments, and allowlists that need a file path
-// or a commit never apply
+// or a commit never apply.
 package secrets
 
 import (
@@ -21,10 +21,10 @@ import (
 )
 
 // MaxText bounds the text Scan reads. Longer text is a finding of its own
-// (TooLong): a secret past the limit would otherwise go unseen
+// (TooLong): a secret past the limit would otherwise go unseen.
 const MaxText = 4 << 20
 
-// TooLong is the Finding.Rule for text longer than MaxText
+// TooLong is the Finding.Rule for text longer than MaxText.
 const TooLong = "too-long"
 
 // Finding is a secret Scan found.
@@ -78,8 +78,8 @@ func compileAllow(a allowlist) compiledAllow {
 
 // compile sets the rules up once. A rule's regexes are compiled only when
 // one of its keywords is in a text (rule.load): compiling all of them takes
-// about 12 ms, and the hook is a new process for every tool call
-// The patterns are fixed at build time, so MustCompile can't fail in a release
+// about 12 ms, and the hook is a new process for every tool call.
+// The patterns are fixed at build time, so MustCompile can't fail in a release.
 func compile() {
 	global = compileAllow(globalAllow)
 	rules = make([]rule, len(ruleSpecs))
@@ -97,7 +97,7 @@ func (r *rule) load() {
 	})
 }
 
-// Rules returns the ids of every rule, sorted
+// Rules returns the ids of every rule, sorted.
 func Rules() []string {
 	ids := make([]string, len(ruleSpecs))
 	for i, s := range ruleSpecs {
@@ -110,7 +110,7 @@ func Rules() []string {
 // Scan returns the secrets in text, in the order of their offsets, skipping
 // rules whose id is in ignore. Text longer than MaxText is reported as a
 // single TooLong finding without being read. When ctx ends first, Scan
-// returns its error and no findings; the hook then denies
+// returns its error and no findings; the hook then denies.
 func Scan(ctx context.Context, text string, ignore []string) ([]Finding, error) {
 	if len(text) > MaxText {
 		return []Finding{{Rule: TooLong, Description: "the text is too long to check for secrets"}}, nil
@@ -154,7 +154,7 @@ func Scan(ctx context.Context, text string, ignore []string) ([]Finding, error) 
 // asciiLower lowercases A-Z only. Unlike strings.ToLower it keeps every
 // byte where it was (invalid UTF-8 and some letters change length), so
 // offsets in it are offsets in the text. Every keyword is ASCII, so no
-// keyword is missed
+// keyword is missed.
 func asciiLower(s string) string {
 	b := []byte(s)
 	for i, c := range b {
@@ -172,7 +172,7 @@ func asciiLower(s string) string {
 // because their PEM formatting has no length bound. Some rules allow any
 // distance on a line, and up to windowLines lines after it (curl-auth-header:
 // curl, then -H on the same line or a continuation), so a window also covers
-// the keyword's whole line and that many lines after it, however long
+// the keyword's whole line and that many lines after it, however long.
 const (
 	windowBefore = 1 << 10
 	windowAfter  = 16 << 10
@@ -181,7 +181,7 @@ const (
 
 // windows returns the ranges of text to run a rule on: around each
 // occurrence of one of its keywords, merged where they overlap, in order.
-// A rule without keywords runs on all of text
+// A rule without keywords runs on all of text.
 func windows(lower string, keywords []string) [][2]int {
 	if len(keywords) == 0 {
 		return [][2]int{{0, len(lower)}}
@@ -224,7 +224,7 @@ func windows(lower string, keywords []string) [][2]int {
 }
 
 // linesEnd returns the offset of the end of the line holding offset at, n
-// lines further on (or the end of s)
+// lines further on (or the end of s).
 func linesEnd(s string, at, n int) int {
 	for ; n >= 0; n-- {
 		i := strings.IndexByte(s[at:], '\n')
@@ -237,7 +237,7 @@ func linesEnd(s string, at, n int) int {
 }
 
 // finding applies the rule's secret group, entropy and allowlists to one
-// match (m as from FindAllStringSubmatchIndex)
+// match (m as from FindAllStringSubmatchIndex).
 func (r *rule) finding(text string, m []int) (Finding, bool) {
 	match := strings.Trim(text[m[0]:m[1]], "\n")
 	start := m[0] + strings.Index(text[m[0]:m[1]], match)
@@ -276,7 +276,7 @@ func (r *rule) finding(text string, m []int) (Finding, bool) {
 	return Finding{Rule: r.id, Description: r.description, Start: sStart, End: sEnd}, true
 }
 
-// lineAround returns the lines of text that hold text[start:end]
+// lineAround returns the lines of text that hold text[start:end].
 func lineAround(text string, start, end int) string {
 	if i := strings.LastIndexByte(text[:start], '\n'); i >= 0 {
 		start = i + 1
@@ -292,7 +292,7 @@ func lineAround(text string, start, end int) string {
 }
 
 // allows reports whether the allowlist lets a finding through: any of its
-// regexes or stopwords (both, with "and"). An empty allowlist allows nothing
+// regexes or stopwords (both, with "and"). An empty allowlist allows nothing.
 func (a compiledAllow) allows(secret, match, line string) bool {
 	target := secret
 	switch a.target {
@@ -322,7 +322,7 @@ func (a compiledAllow) allows(secret, match, line string) bool {
 	return byRegex || byWord
 }
 
-// entropy is the Shannon entropy of s in bits per character, as gitleaks computes it
+// entropy is the Shannon entropy of s in bits per character, as gitleaks computes it.
 func entropy(s string) float64 {
 	if s == "" {
 		return 0
@@ -342,7 +342,7 @@ func entropy(s string) float64 {
 
 // Redact returns text with every finding's secret replaced by
 // "[REDACTED:rule]", for logs: the audit log must not become a store of the
-// secrets the hook stopped. Text longer than MaxText is replaced whole
+// secrets the hook stopped. Text longer than MaxText is replaced whole.
 func Redact(text string, findings []Finding) string {
 	if len(findings) == 1 && findings[0].Rule == TooLong {
 		return "[REDACTED:" + TooLong + "]"

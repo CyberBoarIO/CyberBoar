@@ -14,9 +14,9 @@ import (
 	"cyberboar.dev/cyberboar/pkg/sign"
 )
 
-// runKeygen creates the key pair that signs policies
-// The private key belongs in CI's secret store, and the public key goes to endpoints
-func runKeygen(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stderr io.Writer) int {
+// runKeygen creates the key pair that signs policies.
+// The private key belongs in CI's secret store, and the public key goes to endpoints.
+func runKeygen(_ host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	priv := fs.String("private", "policy-signing.key", "private key file to create (never overwritten)")
 	pub := fs.String("public", "policy-signing.pub", "public key file to create (never overwritten)")
@@ -35,12 +35,12 @@ func runKeygen(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, std
 	return 0
 }
 
-// maxLifetime bounds how far ahead sign puts an expiry
-// It is the longest an endpoint can be kept on an old policy by a console that stops serving new ones
+// maxLifetime bounds how far ahead sign puts an expiry.
+// It is the longest an endpoint can be kept on an old policy by a console that stops serving new ones.
 const maxLifetime = 366 * 24 * time.Hour
 
-// runSign writes POLICY.sig for each policy, with a serial and an expiry
-// Endpoints refuse an older policy than the one they have, and stop trusting one nobody signs again
+// runSign writes POLICY.sig for each policy, with a serial and an expiry.
+// Endpoints refuse an older policy than the one they have, and stop trusting one nobody signs again.
 func runSign(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	keyPath := fs.String("key", h.getenv(envName("signing-key")), "private key file (env "+envName("signing-key")+")")
@@ -105,8 +105,8 @@ func runSign(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stder
 	return 0
 }
 
-// signHeader parses sign's --serial and --expires
-// A duration in --expires counts from t
+// signHeader parses sign's --serial and --expires.
+// A duration in --expires counts from t.
 func signHeader(serial, expires string, t time.Time) (sign.Header, error) {
 	var h sign.Header
 	n, err := strconv.ParseUint(serial, 10, 64)
@@ -136,7 +136,7 @@ func signHeader(serial, expires string, t time.Time) (sign.Header, error) {
 	return h, nil
 }
 
-// runVerify checks POLICY.sig for each policy
+// runVerify checks POLICY.sig for each policy.
 func runVerify(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	pubPath := fs.String("pubkey", h.getenv(envName("pubkey")), "public key file (env "+envName("pubkey")+")")
@@ -173,7 +173,7 @@ func runVerify(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, std
 	return 0
 }
 
-// verifyFile checks the signature in path's POLICY.sig file against the policy in path and returns its header
+// verifyFile checks the signature in path's POLICY.sig file against the policy in path and returns its header.
 func verifyFile(pub []byte, path string) (sign.Header, error) {
 	// #nosec G703 -- a policy file the operator named
 	data, err := os.ReadFile(path)

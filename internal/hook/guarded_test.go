@@ -14,7 +14,7 @@ import (
 )
 
 // The agent may not switch its own hook off (builtin.guarded), which one
-// Edit of .claude/settings.local.json would do
+// Edit of .claude/settings.local.json would do.
 func TestHookFilesAreGuarded(t *testing.T) {
 	home := t.TempDir()
 	repo := filepath.Join(home, "repo")

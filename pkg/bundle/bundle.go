@@ -1,11 +1,11 @@
 // Package bundle reads a directory of policy files and turns each valid one
-// into a policy bundle, the document the console serves to endpoints
+// into a policy bundle, the document the console serves to endpoints.
 //
 // The bundle format is a client contract. It is a JSON envelope, versioned by
 // apiVersion and kind, holding the policy file byte for byte, so the
 // SHA-256 an endpoint reports in its audit events (policySha256) can be
 // compared with the bundle's to detect drift. The format is specified in
-// docs/protocol, and this package is its reference implementation
+// docs/protocol, and this package is its reference implementation.
 package bundle
 
 import (
@@ -29,30 +29,30 @@ import (
 	"cyberboar.dev/cyberboar/pkg/sign"
 )
 
-// Kind is the bundle envelope's kind
+// Kind is the bundle envelope's kind.
 const Kind = "PolicyBundle"
 
-// MaxFiles bounds the number of policy files LoadDir reads from one directory
+// MaxFiles bounds the number of policy files LoadDir reads from one directory.
 const MaxFiles = 1000
 
 // MaxSize bounds an encoded bundle. JSON can expand each policy byte to a
-// six-byte escape; the remaining space holds the envelope and signature
+// six-byte escape; the remaining space holds the envelope and signature.
 const MaxSize = 6*policy.MaxSize + (4 << 10)
 
-// Envelope is the bundle document. Add fields only with a new apiVersion
+// Envelope is the bundle document. Add fields only with a new apiVersion.
 type Envelope struct {
 	APIVersion   string `json:"apiVersion"`
 	Kind         string `json:"kind"`
 	Name         string `json:"name"`
 	PolicySHA256 string `json:"policySha256"` // lowercase hex SHA-256 of Policy
 	Policy       string `json:"policy"`       // the policy file, byte for byte
-	// Signature is the contents of the POLICY.sig file (sign package)
-	// Endpoints verify it with their pinned public key and ignore a bundle that fails
+	// Signature is the contents of the POLICY.sig file (sign package).
+	// Endpoints verify it with their pinned public key and ignore a bundle that fails.
 	Signature string `json:"signature,omitempty"`
 }
 
 // Bundle is a servable bundle. Its name is a policy's metadata.name, which the
-// policy schema limits to a DNS label, so it is safe as a URL path segment
+// policy schema limits to a DNS label, so it is safe as a URL path segment.
 type Bundle struct {
 	Name         string // metadata.name of the policy
 	PolicySHA256 string // lowercase hex SHA-256 of the policy file
@@ -60,7 +60,7 @@ type Bundle struct {
 	Body         []byte // the encoded Envelope, newline included
 }
 
-// Source is one policy file in the directory
+// Source is one policy file in the directory.
 type Source struct {
 	File         string // base name
 	Name         string // metadata.name, when the policy loaded
@@ -75,13 +75,13 @@ type Source struct {
 	Err    error
 }
 
-// Set is everything found in a policy directory
+// Set is everything found in a policy directory.
 type Set struct {
 	Sources []Source // by file name
 	bundles map[string]*Bundle
 }
 
-// Bundle returns the bundle for a policy name
+// Bundle returns the bundle for a policy name.
 func (s *Set) Bundle(name string) (*Bundle, bool) {
 	if s == nil {
 		return nil, false
@@ -90,7 +90,7 @@ func (s *Set) Bundle(name string) (*Bundle, bool) {
 	return b, ok
 }
 
-// Bundles returns every servable bundle, by name
+// Bundles returns every servable bundle, by name.
 func (s *Set) Bundles() []*Bundle {
 	if s == nil {
 		return nil
@@ -108,15 +108,15 @@ func (s *Set) Bundles() []*Bundle {
 // regular file inside dir, since Kubernetes ConfigMap volumes are built from
 // such links. A link pointing elsewhere, for a policy or its POLICY.sig, is
 // listed as not served and is never read, so that a console cannot show a file
-// from outside the directory
+// from outside the directory.
 // A file that fails to load, or shares its metadata.name with another file, is
 // kept as a Source with Err set and is not served, so an endpoint keeps its
 // last good policy rather than getting a broken or ambiguous one. An error
-// is returned if the directory cannot be read or contains too many policy files
+// is returned if the directory cannot be read or contains too many policy files.
 //
 // With pub set, a policy is served only with a valid POLICY.sig from that
 // key. Without it, a signature file is passed on unchecked (endpoints verify
-// it anyway)
+// it anyway).
 func LoadDir(dir string, pub ed25519.PublicKey) (*Set, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -149,7 +149,7 @@ func LoadDir(dir string, pub ed25519.PublicKey) (*Set, error) {
 		src.File = n
 		if src.Err == nil {
 			// The signature may be a link too (a ConfigMap's are), held to the
-			// same rule, and checked before anything is read through it
+			// same rule, and checked before anything is read through it.
 			var sig []byte
 			err := fs.ErrNotExist
 			if _, lerr := os.Lstat(path + sign.SigSuffix); lerr == nil {
@@ -169,7 +169,7 @@ func LoadDir(dir string, pub ed25519.PublicKey) (*Set, error) {
 			}
 			if pub != nil && src.Err == nil {
 				if src.Header, err = sign.Verify(pub, src.Name, src.Data, sig); err != nil {
-					src.Err = fmt.Errorf("%s: %v", n+sign.SigSuffix, err)
+					src.Err = fmt.Errorf("%s: %w", n+sign.SigSuffix, err)
 				}
 			}
 		}
@@ -202,7 +202,7 @@ func LoadDir(dir string, pub ed25519.PublicKey) (*Set, error) {
 }
 
 // inside resolves the links of path, a file in realDir, and reports whether
-// it ends at a file inside realDir. A path without links is inside
+// it ends at a file inside realDir. A path without links is inside.
 func inside(realDir, path string) (string, bool) {
 	target, err := filepath.EvalSymlinks(path)
 	return target, err == nil && strings.HasPrefix(target, realDir+string(filepath.Separator))

@@ -1,10 +1,10 @@
-// Package shell turns a shell command line into the commands it may run
+// Package shell turns a shell command line into the commands it may run.
 //
 // It parses the command line and finds every simple command anywhere in it:
 // lists, pipelines, subshells, command and process substitutions, function
 // bodies, and code passed to shells and wrappers (`sh -c`, `eval`, `sudo`,
 // `xargs`, …). Nothing is executed. Where the analysis can't know what runs,
-// it says so (Many elements, unknown layers) instead of guessing
+// it says so (Many elements, unknown layers) instead of guessing.
 package shell
 
 import (
@@ -21,7 +21,7 @@ import (
 	"cyberboar.dev/cyberboar/internal/engine/shell/limits"
 )
 
-// Limits. Anything beyond them is refused, not truncated
+// Limits. Anything beyond them is refused, not truncated.
 const (
 	MaxBytes    = limits.MaxBytes    // command line size
 	MaxDepth    = limits.MaxDepth    // nesting of code in code: sh -c 'eval "…"'
@@ -32,7 +32,7 @@ const (
 // Errors Analyze returns for a command line it can't read in full: longer
 // than MaxBytes, not valid shell syntax (wrapped with the parser's message),
 // or past MaxDepth, MaxCommands or the wrapper limit. The engine denies each
-// Literals also uses ErrTooLarge and ErrTooComplex for its expansion limits
+// Literals also uses ErrTooLarge and ErrTooComplex for its expansion limits.
 var (
 	ErrTooLarge    = limits.ErrTooLarge
 	ErrUnparseable = limits.ErrUnparseable
@@ -40,39 +40,40 @@ var (
 )
 
 // Command is one simple command. Layers are the argv forms to check: as
-// written, then each command a wrapper runs ("sudo nice ls" has three)
-// A layer of a single Many element means "could be anything"
+// written, then each command a wrapper runs ("sudo nice ls" has three).
+// A layer of a single Many element means "could be anything".
 type Command struct {
 	Layers [][]Elem
 	// Aliases is the number of layers after the first that are the same
 	// command by another name: a PowerShell alias's cmdlet (rm is
-	// Remove-Item). An allow rule for any of these names allows them all
+	// Remove-Item). An allow rule for any of these names allows them all.
 	Aliases int
 }
 
-// Code is one place where text on the command line becomes code
+// Code is one place where text on the command line becomes code.
 type Code struct {
 	What     string // the construct, for messages: "python -c", "ssh -o proxycommand"
 	Analyzed bool   // shell code whose commands were analyzed; false: unknown
 }
 
-// Analysis is the result of Analyze
+// Analysis is the result of Analyze.
 type Analysis struct {
 	Commands []Command
 	// Code lists inline code: code passed to shells and interpreters, and
 	// command lines that aren't a single plain command. Values that name a
 	// single plain command (GIT_EDITOR=true) are not listed; that command is
+	// analyzed like the line's other commands.
 	Code []Code
 	// Hidden lists constructs that evaluate a run-time value as code or as a
-	// name, so the value may run commands the analysis can't see (hidden.go)
+	// name, so the value may run commands the analysis can't see (hidden.go).
 	Hidden []string
-	// Files lists every path the command line may touch
+	// Files lists every path the command line may touch.
 	Files []FileRef
 	feeds []commandSet
 }
 
 // Feeds reports whether command from's output can reach command to's input,
-// through pipes, substitutions or shells in between
+// through pipes, substitutions or shells in between.
 func (an *Analysis) Feeds(from, to int) bool {
 	row := an.feeds[from]
 	_ = an.feeds[to] // retain the matrix's bounds check on both indices
@@ -85,28 +86,28 @@ type analyzer struct {
 	fs        osfs.FS
 	windows   bool // paths are read as Git Bash on Windows does (fs.Windows)
 	// powershell: the words being read come from PowerShell, which has no
-	// mounts (powershell.go). Bash code it starts is read as bash again
+	// mounts (powershell.go). Bash code it starts is read as bash again.
 	powershell bool
 	mounts     map[string]string
 	// Set on a second pass when the command line may change HOME (so ~,
 	// $HOME and a bare cd are unknown) or CDPATH/cdable_vars (so `cd name`
-	// may go elsewhere than ./name). saw* record what the first pass found
+	// may go elsewhere than ./name). saw* record what the first pass found.
 	homeUnsure, cdUnsure bool
 	sawHome, sawCd       bool
-	// Glob options set anywhere apply to every glob, the same way
+	// Glob options set anywhere apply to every glob, the same way.
 	globs, sawGlobs globOpts
-	// lastpipe may run the final pipeline command in the current shell
+	// lastpipe may run the final pipeline command in the current shell.
 	lastpipe, sawLastpipe bool
 	// Aliases defined anywhere ("name=body"): bash expands them in the
-	// lines after, so their bodies run wherever the name is a command
+	// lines after, so their bodies run wherever the name is a command.
 	aliases, sawAliases map[string]bool
 	// Aliases whose body is being analyzed: bash doesn't expand an alias
-	// again inside its own expansion (alias ls='ls -la')
+	// again inside its own expansion (alias ls='ls -la').
 	expanding map[string]bool
-	// persistent: later commands run in the same shell (Options.Persistent)
+	// persistent: later commands run in the same shell (Options.Persistent).
 	persistent bool
 	// The variables the line set itself (vars.go): those in each statement
-	// of the current script and those known in the statement being analyzed
+	// of the current script and those known in the statement being analyzed.
 	vars   map[string]string
 	varsAt map[*syntax.Stmt]map[string]string
 	cmds   []Command
@@ -115,7 +116,7 @@ type analyzer struct {
 	files  []FileRef
 	edges  []commandSet
 	// Code run by a shell or wrapper inherits its stdin and stdout, so
-	// whatever feeds the outer command feeds the inner ones, and vice versa
+	// whatever feeds the outer command feeds the inner ones, and vice versa.
 	transparent []transparent
 }
 
@@ -127,29 +128,29 @@ type transparent struct {
 var unknownLayer = []Elem{{Kind: Many, Text: "*"}}
 
 // Analyze finds every command src may run and every path it may touch
-// home is the value of ~ and $HOME; cwd is the absolute directory it starts in
+// home is the value of ~ and $HOME; cwd is the absolute directory it starts in.
 func Analyze(src, home, cwd string) (*Analysis, error) {
 	return analyze(src, home, dir{path: cwd, known: true}, false, false, osfs.FS{}, nil)
 }
 
-// Options are what else is known about where a command runs
+// Options are what else is known about where a command runs.
 type Options struct {
 	Cwd        string // the starting directory, unless CwdUnknown
 	CwdUnknown bool
 	CDPath     bool // CDPATH is set in the environment
 	// Persistent says earlier commands ran in the same shell. They may have
 	// set HOME, CDPATH and glob options, and an alias defined here may be
-	// used later with any arguments
+	// used later with any arguments.
 	Persistent bool
 	// FS reaches the filesystem (glob expansion); the zero value is POSIX.
 	FS osfs.FS
 	// Mounts is Git Bash's mount table on Windows: mount point (/, /tmp) to
 	// the directory in the engine's form, "" when that directory is unknown.
-	// Nil means the table is unknown, and paths outside a drive are refused
+	// Nil means the table is unknown, and paths outside a drive are refused.
 	Mounts map[string]string
 }
 
-// AnalyzeWith is Analyze with Options
+// AnalyzeWith is Analyze with Options.
 func AnalyzeWith(src, home string, o Options) (*Analysis, error) {
 	start := dir{path: o.Cwd, known: true}
 	if o.CwdUnknown {
@@ -260,7 +261,7 @@ func (a *analyzer) script(src string, depth int, start dir) ([]int, error) {
 	return all, nil
 }
 
-// command records one simple command, analysing any code it runs
+// command records one simple command, analysing any code it runs.
 func (a *analyzer) command(st *syntax.Stmt, call *syntax.CallExpr, depth int, pass *cwdPass) (int, error) {
 	if len(a.cmds) >= MaxCommands {
 		return 0, ErrTooComplex
@@ -324,7 +325,7 @@ func (a *analyzer) command(st *syntax.Stmt, call *syntax.CallExpr, depth int, pa
 	return id, nil
 }
 
-// innerDir is the directory the innermost command of u runs in, when the shell is in d
+// innerDir is the directory the innermost command of u runs in, when the shell is in d.
 func (a *analyzer) innerDir(u unwrapResult, d dir) dir {
 	for _, e := range u.dirs {
 		switch {
@@ -335,14 +336,18 @@ func (a *analyzer) innerDir(u unwrapResult, d dir) dir {
 		case path.IsAbs(e.Text):
 			d = dir{path: e.Text, known: true}
 		case d.known:
-			d = dir{path: joinDir(d.path, e.Text), known: true}
+			next := dir{path: joinDir(d.path, e.Text), known: true}
+			if d.alt != "" {
+				next.alt = joinDir(d.alt, e.Text)
+			}
+			d = next
 		}
 	}
 	return d
 }
 
 // runCode handles inline code: shell code is analyzed, anything else (or code
-// only known at run time) makes the command unknown
+// only known at run time) makes the command unknown.
 func (a *analyzer) runCode(id int, r codeRun, depth int, unknown bool, d dir) (bool, error) {
 	if r.start != nil {
 		d = *r.start
@@ -366,8 +371,8 @@ func (a *analyzer) runCode(id int, r codeRun, depth int, unknown bool, d dir) (b
 	return unknown, err
 }
 
-// runCommandLine handles a value run as a command line
-// A single plain command is only a command; anything more is also inline code
+// runCommandLine handles a value run as a command line.
+// A single plain command is only a command; anything more is also inline code.
 func (a *analyzer) runCommandLine(id int, r codeRun, depth int, unknown bool, d dir) (bool, error) {
 	if r.start != nil {
 		d = *r.start
@@ -387,7 +392,7 @@ func (a *analyzer) runCommandLine(id int, r codeRun, depth int, unknown bool, d 
 }
 
 // isPlainCommand reports a single simple command: words only, no operators,
-// redirections, assignments or expansions
+// redirections, assignments or expansions.
 func isPlainCommand(text string) bool {
 	f, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(text), "")
 	if err != nil || len(f.Stmts) != 1 {
@@ -411,7 +416,7 @@ func isPlainCommand(text string) bool {
 }
 
 // assignments checks NAME=VALUE settings for variables that run or load code
-// id is the command they apply to, or -1 for a bare assignment or export
+// id is the command they apply to, or -1 for a bare assignment or export.
 func (a *analyzer) assignments(id int, as []*syntax.Assign, depth int, unknown bool, d dir) (bool, error) {
 	for _, as := range as {
 		if as.Name == nil || as.Value == nil {
@@ -431,7 +436,7 @@ func (a *analyzer) assignments(id int, as []*syntax.Assign, depth int, unknown b
 	return unknown, nil
 }
 
-// bareAssignments handles assignments without a command (NAME=VALUE, export)
+// bareAssignments handles assignments without a command (NAME=VALUE, export).
 func (a *analyzer) bareAssignments(as []*syntax.Assign, depth int, d dir) error {
 	unknown, err := a.assignments(-1, as, depth, false, d)
 	if err != nil {
@@ -455,7 +460,7 @@ func (a *analyzer) envVar(id int, name string, value Elem, depth int, unknown bo
 }
 
 // markUnknown adds a "could be anything" layer to command id, or, for id < 0,
-// a command of its own
+// a command of its own.
 func (a *analyzer) markUnknown(id int) error {
 	if id >= 0 {
 		a.cmds[id].Layers = append(a.cmds[id].Layers, unknownLayer)
@@ -471,7 +476,7 @@ func (a *analyzer) markUnknown(id int) error {
 type unwrapResult struct {
 	layers [][]Elem
 	// dirs are the directories wrappers move into (env -C a env -C b), and
-	// layers[dirFrom:] run in the last of them; dirFrom is -1 without one
+	// layers[dirFrom:] run in the last of them; dirFrom is -1 without one.
 	dirs     []Elem
 	dirFrom  int
 	code     []codeRun
@@ -493,7 +498,7 @@ func (r *unwrapResult) merge(u unwrapped) {
 	r.unknown = r.unknown || u.unknown
 }
 
-// unwrapAll follows wrappers from argv inwards, collecting every layer
+// unwrapAll follows wrappers from argv inwards, collecting every layer.
 func (a *analyzer) unwrapAll(argv []Elem, depth int) (unwrapResult, error) {
 	res := unwrapResult{layers: [][]Elem{argv}, dirFrom: -1}
 	cur := argv
@@ -550,7 +555,7 @@ func (a *analyzer) unwrapAll(argv []Elem, depth int) (unwrapResult, error) {
 
 // stdinScript returns the code a shell reads from stdin: nil with known=true
 // for a plain file (not analyzed, like any script file), known=false when the
-// code comes from a pipe or anything else only known at run time
+// code comes from a pipe or anything else only known at run time.
 func (a *analyzer) stdinScript(st *syntax.Stmt) (src *codeRun, known bool) {
 	var last *syntax.Redirect
 	for _, r := range st.Redirs {
@@ -592,7 +597,7 @@ func (a *analyzer) stdinScript(st *syntax.Stmt) (src *codeRun, known bool) {
 }
 
 // linkFile records which commands feed which: pipes, and command/process
-// substitutions into the command that uses them
+// substitutions into the command that uses them.
 func (a *analyzer) linkFile(f *syntax.File, ids map[*syntax.Stmt]int) {
 	var spans map[syntax.Node]commandSpan
 	var order []int
@@ -664,7 +669,7 @@ func (a *analyzer) link(from, to []int) {
 }
 
 // closure computes the transitive "feeds" relation, including through code
-// run by shells and wrappers
+// run by shells and wrappers.
 func (a *analyzer) closure() []commandSet {
 	n := len(a.cmds)
 	m := make([]commandSet, n)
@@ -679,8 +684,8 @@ func (a *analyzer) closure() []commandSet {
 	// isolated wrapper must not create a feeds relation by itself
 	for changed := true; changed; {
 		changed = false
-		for k := 0; k < n; k++ {
-			for i := 0; i < n; i++ {
+		for k := range n {
+			for i := range n {
 				if !m[i].has(k) {
 					continue
 				}
@@ -688,7 +693,7 @@ func (a *analyzer) closure() []commandSet {
 			}
 		}
 		for _, t := range a.transparent {
-			for x := 0; x < n; x++ {
+			for x := range n {
 				for _, in := range t.inner {
 					if m[x].has(t.outer) && x != in && !m[x].has(in) {
 						m[x].add(in)

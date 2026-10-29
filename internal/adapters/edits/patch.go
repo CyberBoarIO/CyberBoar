@@ -12,7 +12,7 @@ import (
 	"cyberboar.dev/cyberboar/internal/engine"
 )
 
-// These are the markers of the apply_patch grammar (codex-rs/apply-patch parser.rs)
+// These are the markers of the apply_patch grammar (codex-rs/apply-patch parser.rs).
 const (
 	beginPatch         = "*** Begin Patch"
 	endPatch           = "*** End Patch"
@@ -26,17 +26,17 @@ const (
 	environmentID      = "*** Environment ID:"
 )
 
-// chunk is one @@ section of an update, which replaces old lines with new ones
+// chunk is one @@ section of an update, which replaces old lines with new ones.
 type chunk struct {
 	context  *string
 	old, new []string
-	// ctx pairs the indices in old and new of lines given as context
+	// ctx pairs the indices in old and new of lines given as context.
 	ctx [][2]int
 	eof bool
 }
 
 // update is one "*** Update File" section, with its path, the destination of
-// a move and its hunks
+// a move and its hunks.
 type update struct {
 	path, moveTo string
 	chunks       []chunk
@@ -44,18 +44,18 @@ type update struct {
 
 // Patch reads an apply_patch document as Codex does (codex-rs/apply-patch:
 // parser.rs, streaming_parser.rs, file_update.rs, seek_sequence.rs) and
-// returns the Rewrite of each file it updates, by the path its header names
+// returns the Rewrite of each file it updates, by the path its header names.
 // For a moved file, the Rewrite of the source gives the content the
 // destination gets. The files the document adds, whose content is the whole
 // text, and the files it deletes are not in the map. A document Codex can't
 // read is an error. A file the document touches twice gets a Rewrite that
-// fails, because Codex applies the parts in turn, which Patch doesn't follow
+// fails, because Codex applies the parts in turn, which Patch doesn't follow.
 func Patch(doc string) (map[string]engine.Rewrite, error) {
 	rewrites, _, err := PatchWithMoves(doc)
 	return rewrites, err
 }
 
-// PatchWithMoves is Patch with the source paths of updates that move to another file
+// PatchWithMoves is Patch with the source paths of updates that move to another file.
 func PatchWithMoves(doc string) (map[string]engine.Rewrite, map[string]bool, error) {
 	updates, touched, err := parsePatch(doc)
 	if err != nil {
@@ -84,7 +84,7 @@ func PatchWithMoves(doc string) (map[string]engine.Rewrite, map[string]bool, err
 }
 
 // parsePatch returns the update sections of doc, and for each path, how many
-// file headers name it, so Patch can refuse a file that is changed twice
+// file headers name it, so Patch can refuse a file that is changed twice.
 func parsePatch(doc string) (updates []update, touched map[string]int, err error) {
 	lines := strings.Split(strings.TrimSpace(doc), "\n")
 	for i, l := range lines {
@@ -201,7 +201,7 @@ func parsePatch(doc string) (updates []update, touched map[string]int, err error
 	return updates, touched, nil
 }
 
-// errOrf returns err when it is set, and otherwise an error formatted from format and args
+// errOrf returns err when it is set, and otherwise an error formatted from format and args.
 func errOrf(err error, format string, args ...any) error {
 	if err != nil {
 		return err
@@ -209,12 +209,12 @@ func errOrf(err error, format string, args ...any) error {
 	return fmt.Errorf(format, args...)
 }
 
-// bounded reports whether lines start and end with the patch's markers
+// bounded reports whether lines start and end with the patch's markers.
 func bounded(lines []string) bool {
 	return len(lines) > 0 && strings.TrimSpace(lines[0]) == beginPatch && strings.TrimSpace(lines[len(lines)-1]) == endPatch
 }
 
-// line reads one line of an update hunk. u is the line without trailing whitespace
+// line reads one line of an update hunk. u is the line without trailing whitespace.
 func (cur *update) line(line, u string) error {
 	last := func() *chunk {
 		if len(cur.chunks) == 0 {
@@ -273,7 +273,7 @@ func (cur *update) line(line, u string) error {
 	return nil
 }
 
-// replacement replaces n lines at line index at with lines
+// replacement replaces n lines at line index at with lines.
 type replacement struct {
 	at, n int
 	lines []string
@@ -281,7 +281,7 @@ type replacement struct {
 
 // applyChunks returns the file after the chunks, as Codex writes it by
 // default (lines in the patch's form, LF endings), and as it writes it
-// when keeping line endings (context lines kept as the file has them)
+// when keeping line endings (context lines kept as the file has them).
 func applyChunks(old string, chunks []chunk) ([]string, error) {
 	lines := strings.Split(old, "\n")
 	if lines[len(lines)-1] == "" {
@@ -331,8 +331,8 @@ func applyChunks(old string, chunks []chunk) ([]string, error) {
 	out := func(rs []replacement) string {
 		slices.SortStableFunc(rs, func(a, b replacement) int { return a.at - b.at })
 		res := slices.Clone(lines)
-		for k := len(rs) - 1; k >= 0; k-- {
-			r := rs[k]
+		for _, r := range slices.Backward(rs) {
+
 			end := min(r.at+r.n, len(res))
 			res = slices.Concat(res[:r.at], r.lines, res[end:])
 		}
@@ -347,7 +347,7 @@ func applyChunks(old string, chunks []chunk) ([]string, error) {
 // seek finds pattern in lines at or after start, as Codex's seek_sequence
 // does. It tries an exact match first, then one that ignores trailing
 // whitespace, then surrounding whitespace, and then typographic punctuation
-// too. If eof is set, only the end of the file is tried
+// too. If eof is set, only the end of the file is tried.
 func seek(lines, pattern []string, start int, eof bool) (int, bool) {
 	if len(pattern) == 0 {
 		return start, true
@@ -378,11 +378,11 @@ func seek(lines, pattern []string, start int, eof bool) (int, bool) {
 }
 
 // trimEnd removes trailing whitespace. Rust's trim functions and Go's agree
-// on what is whitespace (Unicode's White_Space)
+// on what is whitespace (Unicode's White_Space).
 func trimEnd(s string) string { return strings.TrimRightFunc(s, unicode.IsSpace) }
 
 // punct returns s as Codex's normalize function does, trimmed and with
-// typographic dashes, quotes and spaces in ASCII
+// typographic dashes, quotes and spaces in ASCII.
 func punct(s string) string {
 	return strings.Map(func(r rune) rune {
 		switch r {
@@ -402,7 +402,7 @@ func punct(s string) string {
 // ShellPatch returns the patch a shell script hands to apply_patch, found the
 // way Codex finds it (codex-rs/apply-patch invocation.rs). The script must be
 // that one command with the patch in a here-document, alone or after
-// `cd DIR &&`, and dir is then DIR. ok is false for any other script
+// `cd DIR &&`, and dir is then DIR. ok is false for any other script.
 func ShellPatch(script string) (patch, dir string, ok bool) {
 	f, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(script), "")
 	if err != nil || len(f.Stmts) != 1 {
@@ -436,14 +436,14 @@ func ShellPatch(script string) (patch, dir string, ok bool) {
 	}
 	// The word ends with the closing delimiter's line
 	body := script[r.Hdoc.Pos().Offset():r.Hdoc.End().Offset()]
-	i := strings.LastIndexByte(body, '\n')
-	if i < 0 {
+	before, _, ok := strings.CutLast(body, "\n")
+	if !ok {
 		return "", "", false
 	}
-	return strings.TrimRight(body[:i], "\n"), dir, true
+	return strings.TrimRight(before, "\n"), dir, true
 }
 
-// lit returns a word that is one literal or quoted string, unquoted, or ""
+// lit returns a word that is one literal or quoted string, unquoted, or "".
 func lit(w *syntax.Word) string {
 	if len(w.Parts) != 1 {
 		return ""

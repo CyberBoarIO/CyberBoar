@@ -14,7 +14,7 @@ import (
 // space, as it is. opencode takes the text after the marker with surrounding
 // spaces trimmed, so for it "*** Add File:a" and "*** Add File:  a" both add
 // the file a. Copilot CLI's apply_patch tool is said to take Codex's grammar,
-// but its parser can't be read, so both readings are used for every agent
+// but its parser can't be read, so both readings are used for every agent.
 const (
 	BeginPatch      = "*** Begin Patch"
 	addFile         = "*** Add File:"
@@ -25,14 +25,14 @@ const (
 )
 
 // PatchPaths returns every file an apply_patch document may touch, and
-// whether the patch names an environment (a machine other than the hook's)
+// whether the patch names an environment (a machine other than the hook's).
 //
 // It over-approximates on purpose. Codex trims lines before matching headers
 // in most states, and instead of following its parser state by state,
 // PatchPaths takes every line that could be read as a file header in any
 // state, so a header hidden in hunk content still counts. For each header it
 // returns both Codex's and opencode's reading of the path. Extra paths can
-// only make the verdict stricter
+// only make the verdict stricter.
 func PatchPaths(patch string) (paths []string, environment bool) {
 	seen := map[string]bool{}
 	add := func(p string) {
@@ -41,7 +41,7 @@ func PatchPaths(patch string) (paths []string, environment bool) {
 			paths = append(paths, p)
 		}
 	}
-	for _, line := range strings.Split(patch, "\n") {
+	for line := range strings.SplitSeq(patch, "\n") {
 		t := strings.TrimSpace(line)
 		if strings.HasPrefix(t, environmentLine) {
 			environment = true
@@ -63,10 +63,10 @@ func PatchPaths(patch string) (paths []string, environment bool) {
 // PatchText returns what an apply_patch document may add to files, for the
 // secrets check. That is every line that could be an added line, without its
 // "+". Like PatchPaths, it over-approximates, so a line indented before its
-// "+" counts
+// "+" counts.
 func PatchText(patch string) string {
 	var add []string
-	for _, line := range strings.Split(patch, "\n") {
+	for line := range strings.SplitSeq(patch, "\n") {
 		line = strings.TrimSuffix(line, "\r")
 		if t := strings.TrimLeft(line, " \t"); strings.HasPrefix(t, "+") {
 			add = append(add, t[1:])
@@ -78,8 +78,8 @@ func PatchText(patch string) string {
 // PatchWrites returns the write actions of an apply_patch document, one for
 // each path it may touch (PatchPaths). Each holds what the document may add
 // (PatchText) and, for a file it updates, the Rewrite that works out the file
-// after it (package edits), so the secrets check sees what the file will hold
-// A moved file's complete rewritten contents are checked as a new write
+// after it (package edits), so the secrets check sees what the file will hold.
+// A moved file's complete rewritten contents are checked as a new write.
 // A document Codex couldn't read gives each write a Rewrite that fails. Codex
 // would refuse the patch too, and what a looser reader such as opencode's
 // makes of it can't be worked out.

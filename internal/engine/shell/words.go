@@ -12,39 +12,39 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// Kind says how much is known about an argv element
+// Kind says how much is known about an argv element.
 type Kind int
 
 const (
-	// Lit is exactly one word with a known value
+	// Lit is exactly one word with a known value.
 	Lit Kind = iota
-	// One is exactly one word whose value is only known at run time, e.g. "$X"
+	// One is exactly one word whose value is only known at run time, e.g. "$X".
 	One
 	// Many is zero or more words only known at run time, e.g. unquoted $X
-	// (field splitting) or a glob like *.go
+	// (field splitting) or a glob like *.go.
 	Many
 )
 
-// Elem is one argv element. For Lit, Text is the value
-// For One and Many, Text is the shape: a glob every possible word matches ("*" if nothing is known)
+// Elem is one argv element. For Lit, Text is the value.
+// For One and Many, Text is the shape: a glob every possible word matches ("*" if nothing is known).
 type Elem struct {
 	Kind Kind
 	Text string
 	// Glob marks an unquoted glob (Many): Text is the pattern, and it expands
-	// to existing paths. Otherwise a Many is a run-time value
+	// to existing paths. Otherwise a Many is a run-time value.
 	Glob bool
 	// Shape is set for a run-time value whose literal parts can be read: a
 	// glob over what the word may be before field splitting, its literal
 	// parts with each run-time part as "*" ("/proc/*/environ" for
 	// /proc/$PPID/environ). The built-in rules check it, since its literal
-	// parts can pin it under /proc or /dev
+	// parts can pin it under /proc or /dev.
 	Shape string
-	// Src is a run-time value's word as written ("$f"), for messages
+	// Src is a run-time value's word as written ("$f"), for messages.
 	Src string
 }
 
 // String returns the element as written in messages: a literal or glob
-// shape, or "…" for a value only known at run time
+// shape, or "…" for a value only known at run time.
 func (e Elem) String() string {
 	if e.Kind == Lit || e.Glob || e.Text != "*" {
 		return e.Text // a literal, or a glob shape like *.go
@@ -53,7 +53,7 @@ func (e Elem) String() string {
 }
 
 // Shown returns the element as written in messages, as String does, but
-// shows a value only known at run time as its word ("$f") where known
+// shows a value only known at run time as its word ("$f") where known.
 func (e Elem) Shown() string {
 	if s := e.String(); s != "…" || e.Src == "" {
 		return s
@@ -61,10 +61,10 @@ func (e Elem) Shown() string {
 	return e.Src
 }
 
-// maxSrc bounds Elem.Src, so a long word doesn't flood a message
+// maxSrc bounds Elem.Src, so a long word doesn't flood a message.
 const maxSrc = 80
 
-// wordSrc returns w as written, cut to maxSrc bytes
+// wordSrc returns w as written, cut to maxSrc bytes.
 func wordSrc(w *syntax.Word) string {
 	var b strings.Builder
 	if err := syntax.NewPrinter().Print(&b, w); err != nil {
@@ -81,7 +81,7 @@ func wordSrc(w *syntax.Word) string {
 	return s
 }
 
-// classify reports what a word expands to, without expanding it
+// classify reports what a word expands to, without expanding it.
 func (a *analyzer) classify(w *syntax.Word) Kind {
 	kind := Lit
 	glob := false
@@ -146,7 +146,7 @@ func (a *analyzer) classify(w *syntax.Word) Kind {
 // knownParam reports a plain $NAME or ${NAME} whose value the engine knows:
 // HOME (the action's home directory), or a variable the line set itself
 // (vars.go). Unquoted, the value must also come through field splitting and
-// globbing as it is
+// globbing as it is.
 func (a *analyzer) knownParam(p *syntax.ParamExp, quoted bool) bool {
 	if p.Param == nil || p.Excl || p.Length || p.Width || p.IsSet || p.Flags != nil || p.NestedParam != nil ||
 		p.Index != nil || len(p.Modifiers) > 0 || p.Slice != nil || p.Repl != nil || p.Names != 0 || p.Exp != nil {
@@ -174,8 +174,8 @@ func hasUnescapedMeta(s string) bool {
 	return false
 }
 
-// word turns one shell word into argv elements
-// A literal word with brace expansion becomes several elements
+// word turns one shell word into argv elements.
+// A literal word with brace expansion becomes several elements.
 func (a *analyzer) word(w *syntax.Word) []Elem {
 	switch a.classify(w) {
 	case One:
@@ -218,8 +218,8 @@ func (a *analyzer) hasDynamicPart(w *syntax.Word) bool {
 }
 
 // fields expands a word that has no run-time parts the way the shell would:
-// quote and escape removal, $'…', brace expansion, ~ and $HOME
-// Globs are not expanded (no directory access)
+// quote and escape removal, $'…', brace expansion, ~ and $HOME.
+// Globs are not expanded (no directory access).
 func (a *analyzer) fields(w *syntax.Word) ([]string, error) {
 	// ~user: substitute the home the analyzer looked up, instead of letting
 	// the expander do its own lookup (or keep it literal if unknown)
@@ -235,7 +235,7 @@ func (a *analyzer) fields(w *syntax.Word) ([]string, error) {
 		w = &syntax.Word{Parts: append(first, w.Parts[1:]...)}
 	}
 	// $'…': decode it here rather than trust the expander, which reads some
-	// escapes differently from bash (classify made the rest run-time words)
+	// escapes differently from bash (classify made the rest run-time words).
 	var parts []syntax.WordPart
 	for i, part := range w.Parts {
 		if q, ok := part.(*syntax.SglQuoted); ok && q.Dollar {
@@ -265,7 +265,7 @@ var errUncertainEscape = errors.New("an escape in $'…' that shells read differ
 // A NUL (\0, \x0, \x00) ends the string in bash, while zsh keeps it and the
 // argument ends there when it is run: the same only if the string ends the
 // word (last). What remains is read the same everywhere: \a \b \e \E \f \n
-// \r \t \v \\ \', octal \N to \NNN and \xH or \xHH
+// \r \t \v \\ \', octal \N to \NNN and \xH or \xHH.
 func ansiC(q *syntax.SglQuoted, last bool) (string, bool) {
 	if !q.Dollar {
 		return q.Value, true
@@ -354,7 +354,7 @@ func hexValue(c byte) int {
 
 // tildeShape is the shape of a word whose leading tilde can't be resolved but
 // whose rest is literal: "~-/id_rsa" is "*/id_rsa", so rules anchored anywhere
-// still match its tail. Anything else is "*"
+// still match its tail. Anything else is "*".
 func (a *analyzer) tildeShape(w *syntax.Word) string {
 	if _, ok := tildePrefix(w); !ok || len(w.Parts) != 1 {
 		return "*"
@@ -371,7 +371,7 @@ func (a *analyzer) tildeShape(w *syntax.Word) string {
 // as the shell reads them, glob-escaped, with "*" for each run-time part. It
 // returns "" when they can't be read that way: an unquoted glob or brace
 // expansion, an escape shells read differently, or a leading tilde whose
-// home is unknown
+// home is unknown.
 func (a *analyzer) shape(w *syntax.Word) string {
 	if t, ok := tildePrefix(w); ok {
 		if _, found := a.userHome(t); t == "" && a.homeUnsure || t != "" && !found {
@@ -439,7 +439,7 @@ func (a *analyzer) shape(w *syntax.Word) string {
 	return b.String()
 }
 
-// escapeGlob escapes the glob metacharacters in s, so that it matches itself
+// escapeGlob escapes the glob metacharacters in s, so that it matches itself.
 func escapeGlob(s string) string {
 	var b strings.Builder
 	for _, r := range s {
@@ -452,7 +452,7 @@ func escapeGlob(s string) string {
 }
 
 // tildePrefix returns the user name after a leading unquoted ~ ("" for ~ and
-// ~/…); ok is false when the word doesn't start with one
+// ~/…); ok is false when the word doesn't start with one.
 func tildePrefix(w *syntax.Word) (string, bool) {
 	if len(w.Parts) == 0 {
 		return "", false
@@ -473,7 +473,7 @@ func tildePrefix(w *syntax.Word) (string, bool) {
 }
 
 // userHome looks up ~name. +, - and digits are the directory stack, which the
-// engine doesn't track
+// engine doesn't track.
 func (a *analyzer) userHome(name string) (string, bool) {
 	// On Windows, Git Bash's idea of another user's home isn't the engine's
 	if a.windows || name == "+" || name == "-" || strings.TrimLeft(name, "+-0123456789") == "" {
@@ -482,7 +482,7 @@ func (a *analyzer) userHome(name string) (string, bool) {
 	return lookupHome(name)
 }
 
-// lookupHome finds a user's home directory
+// lookupHome finds a user's home directory.
 func lookupHome(name string) (string, bool) {
 	u, err := user.Lookup(name)
 	if err != nil || u.HomeDir == "" {
@@ -501,7 +501,7 @@ func (a *analyzer) words(ws []*syntax.Word) []Elem {
 
 // normalize reduces argv[0] to its base name ("/usr/bin/git" → "git"). On
 // Windows either separator counts and .exe and .com are dropped, since
-// Windows finds bash.exe for "bash" (BASH.EXE -c runs shell code)
+// Windows finds bash.exe for "bash" (BASH.EXE -c runs shell code).
 func (a *analyzer) normalize(argv []Elem) []Elem {
 	if len(argv) == 0 {
 		return argv
@@ -522,7 +522,7 @@ func (a *analyzer) normalize(argv []Elem) []Elem {
 }
 
 // join renders argv as the shell code a wrapper like eval or watch would run
-// dynamic is true if any element is only known at run time
+// dynamic is true if any element is only known at run time.
 func join(argv []Elem) (text string, dynamic bool) {
 	parts := make([]string, len(argv))
 	for i, e := range argv {

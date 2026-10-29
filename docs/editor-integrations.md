@@ -6,12 +6,11 @@ its Local agent. These integrations reuse the agents' existing hooks or plugins;
 CyberBoar runs in the agent's execution environment, not as a VS Code extension of
 its own.
 
-**Active testing:** Copilot in VS Code has been verified end to end from editor
-sessions; the other editor integrations are under active testing. This support status
-is not a claim that every editor tool, version or platform has been verified:
-CLI/runtime tests do not establish editor-session coverage. Confirm an allowed and a
-policy-denied tool call from the editor before relying on a setup.
-See the [capability matrix](capability-matrix.md) for tested versions and limitations.
+**Testing status:** Copilot in VS Code has been verified end to end from editor
+sessions; the other editor integrations are still being tested in the editor, and CLI
+tests don't cover editor sessions. Before relying on a setup, confirm an allowed and a
+policy-denied tool call from the editor. The [capability matrix](capability-matrix.md)
+lists tested versions and limitations.
 
 ## Choose the integration
 
@@ -234,8 +233,7 @@ one agent only, then start that agent **through its editor integration**.
 4. Record the editor, extension and bundled runtime versions, operating system,
    execution host and policy scope. Do not reuse a CLI test result as an editor result.
 
-This smoke test verifies those calls, not every tool or failure mode. Full validation
-also needs blocked writes, MCP decisions, subagents where available, hook failures,
+A full validation also covers blocked writes, MCP decisions, subagents where available, hook failures,
 trust/loading checks and reviewed tool schemas. Editor-provided selections, attached
 context and inline completions are not automatically governed by a pre-tool hook.
 Read the [security model](security-model.md) and keep the agent's own sandbox and

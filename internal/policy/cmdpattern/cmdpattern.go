@@ -1,8 +1,8 @@
-// Package cmdpattern parses command rule patterns such as "git push" or "curl | sh"
+// Package cmdpattern parses command rule patterns such as "git push" or "curl | sh".
 //
 // A pattern is written in shell syntax: one simple command, or a pipeline of
 // simple commands. Each word becomes a Token, a glob against one argv word in
-// which unquoted * ? [ are wildcards and "*" also matches "/"
+// which unquoted * ? [ are wildcards and "*" also matches "/".
 package cmdpattern
 
 import (
@@ -18,22 +18,22 @@ import (
 )
 
 // Pattern is a parsed command pattern. Stages has one entry for a simple
-// command, more for a pipeline ("curl | sh" has two)
+// command, more for a pipeline ("curl | sh" has two).
 type Pattern struct {
 	Stages [][]Token
 }
 
-// Token matches one argv word
+// Token matches one argv word.
 type Token struct {
 	glob string // path.Match syntax, with '/' mapped to sep
 	meta bool   // glob contains wildcards
 }
 
-// sep stands in for '/' so path.Match's '*' also matches across slashes
-// Command words can't contain NUL, so it never collides
+// sep stands in for '/' so path.Match's '*' also matches across slashes.
+// Command words can't contain NUL, so it never collides.
 const sep = "\x00"
 
-// Parse parses a pattern. Errors are phrased for a policy author
+// Parse parses a pattern. Errors are phrased for a policy author.
 func Parse(s string) (*Pattern, error) {
 	f, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(s), "")
 	if err != nil {
@@ -84,8 +84,8 @@ func (p *Pattern) addStages(st *syntax.Stmt) error {
 	}
 }
 
-// wordToken returns the Token for one word of a pattern
-// Quoted text matches literally, and unquoted * ? [ stay wildcards
+// wordToken returns the Token for one word of a pattern.
+// Quoted text matches literally, and unquoted * ? [ stay wildcards.
 func wordToken(w *syntax.Word) (Token, error) {
 	// The shell expands {a,b} into two words before the command runs, so as
 	// a single glob it would never match
@@ -131,7 +131,7 @@ func wordToken(w *syntax.Word) (Token, error) {
 	return Token{glob: glob, meta: meta}, nil
 }
 
-// quoteMeta escapes the glob wildcards in s, so that s matches itself
+// quoteMeta escapes the glob wildcards in s, so that s matches itself.
 func quoteMeta(s string) string {
 	var b strings.Builder
 	for _, r := range s {
@@ -143,8 +143,8 @@ func quoteMeta(s string) string {
 	return b.String()
 }
 
-// Match reports whether the literal word matches
-// With folded, a match after folding both (which ignores case) also counts
+// Match reports whether the literal word matches.
+// With folded, a match after folding both (which ignores case) also counts.
 func (t Token) Match(word string, folded bool) bool {
 	word = strings.ReplaceAll(word, "/", sep)
 	return globMatch(t.glob, word, folded)
@@ -153,7 +153,7 @@ func (t Token) Match(word string, folded bool) bool {
 // MayMatch reports whether some word of the given shape could match. A shape
 // is a glob over the possible values of a word only known at run time: "*"
 // for a variable, "*.go" for an unquoted glob. With folded, a match after
-// folding both also counts
+// folding both also counts.
 func (t Token) MayMatch(shape string, folded bool) bool {
 	if t.meta {
 		return true // assume two globs can match the same word rather than intersect them
@@ -166,9 +166,9 @@ func (t Token) MayMatch(shape string, folded bool) bool {
 // becomes [a-z], [^e] then also excludes E), so the folded form only adds
 // matches to the written one. An error counts as a match: for a deny rule
 // that is the stricter answer, and for an ask rule it can ask where
-// allow-listed posture would deny, which leaves the call to the user
+// allow-listed posture would deny, which leaves the call to the user.
 // Parse has checked a token's own glob, so only a shape from a command line, or a
-// glob that folding has changed, can cause one
+// glob that folding has changed, can cause one.
 func globMatch(glob, s string, folded bool) bool {
 	ok, err := path.Match(glob, s)
 	if err == nil && !ok && folded {
@@ -177,7 +177,7 @@ func globMatch(glob, s string, folded bool) bool {
 	return ok || err != nil
 }
 
-// unquote removes the backslash escapes of a wildcard-free glob
+// unquote removes the backslash escapes of a wildcard-free glob.
 func unquote(glob string) string {
 	var b strings.Builder
 	esc := false

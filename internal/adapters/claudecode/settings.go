@@ -19,6 +19,7 @@ import (
 // Scope is where Claude Code settings live.
 type Scope string
 
+// The scopes apply installs into, by the settings file each one writes.
 const (
 	ScopeUser    Scope = "user"    // ~/.claude/settings.json
 	ScopeProject Scope = "project" // <project>/.claude/settings.json (committed)
@@ -47,8 +48,9 @@ const legacyManagedDir = `C:\ProgramData\ClaudeCode`
 const disableAllHooks = "disableAllHooks"
 
 // HookTimeout is the Claude Code hook timeout in seconds. The hook's own
-// deadline must stay well below it, because a hook killed by this timeout
-// fails open.
+// deadline must stay well below it: releases before 2.1.295 run the call
+// when this timeout kills the hook, and later ones block it (onFailure) but
+// without the hook's reason, which only an answer before the deadline gives.
 const HookTimeout = 10
 
 // FragmentOptions describe the hook command to install.

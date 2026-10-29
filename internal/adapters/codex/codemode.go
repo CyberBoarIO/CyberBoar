@@ -23,7 +23,7 @@ import (
 // dead-code decoys can exist. With any other script, the directory and shell
 // are unknown, and the call is denied
 
-// scriptCall is one `tools.NAME(args...)` call in a code-mode script
+// scriptCall is one `tools.NAME(args...)` call in a code-mode script.
 type scriptCall struct {
 	name string
 	args []any // decoded literals
@@ -135,7 +135,7 @@ func (p *scriptParser) peek() byte {
 	return p.src[p.pos]
 }
 
-// textArg parses what text() may print, which is values and never calls to tools
+// textArg parses what text() may print, which is values and never calls to tools.
 func (p *scriptParser) textArg() {
 	switch p.peek() {
 	case '"':
@@ -157,7 +157,7 @@ func (p *scriptParser) textArg() {
 	}
 }
 
-// template parses `...${path}...` with no nested templates or expressions
+// template parses `...${path}...` with no nested templates or expressions.
 func (p *scriptParser) template() {
 	p.pos++ // opening backtick
 	for p.pos < len(p.src) && p.err == nil {
@@ -210,7 +210,7 @@ func (p *scriptParser) call() scriptCall {
 	return c
 }
 
-// value parses a literal. depth bounds its nesting
+// value parses a literal. depth bounds its nesting.
 func (p *scriptParser) value(depth int) any {
 	if depth > 16 || p.err != nil {
 		p.fail()
@@ -279,7 +279,7 @@ func (p *scriptParser) value(depth int) any {
 }
 
 // str parses a double-quoted string with JSON escapes (JS-only escapes such
-// as \x41 or \u{41} make the script untrusted)
+// as \x41 or \u{41} make the script untrusted).
 func (p *scriptParser) str() string {
 	p.skipSpace()
 	start := p.pos
@@ -311,8 +311,8 @@ func (p *scriptParser) str() string {
 }
 
 // callFromScript finds the exec_command call in a code-mode script that the
-// hook is asking about (its cmd equals the hook's command)
-// All matching calls must agree on workdir, shell and environment_id
+// hook is asking about (its cmd equals the hook's command).
+// All matching calls must agree on workdir, shell and environment_id.
 func callFromScript(src, cmd string) (*execCall, error) {
 	calls, err := parseScript(src)
 	if err != nil {

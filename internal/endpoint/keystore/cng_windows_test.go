@@ -12,7 +12,7 @@ import (
 	"cyberboar.dev/cyberboar/pkg/brand"
 )
 
-// cngKeyFileOf decodes a CNG key file, for tests that rewrite it
+// cngKeyFileOf decodes a CNG key file, for tests that rewrite it.
 func cngKeyFileOf(t *testing.T, keyFile []byte) cngKeyFile {
 	t.Helper()
 	b, _ := pem.Decode(keyFile)

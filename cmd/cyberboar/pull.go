@@ -17,9 +17,9 @@ import (
 	"cyberboar.dev/cyberboar/pkg/sign"
 )
 
-// runPull installs the signed bundle for a policy, once or every --every
+// runPull installs the signed bundle for a policy, once or every --every.
 // An enrolled endpoint pulls the policy its console assigned it, with authentication,
-// and one that isn't enrolled pulls from a static site (docs/protocol)
+// and one that isn't enrolled pulls from a static site (docs/protocol).
 func runPull(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	server := fs.String("server", h.getenv(envName("server")), "static site base URL, https; for an enrolled endpoint only checked against its console's (env "+envName("server")+")")

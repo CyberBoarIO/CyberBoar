@@ -25,7 +25,7 @@ const corpusDir = "../../../testdata/corpus"
 // becomes the body of a function, and `declare -f` prints bash's own reading
 // of it. Analysing that reprint must give the same commands and paths as
 // analysing the original; a difference means bash reads the command line
-// differently
+// differently.
 //
 // Only what bash's reading has and the analyzer's lacks is an error (a
 // potential bypass); the reverse is over-approximation and only logged. It
@@ -34,7 +34,7 @@ const corpusDir = "../../../testdata/corpus"
 // code: a DEBUG trap (extdebug) aborts before any simple command, PATH is
 // empty, kill is disabled, noclobber and `ulimit -f 0` stop file writes, the
 // working directory and HOME are a temp dir, and inputs that redirect to
-// absolute paths are skipped
+// absolute paths are skipped.
 func TestBashDifferential(t *testing.T) {
 	if os.Getenv("CYBERBOAR_BASH_DIFF") != "1" {
 		t.Skip("set CYBERBOAR_BASH_DIFF=1 (scripts/bash-differential.sh)")
@@ -82,7 +82,7 @@ const (
 )
 
 // compareWithBash analyses in and bash's reprint of it. wrap, if set, is the
-// command that bash runs under (a sandbox)
+// command that bash runs under (a sandbox).
 func compareWithBash(t *testing.T, bash string, wrap []string, work, in string) (outcome, string) {
 	const root = "/nonexistent/cbdiff"
 	home, cwd := root+"/home", root+"/repo"
@@ -125,7 +125,7 @@ func compareWithBash(t *testing.T, bash string, wrap []string, work, in string) 
 }
 
 // differentialInputs is every shell command line in the corpus and in
-// testdata/differential of this package
+// testdata/differential of this package.
 func differentialInputs(t *testing.T) map[string]bool {
 	t.Helper()
 	files, _ := filepath.Glob(filepath.Join(corpusDir, "*.yaml"))
@@ -149,7 +149,7 @@ func differentialInputs(t *testing.T) map[string]bool {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, block := range strings.Split(string(data), "\n---\n") {
+		for block := range strings.SplitSeq(string(data), "\n---\n") {
 			if block = strings.Trim(block, "\n"); block != "" && !strings.HasPrefix(block, "#") {
 				inputs[block] = true
 			}
@@ -171,7 +171,7 @@ func mapKeys(m map[string]bool) func(func(string) bool) {
 // coprocDefaultName finds bash's reprint of a coprocess running a simple
 // command: bash up to 5.2 prints the default name, `coproc COPROC cat .env`,
 // which bash itself would read as the command COPROC. Undone unless the input
-// names COPROC itself, so a real `coproc COPROC cmd` is still compared
+// names COPROC itself, so a real `coproc COPROC cmd` is still compared.
 var coprocDefaultName = regexp.MustCompile(`(^|[\s;&|(])coproc COPROC `)
 
 // absRedirect finds redirections to paths outside the temp dir.
@@ -181,7 +181,7 @@ func unsafeForBash(s string) bool {
 	return absRedirect.MatchString(s) || strings.Contains(s, "enable") || strings.ContainsRune(s, 0)
 }
 
-// bashReprint returns bash's reprint of s as a function body
+// bashReprint returns bash's reprint of s as a function body.
 func bashReprint(t *testing.T, bash string, wrap []string, dir, s string) (string, bool) {
 	script := "set -o noclobber\nulimit -f 0\nenable -n kill\nshopt -s extdebug\n" +
 		`trap '[[ $BASH_COMMAND == "declare -f f" ]] || exit 99' DEBUG` + "\nf() {\n" + s + "\n}\ndeclare -f f\n"
@@ -206,7 +206,7 @@ func bashReprint(t *testing.T, bash string, wrap []string, dir, s string) (strin
 	return text[start+4 : end], true
 }
 
-// found is what an analysis found, as sets of stable strings
+// found is what an analysis found, as sets of stable strings.
 type found struct{ cmds, files, code []string }
 
 // notIn lists what f has that g doesn't.
@@ -223,8 +223,8 @@ func (f found) notIn(g found) string {
 }
 
 // uncovered lists what bash's reading (re) has that the analyzer's (orig)
-// doesn't cover
-// A run-time element or path in orig covers what bash would make of it: the analyzer checks it as any value of its shape
+// doesn't cover.
+// A run-time element or path in orig covers what bash would make of it: the analyzer checks it as any value of its shape.
 func uncovered(orig, re *shell.Analysis) string {
 	var out []string
 	a, b := summary(orig), summary(re)
@@ -267,7 +267,7 @@ func coversCommand(o, c shell.Command) bool {
 }
 
 // coversElems reports whether the elements o could be the elements c: a
-// literal is itself, One is one word of its shape, Many any number of them
+// literal is itself, One is one word of its shape, Many any number of them.
 func coversElems(o, c []shell.Elem) bool {
 	if len(o) == 0 {
 		return len(c) == 0
@@ -291,13 +291,13 @@ func coversElems(o, c []shell.Elem) bool {
 }
 
 // shapeMatches reports whether an element fits a run-time shape, a glob
-// whose * matches anything (slashes too)
+// whose * matches anything (slashes too).
 func shapeMatches(shape string, e shell.Elem) bool {
 	re := "^" + strings.ReplaceAll(strings.ReplaceAll(regexp.QuoteMeta(shape), `\*`, ".*"), `\?`, ".") + "$"
 	return regexp.MustCompile(re).MatchString(e.Text)
 }
 
-// summary is what the analysis found
+// summary is what the analysis found.
 func summary(an *shell.Analysis) found {
 	var f found
 	for _, c := range an.Commands {

@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"maps"
 	"slices"
 	"strings"
 
@@ -57,7 +58,7 @@ func init() {
 }
 
 func registerUnwrap() {
-	for name, fn := range map[string]wrapperFunc{
+	maps.Copy(wrappers, map[string]wrapperFunc{
 		"sudo": wrapSudo, "doas": wrapDoas, "env": wrapEnv,
 		"command": wrapCommand, "builtin": wrapPlain, "nohup": wrapPlain, "busybox": wrapPlain,
 		"exec":    optsThenCommand(optSpec{short: "a"}),
@@ -70,9 +71,7 @@ func registerUnwrap() {
 		"xargs": wrapXargs, "find": wrapFind, "git": wrapGit,
 		"eval": wrapEval, "trap": wrapTrap, "alias": wrapAlias,
 		"fish": wrapFish,
-	} {
-		wrappers[name] = fn
-	}
+	})
 	for _, sh := range []string{"sh", "bash", "rbash", "zsh", "dash", "ksh", "mksh", "ash", "yash", "posh"} {
 		wrappers[sh] = wrapShell
 	}
@@ -263,10 +262,10 @@ func (p parsedOpts) value(names ...string) (Elem, bool) {
 }
 
 func (p parsedOpts) find(names []string, exact bool) (Elem, bool) {
-	for i := len(p.all) - 1; i >= 0; i-- {
+	for _, v := range slices.Backward(p.all) {
 		for _, n := range names {
-			if p.spec.matches(p.all[i].name, n, exact) {
-				return p.all[i].value, true
+			if p.spec.matches(v.name, n, exact) {
+				return v.value, true
 			}
 		}
 	}
@@ -291,7 +290,7 @@ func optsThenCommand(spec optSpec) wrapperFunc {
 	}
 }
 
-func wrapPlain(_ *analyzer, name string, args []Elem) unwrapped {
+func wrapPlain(_ *analyzer, _ string, args []Elem) unwrapped {
 	if len(args) > 0 && args[0].Kind == Lit && args[0].Text == "--" {
 		args = args[1:]
 	}
@@ -312,7 +311,7 @@ func isAssignment(s string) bool {
 	return ok && name != "" && !strings.HasPrefix(name, "-")
 }
 
-func wrapSudo(_ *analyzer, name string, args []Elem) unwrapped {
+func wrapSudo(_ *analyzer, _ string, args []Elem) unwrapped {
 	p := parseOpts(args, optSpec{short: "ugpChDrtTUR", long: set("user", "group", "host", "prompt",
 		"close-from", "chdir", "role", "type", "command-timeout", "other-user", "chroot"), abbrev: true})
 	if p.hasExact("e", "edit") {
@@ -337,7 +336,7 @@ func wrapSudo(_ *analyzer, name string, args []Elem) unwrapped {
 	return u
 }
 
-func wrapDoas(_ *analyzer, name string, args []Elem) unwrapped {
+func wrapDoas(_ *analyzer, _ string, args []Elem) unwrapped {
 	p := parseOpts(args, optSpec{short: "uC"})
 	if p.has("s") && len(p.rest) == 0 {
 		return unwrapped{stdin: &stdinRun{what: "doas -s reading commands from stdin"}, unknown: p.ambiguous}
@@ -345,7 +344,7 @@ func wrapDoas(_ *analyzer, name string, args []Elem) unwrapped {
 	return unwrapped{next: p.rest, unknown: p.ambiguous}
 }
 
-func wrapEnv(a *analyzer, name string, args []Elem) unwrapped {
+func wrapEnv(a *analyzer, _ string, args []Elem) unwrapped {
 	// "env -" is "env -i".
 	var norm []Elem
 	for i, e := range args {
@@ -390,7 +389,7 @@ func (a *analyzer) splitWords(s string) ([]Elem, bool) {
 	return a.words(call.Args), true
 }
 
-func wrapCommand(_ *analyzer, name string, args []Elem) unwrapped {
+func wrapCommand(_ *analyzer, _ string, args []Elem) unwrapped {
 	p := parseOpts(args, optSpec{})
 	if p.has("v", "V") {
 		return unwrapped{unknown: p.ambiguous} // only describes the command
@@ -398,7 +397,7 @@ func wrapCommand(_ *analyzer, name string, args []Elem) unwrapped {
 	return unwrapped{next: p.rest, unknown: p.ambiguous}
 }
 
-func wrapTimeout(_ *analyzer, name string, args []Elem) unwrapped {
+func wrapTimeout(_ *analyzer, _ string, args []Elem) unwrapped {
 	p := parseOpts(args, optSpec{short: "sk", long: set("signal", "kill-after"), abbrev: true})
 	if len(p.rest) == 0 {
 		return unwrapped{unknown: p.ambiguous}
@@ -406,7 +405,7 @@ func wrapTimeout(_ *analyzer, name string, args []Elem) unwrapped {
 	return unwrapped{next: p.rest[1:], unknown: p.ambiguous || p.rest[0].Kind == Many}
 }
 
-func wrapIonice(_ *analyzer, name string, args []Elem) unwrapped {
+func wrapIonice(_ *analyzer, _ string, args []Elem) unwrapped {
 	p := parseOpts(args, optSpec{short: "cnpPu", long: set("class", "classdata", "pid", "pgid", "uid"), abbrev: true})
 	if p.hasExact("p", "P", "u", "pid", "pgid", "uid") {
 		return unwrapped{unknown: p.ambiguous} // changes existing processes
@@ -416,7 +415,7 @@ func wrapIonice(_ *analyzer, name string, args []Elem) unwrapped {
 
 // wrapFlock is the wrapper for flock: flock [opts] FILE CMD… or flock [opts] FILE -c CODE
 // (util-linux only recognizes -c right after FILE).
-func wrapFlock(_ *analyzer, name string, args []Elem) unwrapped {
+func wrapFlock(_ *analyzer, _ string, args []Elem) unwrapped {
 	p := parseOpts(args, optSpec{short: "wE", long: set("wait", "timeout", "conflict-exit-code"), abbrev: true})
 	if len(p.rest) < 2 {
 		return unwrapped{unknown: p.ambiguous}
@@ -432,7 +431,7 @@ func wrapFlock(_ *analyzer, name string, args []Elem) unwrapped {
 }
 
 // wrapWatch is the wrapper for watch: watch joins its operands and runs them with sh -c, unless -x.
-func wrapWatch(_ *analyzer, name string, args []Elem) unwrapped {
+func wrapWatch(_ *analyzer, _ string, args []Elem) unwrapped {
 	p := parseOpts(args, optSpec{short: "nq", long: set("interval", "equexit", "shotsdir"), abbrev: true})
 	if p.has("x", "exec") {
 		return unwrapped{next: p.rest, unknown: p.ambiguous}
@@ -463,7 +462,7 @@ func wrapSu(_ *analyzer, name string, args []Elem) unwrapped {
 	return u
 }
 
-func wrapScript(_ *analyzer, name string, args []Elem) unwrapped {
+func wrapScript(_ *analyzer, _ string, args []Elem) unwrapped {
 	p := parseOpts(args, optSpec{short: "cEIOBTm", permute: true, long: set("command", "echo",
 		"log-in", "log-out", "log-io", "log-timing", "logging-format", "output-limit"), abbrev: true})
 	if v, ok := p.value("c", "command"); ok {
@@ -472,7 +471,7 @@ func wrapScript(_ *analyzer, name string, args []Elem) unwrapped {
 	return unwrapped{stdin: &stdinRun{what: "script reading commands from stdin"}, unknown: p.ambiguous} // runs an interactive shell
 }
 
-func wrapChroot(_ *analyzer, name string, args []Elem) unwrapped {
+func wrapChroot(_ *analyzer, _ string, args []Elem) unwrapped {
 	p := parseOpts(args, optSpec{long: set("userspec", "groups"), abbrev: true})
 	if len(p.rest) <= 1 {
 		return unwrapped{stdin: &stdinRun{what: "chroot shell reading commands from stdin"}, unknown: p.ambiguous} // runs $SHELL -i
@@ -481,7 +480,7 @@ func wrapChroot(_ *analyzer, name string, args []Elem) unwrapped {
 }
 
 // wrapXargs is the wrapper for xargs: the command gets extra arguments read from stdin.
-func wrapXargs(_ *analyzer, name string, args []Elem) unwrapped {
+func wrapXargs(_ *analyzer, _ string, args []Elem) unwrapped {
 	p := parseOpts(args, optSpec{short: "adEILnPs", optional: "eil", long: set("arg-file", "delimiter",
 		"max-args", "max-procs", "max-chars", "process-slot-var"), abbrev: true})
 	next := p.rest
@@ -492,7 +491,7 @@ func wrapXargs(_ *analyzer, name string, args []Elem) unwrapped {
 }
 
 // wrapFind extracts the commands run by -exec, -execdir, -ok and -okdir.
-func wrapFind(_ *analyzer, name string, args []Elem) unwrapped {
+func wrapFind(_ *analyzer, _ string, args []Elem) unwrapped {
 	var u unwrapped
 	for i := 0; i < len(args); i++ {
 		e := args[i]
@@ -522,7 +521,7 @@ func wrapFind(_ *analyzer, name string, args []Elem) unwrapped {
 	return u
 }
 
-func wrapEval(_ *analyzer, name string, args []Elem) unwrapped {
+func wrapEval(_ *analyzer, _ string, args []Elem) unwrapped {
 	if len(args) > 0 && args[0].Kind == Lit && args[0].Text == "--" {
 		args = args[1:]
 	}
@@ -533,7 +532,7 @@ func wrapEval(_ *analyzer, name string, args []Elem) unwrapped {
 }
 
 // wrapTrap is the wrapper for trap: `trap CODE SIGNAL…` runs CODE later, when the signal arrives.
-func wrapTrap(_ *analyzer, name string, args []Elem) unwrapped {
+func wrapTrap(_ *analyzer, _ string, args []Elem) unwrapped {
 	p := parseOpts(args, optSpec{})
 	if len(p.rest) < 2 || (p.rest[0].Kind == Lit && p.rest[0].Text == "-") {
 		return unwrapped{unknown: p.ambiguous}
@@ -544,8 +543,8 @@ func wrapTrap(_ *analyzer, name string, args []Elem) unwrapped {
 // wrapAlias is the wrapper for alias: an alias body is code that runs wherever the alias is used.
 // In a persistent shell a later command may use it, and bash puts the words
 // after the name right after the body, so the body is checked followed by
-// words only known at run time
-func wrapAlias(a *analyzer, name string, args []Elem) unwrapped {
+// words only known at run time.
+func wrapAlias(a *analyzer, _ string, args []Elem) unwrapped {
 	var u unwrapped
 	for _, e := range args {
 		if e.Kind != Lit {
@@ -587,7 +586,7 @@ func wrapShell(a *analyzer, name string, args []Elem) unwrapped {
 
 // informational reports whether a shell's arguments are --version or --help
 // before any option that gives it code, a script or stdin to run. The shell
-// prints and exits at those, so no code runs
+// prints and exits at those, so no code runs.
 func informational(args []Elem) bool {
 	for _, e := range args {
 		switch {

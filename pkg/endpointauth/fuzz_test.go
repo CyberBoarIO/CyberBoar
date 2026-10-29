@@ -14,7 +14,7 @@ import (
 )
 
 // Known test keys, fixed request nonces and deterministic signatures keep seeds
-// identical in the coordinator and every fuzz worker
+// identical in the coordinator and every fuzz worker.
 func fuzzKey(t testing.TB, scalar byte) deterministic {
 	t.Helper()
 	var raw [32]byte
@@ -37,7 +37,7 @@ func fuzzRequest(t testing.TB, target string, body []byte) (*http.Request, *ecds
 }
 
 // twin returns the other valid encoding of an ECDSA signature, (r, n-s):
-// ECDSA signatures are malleable, so it verifies too and isn't a forgery
+// ECDSA signatures are malleable, so it verifies too and isn't a forgery.
 func twin(sig string) string {
 	raw, err := base64.StdEncoding.DecodeString(strings.Trim(strings.TrimPrefix(sig, "cyberboar="), ":"))
 	if err != nil || len(raw) != 64 {
@@ -48,8 +48,8 @@ func twin(sig string) string {
 	return "cyberboar=:" + base64.StdEncoding.EncodeToString(raw) + ":"
 }
 
-// FuzzVerifyRequest: no input panics ParseRequest, and nothing but the request that was signed verifies
-// The fuzzer edits the method, target and the three headers of one signed request
+// FuzzVerifyRequest: no input panics ParseRequest, and nothing but the request that was signed verifies.
+// The fuzzer edits the method, target and the three headers of one signed request.
 func FuzzVerifyRequest(f *testing.F) {
 	body := []byte(`{"events":[]}`)
 	orig, pub := fuzzRequest(f, "/api/v1/events", body)
@@ -86,7 +86,7 @@ func FuzzVerifyRequest(f *testing.F) {
 	})
 }
 
-// FuzzVerifyResponse: nothing except the answer the console signed verifies
+// FuzzVerifyResponse: nothing except the answer the console signed verifies.
 func FuzzVerifyResponse(f *testing.F) {
 	console := fuzzKey(f, 2)
 	req, _ := fuzzRequest(f, "https://console.example/api/v1/events", []byte("{}"))

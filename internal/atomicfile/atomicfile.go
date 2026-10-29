@@ -1,5 +1,5 @@
 // Package atomicfile replaces files so that a reader, or the next run after
-// a crash, finds either the old contents or the new, never part of either
+// a crash, finds either the old contents or the new, never part of either.
 package atomicfile
 
 import (
@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 )
 
-// Write replaces the file at path with data, which gets permissions perm
-// The directory must exist
+// Write replaces the file at path with data, which gets permissions perm.
+// The directory must exist.
 func Write(path string, data []byte, perm fs.FileMode) error {
 	tmp, err := Stage(filepath.Dir(path), filepath.Base(path), data, perm)
 	if err != nil {
@@ -23,9 +23,9 @@ func Write(path string, data []byte, perm fs.FileMode) error {
 }
 
 // Stage writes data to a new hidden file in dir, named after name, synced to
-// disk and with permissions perm, and returns its path
+// disk and with permissions perm, and returns its path.
 // Renaming it over the final name is the caller's step, so that several files can be staged
-// before any is replaced. On error nothing is left behind
+// before any is replaced. On error nothing is left behind.
 func Stage(dir, name string, data []byte, perm fs.FileMode) (string, error) {
 	tmp, err := os.CreateTemp(dir, "."+name+".*")
 	if err != nil {
@@ -50,10 +50,10 @@ func Stage(dir, name string, data []byte, perm fs.FileMode) (string, error) {
 	return tmp.Name(), nil
 }
 
-// WriteNew creates path, which must not exist, with data and permissions perm
-// The data is synced before path becomes visible
+// WriteNew creates path, which must not exist, with data and permissions perm.
+// The data is synced before path becomes visible.
 // The filesystem must support hard links. Creating an existing file fails
-// with an error that matches fs.ErrExist; on any other error nothing is left behind
+// with an error that matches fs.ErrExist; on any other error nothing is left behind.
 func WriteNew(path string, data []byte, perm fs.FileMode) error {
 	tmp, err := Stage(filepath.Dir(path), filepath.Base(path), data, perm)
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 	"cyberboar.dev/cyberboar/internal/policy"
 )
 
-// Hook latency: every agent tool call pays for one Evaluate
+// Hook latency: every agent tool call pays for one Evaluate.
 func BenchmarkEvaluate(b *testing.B) {
 	data, err := os.ReadFile(filepath.Join("..", "..", "examples", "baseline.yaml"))
 	if err != nil {

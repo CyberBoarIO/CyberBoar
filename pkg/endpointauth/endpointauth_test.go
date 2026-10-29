@@ -23,7 +23,7 @@ import (
 
 const testID = "0b6a3f4e-2c1d-4e5f-8a9b-0c1d2e3f4a5b"
 
-// A fixed epoch keeps the clock component of signed fuzz seeds reproducible
+// A fixed epoch keeps the clock component of signed fuzz seeds reproducible.
 var testNow = time.Unix(0, 0).UTC().Add(24 * time.Hour)
 
 func newKey(t testing.TB) *ecdsa.PrivateKey {
@@ -90,7 +90,7 @@ func TestNonceIsFresh(t *testing.T) {
 	}
 }
 
-// TestSignatureBases pins the wire format: endpoints sign exactly this, so a change locks them out
+// TestSignatureBases pins the wire format: endpoints sign exactly this, so a change locks them out.
 func TestSignatureBases(t *testing.T) {
 	u, _ := url.Parse("https://console.example/api/v1/events")
 	empty := "sha-256=:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=:" // RFC 9530 §B: SHA-256 of no bytes
@@ -123,7 +123,7 @@ func TestSignatureBases(t *testing.T) {
 
 // TestRFC9421Vector checks the signature base layout and the r‖s encoding
 // against the ecdsa-p256-sha256 example of RFC 9421 (B.2.4, key B.1.3): lines
-// of "name": value joined by LF, @signature-params last, no final LF
+// of "name": value joined by LF, @signature-params last, no final LF.
 func TestRFC9421Vector(t *testing.T) {
 	block, _ := pem.Decode([]byte(`-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEqIVYZVLCrPZHGHjP17CTW0/+D9Lf
@@ -144,7 +144,7 @@ w0EkjqF7xB4FivAxzic30tMM4GF+hR6Dxh71Z50VGGdldkkDXZCnTNnoXQ==
 }
 
 // TestRejectedRequests covers ways a request can fail before or at the
-// signature check. Each must be refused, none should reach a handler
+// signature check. Each must be refused, none should reach a handler.
 func TestRejectedRequests(t *testing.T) {
 	s := testSigner(t)
 	pub := public(s)
@@ -325,7 +325,7 @@ func flip(sig string) string {
 	return string(b)
 }
 
-// answer signs a 202 to req as a console would
+// answer signs a 202 to req as a console would.
 func answer(t *testing.T, console *ecdsa.PrivateKey, req *http.Request, status int, body []byte, now time.Time) *http.Response {
 	t.Helper()
 	q, err := ParseRequest(req, now)
@@ -466,7 +466,7 @@ func TestTokens(t *testing.T) {
 }
 
 // issue makes a client certificate as a console would
-// edit changes the template first
+// edit changes the template first.
 func issue(t *testing.T, ca *x509.Certificate, caKey *ecdsa.PrivateKey, pub *ecdsa.PublicKey, edit func(*x509.Certificate)) []byte {
 	t.Helper()
 	u, _ := url.Parse(EndpointURI(testID))

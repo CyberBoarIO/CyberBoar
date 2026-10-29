@@ -58,13 +58,13 @@ func TestReferenceCommandExamples(t *testing.T) {
 	}
 }
 
-// refFlag is one row of a command's flag table in docs/cli.md
+// refFlag is one row of a command's flag table in docs/cli.md.
 type refFlag struct {
 	value, env, def string
 }
 
 // readReference returns the flag tables of docs/cli.md by command, and the
-// variables its Environment table lists
+// variables its Environment table lists.
 func readReference(t *testing.T) (map[string]map[string]refFlag, []string) {
 	t.Helper()
 	data, err := os.ReadFile(cliReference)
@@ -77,7 +77,7 @@ func readReference(t *testing.T) (map[string]map[string]refFlag, []string) {
 	commands := map[string]map[string]refFlag{}
 	var env []string
 	section := ""
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if strings.HasPrefix(line, "## ") {
 			section = line
 			if m := heading.FindStringSubmatch(line); m != nil {
@@ -116,7 +116,7 @@ func readReference(t *testing.T) (map[string]map[string]refFlag, []string) {
 	return commands, env
 }
 
-// usageCommands are the commands `cyberboar help` lists
+// usageCommands are the commands `cyberboar help` lists.
 func usageCommands() []string {
 	var b bytes.Buffer
 	usage(&b)
@@ -128,7 +128,7 @@ func usageCommands() []string {
 }
 
 // commandFlags runs `cyberboar COMMAND --help` and returns the flag set the
-// command defined, nil for a command without flags
+// command defined, nil for a command without flags.
 func commandFlags(t *testing.T, command string, getenv func(string) string) *flag.FlagSet {
 	t.Helper()
 	c, ok := commands[command]
@@ -144,7 +144,7 @@ func commandFlags(t *testing.T, command string, getenv func(string) string) *fla
 // TestCLIReference holds the CLI to its frozen reference, docs/cli.md: the
 // same commands, and for each the same flags with the same kind of value,
 // environment variable and default. A change to either needs the other in the
-// same commit
+// same commit.
 func TestCLIReference(t *testing.T) {
 	ref, refEnv := readReference(t)
 	commands := usageCommands()
@@ -252,7 +252,7 @@ func TestCLIReference(t *testing.T) {
 	}
 }
 
-// TestCLIExitStatus checks the exit statuses docs/cli.md promises for usage errors and -h
+// TestCLIExitStatus checks the exit statuses docs/cli.md promises for usage errors and -h.
 func TestCLIExitStatus(t *testing.T) {
 	code := func(args ...string) (int, string) {
 		var out, errb bytes.Buffer
@@ -316,7 +316,7 @@ func TestCLIHelpFlagSpelling(t *testing.T) {
 	}
 }
 
-// noArgumentCommands returns the commands docs/cli.md documents as taking no arguments
+// noArgumentCommands returns the commands docs/cli.md documents as taking no arguments.
 func noArgumentCommands(t *testing.T) []string {
 	t.Helper()
 	data, err := os.ReadFile(cliReference)
@@ -341,7 +341,7 @@ func noArgumentCommands(t *testing.T) []string {
 // TestCLIStrayArgument holds every command that docs/cli.md documents as
 // taking no arguments to a usage error when one is given anyway. Go's flag
 // parsing stops at the first word that isn't a flag, so a command that
-// ignored the word would also ignore every flag after it
+// ignored the word would also ignore every flag after it.
 func TestCLIStrayArgument(t *testing.T) {
 	dir := t.TempDir()
 	// Each command line is valid on its own, so the stray argument is the only usage error
@@ -390,7 +390,7 @@ func TestCLIStrayArgument(t *testing.T) {
 	}
 }
 
-// TestExplainJSONReference checks explain --json against the fields docs/cli.md lists
+// TestExplainJSONReference checks explain --json against the fields docs/cli.md lists.
 func TestExplainJSONReference(t *testing.T) {
 	code, out, errs := call(t, "", "explain", "--json", "--policy", baseline, "--cwd", "/work/repo", "--command", "cat .env")
 	if code != 0 {

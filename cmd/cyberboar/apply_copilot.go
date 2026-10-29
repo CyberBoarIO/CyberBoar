@@ -26,7 +26,7 @@ func applyCopilot(a applyArgs, stdout io.Writer, getenv func(string) string, fai
 		Command: a.command, PubKey: a.pubkey}
 
 	var target string
-	// settings are the files of the scope that can switch its hooks off
+	// settings are the files of the scope that can switch its hooks off.
 	var settings []string
 	// local says whether VS Code's Local agent reads the target: it reads the
 	// repository's .github/hooks and ~/.copilot/hooks

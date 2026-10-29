@@ -21,21 +21,22 @@ import (
 	"cyberboar.dev/cyberboar/pkg/endpointauth"
 )
 
-// maxTokenFile bounds a token file
-// A token is under 64 bytes
+// maxTokenFile bounds a token file.
+// A token is under 64 bytes.
 const maxTokenFile = 4096
 
 // runEnroll enrolls this machine with a console, or, when it is already
-// enrolled, renews its client certificate if that is due
+// enrolled, renews its client certificate if that is due.
 // It is safe to run on every MDM check-in. The token comes from a file or the environment,
-// never from a flag value, which any user on the machine can read in the process list
+// never from a flag value, which any user on the machine can read in the process list.
 func runEnroll(h host, fs *flag.FlagSet, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	server := fs.String("server", h.getenv(envName("server")), "console base URL, e.g. https://console.example (env "+envName("server")+")")
 	tokenFile := fs.String("token-file", "", "file holding the enrollment token, - for stdin; default: env "+envName("enroll-token"))
 	stateDir := fs.String("state", h.getenv(envName("state")), "state directory for the endpoint's key and enrollment (env "+envName("state")+
 		"; default: $XDG_STATE_HOME/"+brand.Name+"; machine-wide installs use one only root or SYSTEM can read, see docs/deploy-mdm.md)")
-	consoleKey := fs.String("console-key", h.getenv(envName("console-key")), "PEM public key the console's answers must be signed with; required with --insecure-skip-verify (env "+envName("console-key")+")")
+	consoleKey := fs.String("console-key", h.getenv(envName("console-key")),
+		"PEM public key the console's answers must be signed with; required with --insecure-skip-verify (env "+envName("console-key")+")")
 	defaultStorage := h.getenv(envName("key-storage"))
 	if defaultStorage == "" {
 		defaultStorage = string(keystore.Auto)
@@ -44,7 +45,9 @@ func runEnroll(h host, fs *flag.FlagSet, args []string, stdin io.Reader, stdout,
 		"where a new endpoint key is made: auto (the TPM, else the OS key store, else a file), tpm, os or file (env "+envName("key-storage")+")")
 	tlsOpts := tlsFlags(fs, h.getenv)
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, "usage: %s enroll --server URL [flags]\n\nEnroll requires a compatible console and its enrollment token.\nLocal hooks and static-site pull do not need enrollment.\n\n", brand.Name)
+		fmt.Fprintf(stderr, "usage: %s enroll --server URL [flags]\n\n"+
+			"Enroll requires a compatible console and its enrollment token.\n"+
+			"Local hooks and static-site pull do not need enrollment.\n\n", brand.Name)
 		printFlagDefaults(fs)
 	}
 	if code, ok := parseFlags(fs, args); !ok {
@@ -117,19 +120,19 @@ func runEnroll(h host, fs *flag.FlagSet, args []string, stdin io.Reader, stdout,
 	return 0
 }
 
-// outcomeText says what enroll.Once did, for the summary line
+// outcomeText says what enroll.Once did, for the summary line.
 var outcomeText = map[enroll.Outcome]string{
 	enroll.Enrolled:   "enrolled",
 	enroll.Reenrolled: "enrolled again",
 	enroll.Already:    "already enrolled",
 }
 
-// keyPlace names where an endpoint key is, for messages
+// keyPlace names where an endpoint key is, for messages.
 var keyPlace = map[keystore.Storage]string{keystore.TPM: "the TPM", keystore.OS: "the OS key store", keystore.File: "a file"}
 
 // readToken reads the enrollment token from path, from stdin if path is
 // "-", or from the environment if there is no path. The token may be empty,
-// because an enrolled endpoint needs none
+// because an enrolled endpoint needs none.
 func readToken(path string, stdin io.Reader, getenv func(string) string) (string, error) {
 	if path == "" {
 		return strings.TrimSpace(getenv(envName("enroll-token"))), nil
@@ -154,7 +157,7 @@ func readToken(path string, stdin io.Reader, getenv func(string) string) (string
 	return strings.TrimSpace(string(data)), nil
 }
 
-// loadConsoleKey reads a PEM "PUBLIC KEY" file holding a P-256 key
+// loadConsoleKey reads a PEM "PUBLIC KEY" file holding a P-256 key.
 func loadConsoleKey(path string) (*ecdsa.PublicKey, error) {
 	// #nosec G703 -- the operator's own --console-key argument
 	data, err := os.ReadFile(path)

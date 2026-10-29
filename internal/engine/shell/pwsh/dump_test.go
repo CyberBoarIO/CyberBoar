@@ -11,7 +11,7 @@ import (
 // own: Type{properties}(children), with PowerShell's type names and its
 // children in source order. The Go tree is smaller than PowerShell's (no
 // NamedBlockAst, no TypeConstraintAst nodes of their own), so dump adds
-// those back where PowerShell has them
+// those back where PowerShell has them.
 func dump(sb *ScriptBlock) string {
 	var b strings.Builder
 	scriptBlockNode(sb).write(&b)
@@ -43,7 +43,7 @@ func (d *dnode) write(b *strings.Builder) {
 	b.WriteByte(')')
 }
 
-// sorted orders children as the dump script does, by start then end offset
+// sorted orders children as the dump script does, by start then end offset.
 func sortedNodes(kids []*dnode) []*dnode {
 	slices.SortStableFunc(kids, func(a, b *dnode) int {
 		return cmp.Or(cmp.Compare(a.ext.Start, b.ext.Start), cmp.Compare(a.ext.End, b.ext.End))
@@ -88,7 +88,7 @@ func scriptBlockNode(sb *ScriptBlock) *dnode {
 	return d
 }
 
-// statements are a block's statements and traps, in source order
+// statements are a block's statements and traps, in source order.
 func statements(b *StatementBlock) []*dnode {
 	var kids []*dnode
 	for _, s := range b.Statements {
@@ -105,7 +105,7 @@ func typeConstraint(t *TypeConstraint) *dnode {
 }
 
 // fullName is PowerShell's ITypeName.FullName: the name as written, generic
-// arguments in brackets, then the array ranks
+// arguments in brackets, then the array ranks.
 func fullName(t *TypeName) string {
 	s := t.Name
 	if len(t.Generic) > 0 {

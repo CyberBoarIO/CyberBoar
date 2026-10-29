@@ -8,7 +8,7 @@ import (
 
 // Capability is one row of the capability matrix: what each agent adapter
 // can and can't enforce. Maintainers describe the tested behavior and known
-// limitations here; docs/capability-matrix.md is generated from this prose
+// limitations here; docs/capability-matrix.md is generated from this prose.
 type Capability struct {
 	What       string
 	ClaudeCode string
@@ -19,7 +19,7 @@ type Capability struct {
 }
 
 // Matrix is the capability matrix. Keep it in step with the adapters and
-// their case files; docs/capability-matrix.md is generated from it
+// their case files; docs/capability-matrix.md is generated from it.
 var Matrix = []Capability{
 	{"Validation coverage",
 		"Claude Code 2.1.220: captured inputs and real-agent harness.",
@@ -125,7 +125,7 @@ var Matrix = []Capability{
 		"Not governed."},
 }
 
-// WriteMatrix renders the matrix as a Markdown table
+// WriteMatrix renders the matrix as a Markdown table.
 func WriteMatrix(w io.Writer) error {
 	cell := func(s string) string { return strings.ReplaceAll(s, "|", `\|`) }
 	if _, err := fmt.Fprintln(w, "| Capability | Claude Code | Codex CLI | GitHub Copilot (CLI, VS Code) | Cursor | opencode |\n|---|---|---|---|---|---|"); err != nil {

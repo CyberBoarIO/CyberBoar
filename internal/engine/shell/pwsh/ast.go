@@ -6,39 +6,39 @@ package pwsh
 // tokens, and an extent is a start and an end offset in UTF-16 units, as
 // PowerShell's Extent.StartOffset counts them
 
-// Node is any node of the tree
+// Node is any node of the tree.
 type Node interface {
-	// Pos returns the node's start offset in UTF-16 units
+	// Pos returns the node's start offset in UTF-16 units.
 	Pos() int
-	// Span returns the node's extent
+	// Span returns the node's extent.
 	Span() Extent
 }
 
-// Extent is a node's position in the input, as start and end offsets in UTF-16 units
+// Extent is a node's position in the input, as start and end offsets in UTF-16 units.
 type Extent struct {
 	Start, End int
 }
 
-// Pos returns the start offset
+// Pos returns the start offset.
 func (e Extent) Pos() int { return e.Start }
 
-// Span returns the extent itself
+// Span returns the extent itself.
 func (e Extent) Span() Extent { return e }
 
 // Statement is a statement, such as a pipeline, an assignment, a flow
-// statement, a loop or a function definition
+// statement, a loop or a function definition.
 type Statement interface {
 	Node
 	statement()
 }
 
-// Expression is an expression. Every expression can be a command element
+// Expression is an expression. Every expression can be a command element.
 type Expression interface {
 	CommandElement
 	expression()
 }
 
-// CommandElement is an element of a command, either an Expression or a CommandParameter
+// CommandElement is an element of a command, either an Expression or a CommandParameter.
 type CommandElement interface {
 	Node
 	commandElement()
@@ -46,7 +46,7 @@ type CommandElement interface {
 
 // ScriptBlock is the body of a script block, which is the whole input, a
 // function's body or a { ... } literal. When NamedBlocks is false, the body's
-// statements are its EndBlock, or its ProcessBlock for a filter
+// statements are its EndBlock, or its ProcessBlock for a filter.
 type ScriptBlock struct {
 	Extent
 	Param        *ParamBlock
@@ -57,14 +57,14 @@ type ScriptBlock struct {
 	NamedBlocks  bool // written as begin { ... } process { ... } end { ... }
 }
 
-// ParamBlock is a param(...) block and the attributes before it, such as [CmdletBinding()]
+// ParamBlock is a param(...) block and the attributes before it, such as [CmdletBinding()].
 type ParamBlock struct {
 	Extent
 	Attributes []*Attribute
 	Parameters []*Parameter
 }
 
-// Parameter is one parameter of a param block or a function
+// Parameter is one parameter of a param block or a function.
 type Parameter struct {
 	Extent
 	Attributes []AttributeBase
@@ -72,13 +72,13 @@ type Parameter struct {
 	Default    Expression
 }
 
-// AttributeBase is an Attribute or a TypeConstraint
+// AttributeBase is an Attribute or a TypeConstraint.
 type AttributeBase interface {
 	Node
 	attribute()
 }
 
-// Attribute is [Name(args)]
+// Attribute is [Name(args)].
 type Attribute struct {
 	Extent
 	Type       *TypeName
@@ -86,8 +86,8 @@ type Attribute struct {
 	Named      []*NamedAttributeArgument
 }
 
-// NamedAttributeArgument is Name = value in an attribute
-// A Name written without a value means $true
+// NamedAttributeArgument is Name = value in an attribute.
+// A Name written without a value means $true.
 type NamedAttributeArgument struct {
 	Extent
 	Name    string
@@ -95,7 +95,7 @@ type NamedAttributeArgument struct {
 	Omitted bool
 }
 
-// TypeConstraint is [Type] before a variable or an expression
+// TypeConstraint is [Type] before a variable or an expression.
 type TypeConstraint struct {
 	Extent
 	TypeName *TypeName
@@ -103,7 +103,7 @@ type TypeConstraint struct {
 
 // TypeName is a type as written, with its name, its generic arguments, and
 // the ranks of the arrays around it, innermost first. For [int[][,]], Name is
-// int and Array is [1, 2]
+// int and Array is [1, 2].
 type TypeName struct {
 	Extent
 	Name    string
@@ -112,23 +112,23 @@ type TypeName struct {
 }
 
 // StatementBlock is a { ... } body. Traps holds the trap statements among
-// its statements, and Statements holds the others
+// its statements, and Statements holds the others.
 type StatementBlock struct {
 	Extent
 	Statements []Statement
 	Traps      []*Trap
 }
 
-// Pipeline is commands joined by |
-// Background is a trailing & (PowerShell 7)
+// Pipeline is commands joined by |.
+// Background is a trailing & (PowerShell 7).
 type Pipeline struct {
 	Extent
 	Elements   []CommandBase
 	Background bool
 }
 
-// PipelineChain is two pipelines joined by && or || (PowerShell 7)
-// Left is a Pipeline or another PipelineChain
+// PipelineChain is two pipelines joined by && or || (PowerShell 7).
+// Left is a Pipeline or another PipelineChain.
 type PipelineChain struct {
 	Extent
 	Left       Statement
@@ -137,9 +137,9 @@ type PipelineChain struct {
 	Background bool
 }
 
-// Assignment is target = value, or += and the other compound forms
+// Assignment is target = value, or += and the other compound forms.
 // As in PowerShell, a value that is a lone expression is its CommandExpression,
-// not a Pipeline
+// not a Pipeline.
 type Assignment struct {
 	Extent
 	Left     Expression
@@ -147,20 +147,20 @@ type Assignment struct {
 	Right    Statement
 }
 
-// If is if/elseif/else
+// If is if/elseif/else.
 type If struct {
 	Extent
 	Clauses []IfClause
 	Else    *StatementBlock
 }
 
-// IfClause is a condition and the block it guards
+// IfClause is a condition and the block it guards.
 type IfClause struct {
 	Condition Statement
 	Body      *StatementBlock
 }
 
-// Switch is a switch statement
+// Switch is a switch statement.
 type Switch struct {
 	Extent
 	Regex, Wildcard, CaseSensitive bool
@@ -169,13 +169,13 @@ type Switch struct {
 	Default                        *StatementBlock
 }
 
-// SwitchClause is a value to match and its block
+// SwitchClause is a value to match and its block.
 type SwitchClause struct {
 	Condition Expression
 	Body      *StatementBlock
 }
 
-// Foreach is foreach ($v in ...) { ... }
+// Foreach is foreach ($v in ...) { ... }.
 type Foreach struct {
 	Extent
 	Variable  *Variable
@@ -183,21 +183,21 @@ type Foreach struct {
 	Body      *StatementBlock
 }
 
-// For is for (init; condition; iterator) { ... }. Any of the three parts may be nil
+// For is for (init; condition; iterator) { ... }. Any of the three parts may be nil.
 type For struct {
 	Extent
 	Initializer, Condition, Iterator Statement
 	Body                             *StatementBlock
 }
 
-// While is while (...) { ... }
+// While is while (...) { ... }.
 type While struct {
 	Extent
 	Condition Statement
 	Body      *StatementBlock
 }
 
-// DoLoop is do { ... } while (...), or do { ... } until (...) when Until is set
+// DoLoop is do { ... } while (...), or do { ... } until (...) when Until is set.
 type DoLoop struct {
 	Extent
 	Body      *StatementBlock
@@ -205,7 +205,7 @@ type DoLoop struct {
 	Condition Statement
 }
 
-// Try is try/catch/finally
+// Try is try/catch/finally.
 type Try struct {
 	Extent
 	Body    *StatementBlock
@@ -213,21 +213,21 @@ type Try struct {
 	Finally *StatementBlock
 }
 
-// Catch is a catch clause. A clause without Types catches every error
+// Catch is a catch clause. A clause without Types catches every error.
 type Catch struct {
 	Extent
 	Types []*TypeConstraint
 	Body  *StatementBlock
 }
 
-// Trap is trap [Type] { ... }
+// Trap is trap [Type] { ... }.
 type Trap struct {
 	Extent
 	Type *TypeConstraint // nil traps every error
 	Body *StatementBlock
 }
 
-// FunctionDefinition is function or filter Name (params) { ... }
+// FunctionDefinition is function or filter Name (params) { ... }.
 type FunctionDefinition struct {
 	Extent
 	Name       string
@@ -237,7 +237,7 @@ type FunctionDefinition struct {
 }
 
 // Flow is return, exit or throw with an optional pipeline, or break or
-// continue with an optional label
+// continue with an optional label.
 type Flow struct {
 	Extent
 	Keyword  string // "return", "exit", "throw", "break" or "continue"
@@ -259,16 +259,16 @@ func (*Trap) statement()               {}
 func (*FunctionDefinition) statement() {}
 func (*Flow) statement()               {}
 
-// CommandBase is a pipeline element, either a Command or a CommandExpression
+// CommandBase is a pipeline element, either a Command or a CommandExpression.
 type CommandBase interface {
 	Node
 	commandBase()
-	// Redirects returns the element's redirections
+	// Redirects returns the element's redirections.
 	Redirects() []Redirection
 }
 
-// Command is a command call. Elements holds its name and arguments as written
-// Invocation is "&" or "." when the command was invoked with that operator, and empty otherwise
+// Command is a command call. Elements holds its name and arguments as written.
+// Invocation is "&" or "." when the command was invoked with that operator, and empty otherwise.
 type Command struct {
 	Extent
 	Invocation   string
@@ -276,7 +276,7 @@ type Command struct {
 	Redirections []Redirection
 }
 
-// CommandExpression is an expression used as a pipeline's first element
+// CommandExpression is an expression used as a pipeline's first element.
 type CommandExpression struct {
 	Extent
 	Expression   Expression
@@ -286,17 +286,17 @@ type CommandExpression struct {
 func (*Command) commandBase()           {}
 func (*CommandExpression) commandBase() {}
 
-// A CommandExpression is a statement on its own as an assignment's value
+// A CommandExpression is a statement on its own as an assignment's value.
 func (*Command) statement()           {}
 func (*CommandExpression) statement() {}
 
-// Redirects returns the command's redirections
+// Redirects returns the command's redirections.
 func (c *Command) Redirects() []Redirection { return c.Redirections }
 
-// Redirects returns the expression's redirections
+// Redirects returns the expression's redirections.
 func (c *CommandExpression) Redirects() []Redirection { return c.Redirections }
 
-// CommandParameter is -Name, or -Name:value with Argument set
+// CommandParameter is -Name, or -Name:value with Argument set.
 type CommandParameter struct {
 	Extent
 	Name     string
@@ -305,13 +305,13 @@ type CommandParameter struct {
 
 func (*CommandParameter) commandElement() {}
 
-// Redirection is a FileRedirection or a MergingRedirection
+// Redirection is a FileRedirection or a MergingRedirection.
 type Redirection interface {
 	Node
 	redirection()
 }
 
-// FileRedirection is n> file or n>> file
+// FileRedirection is n> file or n>> file.
 type FileRedirection struct {
 	Extent
 	From     Stream
@@ -319,7 +319,7 @@ type FileRedirection struct {
 	Location Expression
 }
 
-// MergingRedirection is n>&1
+// MergingRedirection is n>&1.
 type MergingRedirection struct {
 	Extent
 	From, To Stream
@@ -328,10 +328,10 @@ type MergingRedirection struct {
 func (*FileRedirection) redirection()    {}
 func (*MergingRedirection) redirection() {}
 
-// StringKind says how a string was written
+// StringKind says how a string was written.
 type StringKind uint8
 
-// The ways to write a string
+// The ways to write a string.
 const (
 	BareWord StringKind = iota
 	SingleQuoted
@@ -340,9 +340,9 @@ const (
 	DoubleQuotedHereString
 )
 
-// StringConstant is a string without expansions
+// StringConstant is a string without expansions.
 // It is a bare word, a single-quoted string, or a double-quoted string with nothing to expand, and
-// Value has its quotes and escapes removed
+// Value has its quotes and escapes removed.
 type StringConstant struct {
 	Extent
 	Value string
@@ -358,7 +358,7 @@ type StringConstant struct {
 // the -f operator to get the string's value at run time. Format is built
 // exactly as PowerShell builds it. In a bare word, PowerShell doesn't double
 // the braces of a single-quoted part or of an escaped first character, so
-// the word's value can then differ from what its text suggests, or fail to format
+// the word's value can then differ from what its text suggests, or fail to format.
 type ExpandableString struct {
 	Extent
 	Value  string
@@ -367,67 +367,67 @@ type ExpandableString struct {
 	Nested []Expression
 }
 
-// Constant is a number
+// Constant is a number.
 type Constant struct {
 	Extent
 	Text  string
 	Value Number
 }
 
-// Variable is $name, ${name} or @name (Splatted)
+// Variable is $name, ${name} or @name (Splatted).
 type Variable struct {
 	Extent
 	Path     string // as written, with any scope or drive, as in env:PATH
 	Splatted bool
 }
 
-// Name returns the variable's name without its scope or drive
+// Name returns the variable's name without its scope or drive.
 func (v *Variable) Name() string { return unqualified(v.Path) }
 
 // Drive returns the drive the variable is read from, "env" for $env:PATH and
-// "c" for ${c:\x}, or "" for a plain variable or one with only a scope
+// "c" for ${c:\x}, or "" for a plain variable or one with only a scope.
 func (v *Variable) Drive() string {
 	_, drive := splitVariablePath(v.Path)
 	return drive
 }
 
-// SubExpression is $(...)
+// SubExpression is $(...).
 type SubExpression struct {
 	Extent
 	Body *StatementBlock
 }
 
-// ArrayExpression is @(...)
+// ArrayExpression is @(...).
 type ArrayExpression struct {
 	Extent
 	Body *StatementBlock
 }
 
-// Paren is (...), holding a pipeline or an assignment
+// Paren is (...), holding a pipeline or an assignment.
 type Paren struct {
 	Extent
 	Pipeline Statement
 }
 
-// ScriptBlockExpression is a { ... } literal
+// ScriptBlockExpression is a { ... } literal.
 type ScriptBlockExpression struct {
 	Extent
 	Block *ScriptBlock
 }
 
-// Hashtable is @{ key = value; ... }
+// Hashtable is @{ key = value; ... }.
 type Hashtable struct {
 	Extent
 	Pairs []KeyValue
 }
 
-// KeyValue is one entry of a Hashtable
+// KeyValue is one entry of a Hashtable.
 type KeyValue struct {
 	Key   Expression
 	Value Statement
 }
 
-// ArrayLiteral is a, b, c (or ,a)
+// ArrayLiteral is a, b, c (or ,a).
 type ArrayLiteral struct {
 	Extent
 	Elements []Expression
@@ -435,7 +435,7 @@ type ArrayLiteral struct {
 
 // Binary is left op right. Operator is the operator's name in PowerShell's
 // TokenKind, such as Plus, Ieq, Format or DotDot. As in PowerShell, -eq and
-// -ieq are both Ieq
+// -ieq are both Ieq.
 type Binary struct {
 	Extent
 	Operator    string
@@ -445,7 +445,7 @@ type Binary struct {
 // Unary is op child, or child op for a postfix ++ or --. Operator is the
 // operator's name in PowerShell's TokenKind: Not, Exclaim, Bnot, Minus, Plus,
 // PlusPlus, MinusMinus, Join, Isplit or Csplit, or PostfixPlusPlus or
-// PostfixMinusMinus for a postfix operator
+// PostfixMinusMinus for a postfix operator.
 type Unary struct {
 	Extent
 	Operator string
@@ -453,27 +453,27 @@ type Unary struct {
 	Child    Expression
 }
 
-// Convert is [Type] child
+// Convert is [Type] child.
 type Convert struct {
 	Extent
 	Type  *TypeConstraint
 	Child Expression
 }
 
-// TypeExpression is a type literal, written [Type]
+// TypeExpression is a type literal, written [Type].
 type TypeExpression struct {
 	Extent
 	Type *TypeName
 }
 
-// AttributedExpression is [Attribute(...)] child, as in a param block's [ValidateNotNull()][string]$x
+// AttributedExpression is [Attribute(...)] child, as in a param block's [ValidateNotNull()][string]$x.
 type AttributedExpression struct {
 	Extent
 	Attribute *Attribute
 	Child     Expression
 }
 
-// Member is target.member or target::member (Static)
+// Member is target.member or target::member (Static).
 type Member struct {
 	Extent
 	Target Expression
@@ -481,7 +481,7 @@ type Member struct {
 	Static bool
 }
 
-// InvokeMember is target.member(args), or target.member{ ... } with the block as the one argument
+// InvokeMember is target.member(args), or target.member{ ... } with the block as the one argument.
 type InvokeMember struct {
 	Extent
 	Target    Expression
@@ -490,7 +490,7 @@ type InvokeMember struct {
 	Static    bool
 }
 
-// Index is target[index]
+// Index is target[index].
 type Index struct {
 	Extent
 	Target, Index Expression
@@ -537,12 +537,12 @@ func (*Index) commandElement()                 {}
 func (*Attribute) attribute()      {}
 func (*TypeConstraint) attribute() {}
 
-// Children returns n's child nodes in the order Inspect visits them
+// Children returns n's child nodes in the order Inspect visits them.
 func Children(n Node) []Node { return children(n) }
 
 // Inspect walks the tree in depth-first order. It calls f(n) and, if f
-// returns true, walks n's children in source order
-// Unlike go/ast.Inspect, it never calls f(nil)
+// returns true, walks n's children in source order.
+// Unlike go/ast.Inspect, it never calls f(nil).
 func Inspect(n Node, f func(Node) bool) {
 	if n == nil || isNil(n) || !f(n) {
 		return

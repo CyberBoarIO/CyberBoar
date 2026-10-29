@@ -107,7 +107,7 @@ func TestApplyProjectScope(t *testing.T) {
 }
 
 // A flag value or combination apply doesn't take is a usage error (exit 2),
-// whatever the policy. A command line that can't be carried out fails with exit 1
+// whatever the policy. A command line that can't be carried out fails with exit 1.
 func TestApplyRefuses(t *testing.T) {
 	proj := t.TempDir()
 	missing := filepath.Join(proj, "none.yaml")
@@ -138,7 +138,7 @@ func TestApplyRefuses(t *testing.T) {
 }
 
 // Agents whose user-scope settings live under HOME refuse to install without
-// it, with the message naming HOME
+// it, with the message naming HOME.
 func TestApplyNeedsHome(t *testing.T) {
 	noEnv := func(string) string { return "" }
 	for _, agent := range []string{"codex", "copilot-cli", "cursor", "opencode"} {
@@ -191,7 +191,7 @@ func TestApplyManagedDropIn(t *testing.T) {
 // quotes. It is given as commandWindows too, in the user's .codex under
 // USERPROFILE, and managed requirements name windows_managed_dir. A project
 // hook, which finds the policy from the git root, can't be written for them,
-// and nor can a program path with spaces or a value either shell would change
+// and nor can a program path with spaces or a value either shell would change.
 func TestApplyCodexWindows(t *testing.T) {
 	env := func(k string) string {
 		return map[string]string{"USERPROFILE": `C:\Users\dev`, "HOME": "/home/ignored", "ProgramData": `D:\ProgramData`}[k]
@@ -223,7 +223,7 @@ func TestApplyCodexWindows(t *testing.T) {
 			t.Errorf("%s: exit %d %s", audit, code, errs)
 		}
 	}
-	// Here no short name is found, as for a volume without them
+	// Here no short name is found, as for a volume without them.
 	var out2, errb bytes.Buffer
 	code = h.run([]string{"apply", "--agent", "codex", "--policy", baseline, "--command", `C:\Program Files\CyberBoar\cyberboar.exe`, "--scope", "user"}, nil, &out2, &errb)
 	if code != 1 || !strings.Contains(errb.String(), "no spaces") {
@@ -443,7 +443,7 @@ func TestApplyWarnsAboutCDPATH(t *testing.T) {
 }
 
 // On an operating system the engine doesn't support, apply refuses to write
-// settings: the hook there would deny every call
+// settings: the hook there would deny every call.
 func TestApplyRefusesUnsupportedPlatform(t *testing.T) {
 	dir := t.TempDir()
 	var out, errb bytes.Buffer
@@ -458,7 +458,7 @@ func TestApplyRefusesUnsupportedPlatform(t *testing.T) {
 }
 
 // The settings keep Claude Code's PowerShell tool on, whose commands the hook
-// checks on Windows: they deny no whole tool and mirror the Bash rules
+// checks on Windows: they deny no whole tool and mirror the Bash rules.
 func TestApplyKeepsPowerShell(t *testing.T) {
 	for _, os := range []string{"windows", "linux"} {
 		home := t.TempDir()
@@ -476,7 +476,7 @@ func TestApplyKeepsPowerShell(t *testing.T) {
 
 // The hook reads no CYBERBOAR_STATE, so --state is how an install
 // names the hook's state directory; apply writes it absolute, since the hook
-// refuses a relative one
+// refuses a relative one.
 func TestApplyState(t *testing.T) {
 	home := t.TempDir()
 	env := func(k string) string { return map[string]string{"HOME": home}[k] }

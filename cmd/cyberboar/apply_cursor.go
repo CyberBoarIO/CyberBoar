@@ -10,7 +10,7 @@ import (
 )
 
 // applyCursor installs the hook into Cursor's hooks.json for the user, the
-// project or the machine. Cursor reads one hooks.json per scope, so the file is merged
+// project or the machine. Cursor reads one hooks.json per scope, so the file is merged.
 func applyCursor(a applyArgs, stdout io.Writer, getenv func(string) string, fail, usage func(string, ...any) int) int {
 	if err := checkDeadline(a.deadline, cursor.HookTimeout, "Cursor hook timeout", ""); err != nil {
 		return usage("%v", err)
@@ -69,7 +69,8 @@ func applyCursor(a applyArgs, stdout io.Writer, getenv func(string) string, fail
 	notes := []string{
 		"the hooks are failClosed: a crashed or timed-out hook blocks the tool",
 		"Cursor ignores ask from preToolUse, so ask rules deny",
-		"Cursor runs every matching hook: a later preToolUse hook can replace a tool's input after the check, and a sessionStart hook can set the environment later hooks run in; install only hooks you trust",
+		"Cursor runs every matching hook: a later preToolUse hook can replace a tool's input after the check, " +
+			"and a sessionStart hook can set the environment later hooks run in; install only hooks you trust",
 		"command, file and MCP rules are enforced only by the hook",
 	}
 	if cursor.Scope(a.scope) != cursor.ScopeManaged {

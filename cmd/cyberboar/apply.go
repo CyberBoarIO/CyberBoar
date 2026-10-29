@@ -23,21 +23,22 @@ import (
 )
 
 // runApply installs the hook into an agent's settings. It prints what it
-// would write unless --write is given
+// would write unless --write is given.
 func runApply(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	cwd, _ := os.Getwd()
 	policyPath := fs.String("policy", h.getenv(envName("policy")), "policy file")
 	scope := fs.String("scope", "user", "settings to change: user, project, local or managed")
 	dir := fs.String("dir", cwd, "project directory (project and local scopes)")
-	managedDir := fs.String("managed-dir", claudecode.ManagedDir(h.goos), "managed settings directory (managed scope; codex: "+codex.ManagedDir+", copilot-cli: "+copilot.PolicyDir+", cursor: "+cursorManagedDir(h.goos)+")")
+	managedDir := fs.String("managed-dir", claudecode.ManagedDir(h.goos), "managed settings directory (managed scope; codex: "+
+		codex.ManagedDir+", copilot-cli: "+copilot.PolicyDir+", cursor: "+cursorManagedDir(h.goos)+")")
 	hookExe := fs.String("command", "", brand.Name+" executable for the hook (default: this binary; project scope: "+brand.Name+" on PATH)")
 	auditPath := fs.String("audit", "", "audit log path for the hook")
 	stateDir := fs.String("state", "", "the hook's state directory (default: the hook's own, $XDG_STATE_HOME/"+brand.Name+")")
 	deadline := fs.Duration("deadline", hook.DefaultDeadline, "hook deadline; must stay below the Claude Code hook timeout")
 	lock := fs.Bool("lock", false, "managed scope: set allowManagedHooksOnly so users can't add or disable hooks")
 	write := fs.Bool("write", false, "write the settings (default: print them)")
-	agent := fs.String("agent", "claude-code", "agent to install into: claude-code, codex, copilot-cli, cursor or opencode")
+	agent := fs.String("agent", "claude-code", "agent to install into: "+agentList())
 	pubkey := fs.String("pubkey", "", "policy signing public key: the hook then refuses unsigned or altered policies (required for --scope managed unless --allow-unsigned)")
 	allowUnsigned := fs.Bool("allow-unsigned", false, "managed scope: install without signature checks")
 	if code, ok := parseFlags(fs, args); !ok {
@@ -71,7 +72,7 @@ func runApply(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stde
 	case "opencode":
 		apply = applyOpencode
 	default:
-		return usage("unknown --agent %q (claude-code, codex, copilot-cli, cursor, opencode)", *agent)
+		return usage("unknown --agent %q (%s)", *agent, agentList())
 	}
 	if *pubkey == "" && *scope == "managed" && !*allowUnsigned {
 		return usage("--scope managed needs --pubkey (signed policies) or an explicit --allow-unsigned")
@@ -91,7 +92,7 @@ func runApply(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stde
 			return fail("%v", err)
 		}
 	}
-	if managed != "" && !flagSet(fs, "managed-dir") {
+	if managed != "" && !flagWasSet(fs, "managed-dir") {
 		a.managedDir = managed
 	}
 	return apply(a, stdout, h.getenv, fail, usage)
@@ -99,10 +100,10 @@ func runApply(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stde
 
 // installer installs the hook into one agent's settings, or prints what it
 // would write. It returns the exit status that fail gives for a failure (1),
-// or that usage gives for a flag value or combination the agent doesn't take (2)
+// or that usage gives for a flag value or combination the agent doesn't take (2).
 type installer func(a applyArgs, stdout io.Writer, getenv func(string) string, fail, usage func(string, ...any) int) int
 
-// applyArgs are apply's flags, as every agent's installer reads them
+// applyArgs are apply's flags, as every agent's installer reads them.
 type applyArgs struct {
 	policy, scope, dir, managedDir, command, audit, state, pubkey string
 	deadline                                                      time.Duration
@@ -110,7 +111,7 @@ type applyArgs struct {
 	goos                                                          string // the operating system apply runs on
 }
 
-// loadPolicy reads the policy at path and checks that it compiles
+// loadPolicy reads the policy at path and checks that it compiles.
 func loadPolicy(path string) (*policy.Policy, *engine.Compiled, error) {
 	// #nosec G703 -- the operator's own --policy argument
 	data, err := os.ReadFile(path)
@@ -129,7 +130,7 @@ func loadPolicy(path string) (*policy.Policy, *engine.Compiled, error) {
 }
 
 // checkDeadline refuses a hook deadline that, with the audit write, reaches
-// the agent's hook timeout (in seconds)
+// the agent's hook timeout (in seconds).
 func checkDeadline(deadline time.Duration, timeout int, what, after string) error {
 	if deadline+hook.AuditLimit < time.Duration(timeout)*time.Second {
 		return nil
@@ -164,7 +165,7 @@ func absoluteApplyPaths(a applyArgs) (applyArgs, error) {
 }
 
 // projectPolicy returns the policy's path relative to the project, with
-// slashes, for project-scope hook configuration
+// slashes, for project-scope hook configuration.
 func projectPolicy(dir, policy string) (string, error) {
 	rel, err := filepath.Rel(dir, policy)
 	if err != nil {
@@ -177,7 +178,7 @@ func projectPolicy(dir, policy string) (string, error) {
 }
 
 // userHome returns the user's home directory from HOME, the base of every
-// user-scope settings path
+// user-scope settings path.
 func userHome(getenv func(string) string) (string, error) {
 	if home := getenv("HOME"); home != "" {
 		return home, nil
@@ -185,7 +186,7 @@ func userHome(getenv func(string) string) (string, error) {
 	return "", errors.New("HOME is not set")
 }
 
-// hookCommand returns the executable the hook runs, which is command or the binary
+// hookCommand returns the executable the hook runs, which is command or the binary.
 func hookCommand(command string) (string, error) {
 	if command != "" {
 		return command, nil
@@ -198,7 +199,7 @@ func hookCommand(command string) (string, error) {
 }
 
 // emit writes out to target, or for a dry run prints it under a comment
-// naming target, then warns about shell configuration the hook can't see
+// naming target, then warns about shell configuration the hook can't see.
 func emit(stdout io.Writer, a applyArgs, target, comment string, out []byte, getenv func(string) string) error {
 	if !a.write {
 		fmt.Fprintf(stdout, "%s %s (dry run; add --write to apply)\n%s", comment, target, out)
@@ -220,14 +221,8 @@ func printNotes(stdout io.Writer, heading string, notes []string) {
 	}
 }
 
-func flagSet(fs *flag.FlagSet, name string) bool {
-	set := false
-	fs.Visit(func(f *flag.Flag) { set = set || f.Name == name })
-	return set
-}
-
 // writeAtomic replaces path via a temporary file, keeping a .bak of a
-// previous version
+// previous version.
 func writeAtomic(path string, data []byte) error {
 	// #nosec G301 -- agents' settings directories are normally 0755.
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -251,7 +246,7 @@ func writeAtomic(path string, data []byte) error {
 
 // shellConfigWarnings reports settings in the user's shell configuration that
 // change how commands resolve paths in ways the hook can't see:
-// CDPATH set there (not exported to the hook) and cdable_vars
+// CDPATH set there (not exported to the hook) and cdable_vars.
 func shellConfigWarnings(home string) []string {
 	if home == "" {
 		return nil

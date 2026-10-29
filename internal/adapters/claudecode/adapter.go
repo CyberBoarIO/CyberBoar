@@ -1,5 +1,5 @@
 // Package claudecode maps Claude Code's PreToolUse hook input to engine
-// actions and engine verdicts to hook output
+// actions and engine verdicts to hook output.
 package claudecode
 
 import (
@@ -20,21 +20,21 @@ import (
 	"cyberboar.dev/cyberboar/internal/winpath"
 )
 
-// Adapter speaks Claude Code's hook protocol
+// Adapter speaks Claude Code's hook protocol.
 type Adapter struct{}
 
-// Name returns "claude-code", the agent name used on the command line and in audit events
+// Name returns "claude-code", the agent name used on the command line and in audit events.
 func (Adapter) Name() string { return "claude-code" }
 
 // Parse reads the workspace root from CLAUDE_PROJECT_DIR, which Claude Code
-// sets and the model's shell can't change
+// sets and the model's shell can't change.
 func (Adapter) Parse(data []byte, getenv func(string) string) (*adapters.Call, error) {
 	return parse(data, getenv, runtime.GOOS, gitbash.System(getenv))
 }
 
 // parse is Parse for the operating system goos, a runtime.GOOS value
 // Git Bash is read only on Windows, and gitBash reads the hook's environment
-// through its Getenv
+// through its Getenv.
 func parse(data []byte, getenv func(string) string, goos string, gitBash gitbash.Env) (*adapters.Call, error) {
 	in, err := ParseInput(data)
 	if err != nil {
@@ -69,7 +69,7 @@ func parse(data []byte, getenv func(string) string, goos string, gitBash gitbash
 // ~/.claude or CLAUDE_CONFIG_DIR, the project's shared and local settings,
 // the managed settings directory on goos, a runtime.GOOS value, and the
 // custom agents, skills and commands of the user and of every folder
-// projectDirs returns
+// projectDirs returns.
 func SettingsFiles(env Env, configDir, goos string) []string {
 	w := env.Windows
 	var out []string
@@ -95,7 +95,7 @@ func SettingsFiles(env Env, configDir, goos string) []string {
 // customizations returns the folders of a .claude directory whose custom
 // agents, skills and commands can declare hooks in their frontmatter.
 // Claude Code picks up changes there during the session and runs those
-// hooks when the model starts the agent or invokes the skill
+// hooks when the model starts the agent or invokes the skill.
 func customizations(windows bool, dir string) []string {
 	return []string{adapters.Under(windows, dir, "agents"), adapters.Under(windows, dir, "skills"),
 		adapters.Under(windows, dir, "commands")}
@@ -104,7 +104,7 @@ func customizations(windows bool, dir string) []string {
 // projectDirs returns the folders whose .claude agents, skills and commands
 // Claude Code loads: the project directory, where it started, and every
 // folder above it up to the git work tree holding it. Outside a work tree
-// it is the project directory alone
+// it is the project directory alone.
 func projectDirs(env Env) []string {
 	if env.ProjectDir == "" {
 		return nil
@@ -124,7 +124,7 @@ func projectDirs(env Env) []string {
 }
 
 // parent returns the folder holding dir, or "" when dir is the root (on
-// Windows, of a drive or a share)
+// Windows, of a drive or a share).
 func parent(windows bool, dir string) string {
 	if !windows {
 		if p := path.Dir(dir); p != dir {
@@ -146,7 +146,7 @@ func parent(windows bool, dir string) string {
 // windowsEnv reads the environment on native Windows. Git Bash expands ~
 // with HOME and native tools use USERPROFILE, so when both are set they must
 // name one directory, or the hook can't tell which home a path under ~ means.
-// Directories may come in Git Bash's form, such as /c/Users/dev
+// Directories may come in Git Bash's form, such as /c/Users/dev.
 func windowsEnv(env Env, getenv func(string) string, gitBash gitbash.Env) (Env, error) {
 	env.Windows = true
 	env.ProjectDir = winpath.FromGitBash(env.ProjectDir)
@@ -165,10 +165,10 @@ func windowsEnv(env Env, getenv func(string) string, gitBash gitbash.Env) (Env, 
 	return env, nil
 }
 
-// Respond turns a verdict into hook output (see the package-level Respond)
+// Respond turns a verdict into hook output (see the package-level Respond).
 func (Adapter) Respond(v engine.Verdict, prefix string) adapters.Output { return Respond(v, prefix) }
 
-// Input is the part of the PreToolUse hook input CyberBoar uses
+// Input is the part of the PreToolUse hook input CyberBoar uses.
 type Input struct {
 	HookEventName  string          `json:"hook_event_name"`
 	SessionID      string          `json:"session_id"`
@@ -185,7 +185,7 @@ type Input struct {
 	} `json:"mcp_server"`
 }
 
-// ParseInput decodes exactly one JSON object
+// ParseInput decodes exactly one JSON object.
 func ParseInput(data []byte) (*Input, error) {
 	var in Input
 	if err := adapters.DecodeHookInput(data, &in); err != nil {
@@ -200,18 +200,18 @@ func ParseInput(data []byte) (*Input, error) {
 	return &in, nil
 }
 
-// Env is what the adapter takes from the hook's environment
+// Env is what the adapter takes from the hook's environment.
 type Env struct {
 	// ProjectDir is the workspace root from CLAUDE_PROJECT_DIR, which Claude
-	// Code sets and the model's shell can't change
+	// Code sets and the model's shell can't change.
 	ProjectDir string
 	Home       string
 	CDPath     bool // CDPATH is set in the hook's (and so the agent's) environment
 	// Windows reports whether the hook runs on native Windows, where paths
-	// are Windows paths and commands run in Git Bash
+	// are Windows paths and commands run in Git Bash.
 	Windows bool
-	// Mounts is Git Bash's mount table (engine.Action.Mounts)
-	// It is nil if the table couldn't be read
+	// Mounts is Git Bash's mount table (engine.Action.Mounts).
+	// It is nil if the table couldn't be read.
 	Mounts map[string]string
 }
 
@@ -248,13 +248,13 @@ func (s toolSpec) valid() error {
 }
 
 // classification is the embedded tools.yaml. If it doesn't load, every tool
-// is unclassified and denied
+// is unclassified and denied.
 var classification = sync.OnceValues(func() (map[string]toolSpec, error) {
 	return adapters.LoadTools(toolsYAML, func(_ string, s toolSpec) error { return s.valid() })
 })
 
-// Actions maps a hook input to the engine actions to evaluate
-// No actions and no error means the tool touches nothing CyberBoar governs
+// Actions maps a hook input to the engine actions to evaluate.
+// No actions and no error means the tool touches nothing CyberBoar governs.
 func Actions(in *Input, env Env) ([]engine.Action, error) {
 	base := engine.Action{Cwd: in.Cwd, Home: env.Home, CDPath: env.CDPath}
 	if env.Windows {
@@ -358,7 +358,7 @@ func Actions(in *Input, env Env) ([]engine.Action, error) {
 // Code cuts the pattern at the last separator before its first *, ?, [ or {,
 // and takes the parent directory of a pattern that has none of them. On
 // Windows both separators count, and a pattern is absolute when it starts
-// with one, or with a drive letter, a colon and one
+// with one, or with a drive letter, a colon and one.
 func globBase(pattern string, windows bool) (dir string, ok bool) {
 	seps, root := "/", 1
 	if windows {
@@ -384,13 +384,13 @@ func globBase(pattern string, windows bool) (dir string, ok bool) {
 func isLetter(c byte) bool { return 'a' <= c && c <= 'z' || 'A' <= c && c <= 'Z' }
 
 // mcpNameChars matches the characters of a server name that Claude Code
-// replaces with "_" in tool names
+// replaces with "_" in tool names.
 var mcpNameChars = regexp.MustCompile(`[^A-Za-z0-9_-]`)
 
 // mcpActions splits mcp__<server>__<tool>. If the input has mcp_server.name,
-// the split is known
+// the split is known.
 // Otherwise every split is evaluated and the strictest verdict wins, so
-// a server named "a__b" can't hide behind the split (a, b__tool)
+// a server named "a__b" can't hide behind the split (a, b__tool).
 func mcpActions(in *Input, base engine.Action) ([]engine.Action, error) {
 	rest := strings.TrimPrefix(in.ToolName, "mcp__")
 	mk := func(server, tool string) engine.Action {
@@ -418,14 +418,14 @@ func mcpActions(in *Input, base engine.Action) ([]engine.Action, error) {
 	return out, nil
 }
 
-// Output is the hook's response to Claude Code
+// Output is the hook's response to Claude Code.
 type Output = adapters.Output
 
 // Respond turns a verdict into hook output. Deny exits 2 (which blocks even
 // if Claude Code can't parse the JSON) and also puts the reason on stderr.
 // Allow produces no output, because a hook "allow" would skip the user's own
 // permission prompt, which CyberBoar must never do
-// A verdict's Notice is shown to the user as systemMessage
+// A verdict's Notice is shown to the user as systemMessage.
 func Respond(v engine.Verdict, prefix string) Output {
 	reason := prefix + v.Reason
 	var decision string

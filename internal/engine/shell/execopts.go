@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"maps"
 	"strings"
 )
 
@@ -9,12 +10,10 @@ import (
 // command is checked like any command; anything more is inline shell code
 
 func registerExecOpts() {
-	for name, fn := range map[string]wrapperFunc{
+	maps.Copy(wrappers, map[string]wrapperFunc{
 		"ssh": wrapSSH, "scp": wrapSSH, "sftp": wrapSSH, "slogin": wrapSSH,
 		"rsync": wrapRsync, "tar": wrapTar, "gtar": wrapTar, "zip": wrapZip, "man": wrapMan,
-	} {
-		wrappers[name] = fn
-	}
+	})
 }
 
 func cmdLine(what string, e Elem) codeRun {
@@ -68,7 +67,7 @@ func wrapRsync(a *analyzer, name string, args []Elem) unwrapped {
 	return u
 }
 
-// wrapTar finds GNU tar's program-running options
+// wrapTar finds GNU tar's program-running options.
 func wrapTar(_ *analyzer, name string, args []Elem) unwrapped {
 	var u unwrapped
 	long := []string{"to-command", "use-compress-program", "rsh-command", "info-script", "new-volume-script",
@@ -155,7 +154,7 @@ func wrapZip(_ *analyzer, name string, args []Elem) unwrapped {
 	return u
 }
 
-// wrapMan finds the pager (-P, --pager) and HTML browser (-H, --html)
+// wrapMan finds the pager (-P, --pager) and HTML browser (-H, --html).
 func wrapMan(_ *analyzer, name string, args []Elem) unwrapped {
 	var u unwrapped
 	for i := 0; i < len(args); i++ {
@@ -180,14 +179,14 @@ func wrapMan(_ *analyzer, name string, args []Elem) unwrapped {
 	return u
 }
 
-// shellEnvVars are the environment variables whose value is run as a command line (analyzed)
+// shellEnvVars are the environment variables whose value is run as a command line (analyzed).
 var shellEnvVars = set("GIT_SSH_COMMAND", "GIT_SSH", "GIT_EDITOR", "GIT_SEQUENCE_EDITOR", "GIT_PAGER",
 	"GIT_EXTERNAL_DIFF", "GIT_PROXY_COMMAND", "GIT_ASKPASS", "SSH_ASKPASS", "SUDO_ASKPASS", "EDITOR",
 	"VISUAL", "PAGER", "MANPAGER", "SYSTEMD_PAGER", "LESSOPEN", "LESSCLOSE", "BROWSER", "FCEDIT",
 	"PROMPT_COMMAND")
 
 // foreignEnvVars are the environment variables that make programs load or run code the
-// analysis can't see: preloaded libraries, startup files, interpreter options, git config
+// analysis can't see: preloaded libraries, startup files, interpreter options, git config.
 var foreignEnvVars = set("LD_PRELOAD", "LD_AUDIT", "LD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES",
 	"DYLD_LIBRARY_PATH", "BASH_ENV", "ENV", "NODE_OPTIONS", "PERL5OPT", "RUBYOPT", "PYTHONSTARTUP",
 	"JAVA_TOOL_OPTIONS", "_JAVA_OPTIONS", "JDK_JAVA_OPTIONS", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT",

@@ -1,5 +1,5 @@
 // Package endpointauth implements how endpoints and consoles authenticate
-// each other (docs/protocol, "Endpoint authentication")
+// each other (docs/protocol, "Endpoint authentication").
 //
 // An endpoint holds an ECDSA P-256 key it created when it enrolled. The
 // console holds the public half and issues a short-lived client certificate
@@ -47,37 +47,37 @@ import (
 	"cyberboar.dev/cyberboar/pkg/brand"
 )
 
-// Algorithm is the only signature algorithm (RFC 9421 §3.3.4), and the alg parameter's value
+// Algorithm is the only signature algorithm (RFC 9421 §3.3.4), and the alg parameter's value.
 const Algorithm = "ecdsa-p256-sha256"
 
-// MaxSkew is how far a signature's created time may be from the verifier's clock
-// A captured request can't be replayed later than this, and within it the nonce can't be used twice
+// MaxSkew is how far a signature's created time may be from the verifier's clock.
+// A captured request can't be replayed later than this, and within it the nonce can't be used twice.
 const MaxSkew = 5 * time.Minute
 
-// Paths of the requests this package's messages belong to
+// Paths of the requests this package's messages belong to.
 const (
 	EnrollPath      = "/api/v1/enroll"
 	CertificatePath = "/api/v1/endpoint/certificate"
 )
 
-// label names the one signature in Signature-Input and Signature
+// label names the one signature in Signature-Input and Signature.
 // The tags say what a signature is for, so neither side's signature can be taken
-// for the other's, or for another application's
+// for the other's, or for another application's.
 const (
 	label       = brand.Name
 	requestTag  = brand.APIGroup + "/endpoint/v1"
 	responseTag = brand.APIGroup + "/console/v1"
 )
 
-// The covered component lists
-// A request without a body covers the digest of no bytes
+// The covered component lists.
+// A request without a body covers the digest of no bytes.
 const (
 	requestComponents  = `("@method" "@path" "@query" "content-digest")`
 	responseComponents = `("@status" "content-digest" "signature";req;key="` + label + `")`
 )
 
-// Header patterns of the profile
-// Anything else, including other valid RFC 9421 forms, is rejected
+// Header patterns of the profile.
+// Anything else, including other valid RFC 9421 forms, is rejected.
 var (
 	requestInputRE = regexp.MustCompile(`^` + regexp.QuoteMeta(label+"="+requestComponents) +
 		`;created=([0-9]{1,15});keyid="([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})"` +
@@ -89,7 +89,7 @@ var (
 	uuidRE      = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 )
 
-// ValidEndpointID reports whether s is an endpoint ID, which is a lowercase version 4 UUID
+// ValidEndpointID reports whether s is an endpoint ID, which is a lowercase version 4 UUID.
 func ValidEndpointID(s string) bool { return uuidRE.MatchString(s) }
 
 func requestParams(created int64, keyID, nonce string) string {
@@ -102,7 +102,7 @@ func responseParams(created int64, keyID string) string {
 		`";alg="` + Algorithm + `";tag="` + responseTag + `"`
 }
 
-// requestBase builds a request's signature base (RFC 9421 §2.5)
+// requestBase builds a request's signature base (RFC 9421 §2.5).
 func requestBase(method string, u *url.URL, digest, params string) ([]byte, error) {
 	path := u.EscapedPath()
 	if path == "" {
@@ -126,7 +126,7 @@ func requestBase(method string, u *url.URL, digest, params string) ([]byte, erro
 }
 
 // responseBase builds an answer's signature base
-// requestSig is the request's signature as its Signature field's member value
+// requestSig is the request's signature as its Signature field's member value.
 func responseBase(status int, digest, requestSig, params string) []byte {
 	return []byte(`"@status": ` + strconv.Itoa(status) + "\n" +
 		`"content-digest": ` + digest + "\n" +
@@ -134,13 +134,13 @@ func responseBase(status int, digest, requestSig, params string) []byte {
 		`"@signature-params": ` + params)
 }
 
-// ContentDigest returns the Content-Digest field value (RFC 9530) for body
+// ContentDigest returns the Content-Digest field value (RFC 9530) for body.
 func ContentDigest(body []byte) string {
 	sum := sha256.Sum256(body)
 	return "sha-256=:" + base64.StdEncoding.EncodeToString(sum[:]) + ":"
 }
 
-// checkDigest checks a Content-Digest field value against body
+// checkDigest checks a Content-Digest field value against body.
 func checkDigest(field string, body []byte) bool {
 	m := digestRE.FindStringSubmatch(field)
 	if m == nil {
@@ -154,7 +154,7 @@ func checkDigest(field string, body []byte) bool {
 	return subtle.ConstantTimeCompare(sum[:], want) == 1
 }
 
-// p256 returns pub as a P-256 key, or nil
+// p256 returns pub as a P-256 key, or nil.
 func p256(pub crypto.PublicKey) *ecdsa.PublicKey {
 	k, ok := pub.(*ecdsa.PublicKey)
 	if !ok || k == nil || k.Curve != elliptic.P256() {
@@ -164,7 +164,7 @@ func p256(pub crypto.PublicKey) *ecdsa.PublicKey {
 }
 
 // signBase signs base with key and returns the signature in RFC 9421's form
-// for ECDSA, r and s as 32-byte big-endian integers, base64-encoded
+// for ECDSA, r and s as 32-byte big-endian integers, base64-encoded.
 func signBase(key crypto.Signer, base []byte) (string, error) {
 	if p256(key.Public()) == nil {
 		return "", errors.New("the key is not an ECDSA P-256 key")
@@ -195,7 +195,7 @@ func verifyBase(pub *ecdsa.PublicKey, base []byte, sig string) bool {
 	return ecdsa.Verify(pub, sum[:], new(big.Int).SetBytes(raw[:32]), new(big.Int).SetBytes(raw[32:]))
 }
 
-// Signer signs an enrolled endpoint's requests
+// Signer signs an enrolled endpoint's requests.
 type Signer struct {
 	ID  string           // endpoint ID, which is the signature's keyid
 	Key crypto.Signer    // the endpoint's P-256 key
@@ -203,8 +203,8 @@ type Signer struct {
 }
 
 // Sign sets req's Content-Digest, Signature-Input and Signature headers
-// body is the request body, nil for none, and req must send exactly those bytes
-// Every call uses a new nonce, so a retry is a new request
+// body is the request body, nil for none, and req must send exactly those bytes.
+// Every call uses a new nonce, so a retry is a new request.
 func (s *Signer) Sign(req *http.Request, body []byte) error {
 	now := time.Now
 	if s.Now != nil {
@@ -235,7 +235,7 @@ func (s *Signer) sign(req *http.Request, body []byte, created int64, nonce strin
 	return nil
 }
 
-// Request is a request's signature, parsed and within the time window but not yet verified
+// Request is a request's signature, parsed and within the time window but not yet verified.
 type Request struct {
 	EndpointID string    // the endpoint the signature names
 	Created    time.Time // the signature's created time
@@ -289,7 +289,7 @@ func ParseRequest(r *http.Request, now time.Time) (*Request, error) {
 	return &Request{EndpointID: m[2], Created: t, Nonce: m[3], digest: digests[0], base: base, sig: sm[1]}, nil
 }
 
-// Verify checks the signature against the endpoint's public key
+// Verify checks the signature against the endpoint's public key.
 func (q *Request) Verify(pub *ecdsa.PublicKey) error {
 	if !verifyBase(p256(pub), q.base, q.sig) {
 		return unauthenticated("the request's signature doesn't verify with this endpoint's key")
@@ -297,7 +297,7 @@ func (q *Request) Verify(pub *ecdsa.PublicKey) error {
 	return nil
 }
 
-// CheckBody checks that body is what the signed Content-Digest describes
+// CheckBody checks that body is what the signed Content-Digest describes.
 func (q *Request) CheckBody(body []byte) error {
 	if !checkDigest(q.digest, body) {
 		return unauthenticated("the request body doesn't match its signed Content-Digest")
@@ -305,21 +305,21 @@ func (q *Request) CheckBody(body []byte) error {
 	return nil
 }
 
-// NonceExpires is the last time at which ParseRequest accepts the request
+// NonceExpires is the last time at which ParseRequest accepts the request.
 // ParseRequest rejects it as stale only once the console's clock is after
 // NonceExpires, so the console must remember the request's nonce until then,
-// that instant included
-// It may forget the nonce only when its clock is after NonceExpires
+// that instant included.
+// It may forget the nonce only when its clock is after NonceExpires.
 func (q *Request) NonceExpires() time.Time { return q.Created.Add(MaxSkew) }
 
-// ResponseSigner signs a console's answers to enrolled endpoints
+// ResponseSigner signs a console's answers to enrolled endpoints.
 type ResponseSigner struct {
 	Key crypto.Signer    // the console's P-256 key
 	Now func() time.Time // the clock, time.Now if nil
 }
 
 // Sign sets the Content-Digest, Signature-Input and Signature headers of an
-// answer to q with this status and body
+// answer to q with this status and body.
 func (s *ResponseSigner) Sign(h http.Header, status int, body []byte, q *Request) error {
 	now := time.Now
 	if s.Now != nil {
@@ -351,7 +351,7 @@ func (s *ResponseSigner) sign(h http.Header, status int, body []byte, requestSig
 // VerifyResponse checks that resp, whose body is body, is the console's answer
 // to req, the request as Signer signed it
 // The answer must be signed with the console's pinned key, within MaxSkew of now,
-// over its status and body. An endpoint acts on no answer below 400 that fails this
+// over its status and body. An endpoint acts on no answer below 400 that fails this.
 func VerifyResponse(resp *http.Response, body []byte, req *http.Request, console *ecdsa.PublicKey, now time.Time) error {
 	rm := signatureRE.FindStringSubmatch(req.Header.Get("Signature"))
 	if rm == nil {
@@ -393,8 +393,8 @@ func VerifyResponse(resp *http.Response, body []byte, req *http.Request, console
 	return nil
 }
 
-// KeyID returns the keyid by which a console's answers name its key
-// It is the lowercase hex SHA-256 of the key's PKIX (SubjectPublicKeyInfo) encoding
+// KeyID returns the keyid by which a console's answers name its key.
+// It is the lowercase hex SHA-256 of the key's PKIX (SubjectPublicKeyInfo) encoding.
 func KeyID(pub *ecdsa.PublicKey) string {
 	der, err := x509.MarshalPKIXPublicKey(pub)
 	if err != nil {
@@ -405,7 +405,7 @@ func KeyID(pub *ecdsa.PublicKey) string {
 }
 
 // EncodePublicKey returns a P-256 public key as the protocol carries it, in
-// standard base64 of its PKIX (SubjectPublicKeyInfo) encoding
+// standard base64 of its PKIX (SubjectPublicKeyInfo) encoding.
 func EncodePublicKey(pub *ecdsa.PublicKey) (string, error) {
 	if p256(pub) == nil {
 		return "", errors.New("not an ECDSA P-256 key")
@@ -417,7 +417,7 @@ func EncodePublicKey(pub *ecdsa.PublicKey) (string, error) {
 	return base64.StdEncoding.EncodeToString(der), nil
 }
 
-// DecodePublicKey reads a key only in EncodePublicKey's form
+// DecodePublicKey reads a key only in EncodePublicKey's form.
 func DecodePublicKey(s string) (*ecdsa.PublicKey, error) {
 	der, err := base64.StdEncoding.Strict().DecodeString(s)
 	if err != nil {
@@ -428,7 +428,7 @@ func DecodePublicKey(s string) (*ecdsa.PublicKey, error) {
 	}
 	k, err := x509.ParsePKIXPublicKey(der)
 	if err != nil {
-		return nil, fmt.Errorf("the key is not a PKIX public key: %v", err)
+		return nil, fmt.Errorf("the key is not a PKIX public key: %w", err)
 	}
 	pub := p256(k)
 	if pub == nil {

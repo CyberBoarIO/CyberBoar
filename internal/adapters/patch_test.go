@@ -8,7 +8,7 @@ import (
 )
 
 // Codex takes the path after "MARKER " as it is, and opencode takes the
-// trimmed text after "MARKER". PatchPaths returns both readings
+// trimmed text after "MARKER". PatchPaths returns both readings.
 func TestPatchPaths(t *testing.T) {
 	for _, tc := range []struct {
 		patch string

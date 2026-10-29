@@ -10,14 +10,14 @@ import (
 )
 
 // FuzzPatchPaths reads any document: no panic, every file header's path as
-// Codex reads it is among the paths, and each path gets one write action
+// Codex reads it is among the paths, and each path gets one write action.
 func FuzzPatchPaths(f *testing.F) {
 	f.Add("*** Begin Patch\n*** Add File: a\n+x\n*** End Patch\n")
 	f.Add("*** Begin Patch\n*** Update File: b\n*** Move to:  c\n@@\n-x\n+y\n*** End Patch\n")
 	f.Add("  *** Delete File: d\r\n*** Environment ID: e\n")
 	f.Fuzz(func(t *testing.T, patch string) {
 		paths, _ := PatchPaths(patch)
-		for _, line := range strings.Split(patch, "\n") {
+		for line := range strings.SplitSeq(patch, "\n") {
 			tl := strings.TrimSpace(line)
 			for _, m := range []string{addFile, deleteFile, updateFile, moveTo} {
 				if p, ok := strings.CutPrefix(tl, m+" "); ok && !slices.Contains(paths, p) {
@@ -38,7 +38,7 @@ func FuzzPatchPaths(f *testing.F) {
 }
 
 // FuzzSplitMCP splits any name: each reading puts the name back together,
-// with neither part empty, and there is one for each "__" between them
+// with neither part empty, and there is one for each "__" between them.
 func FuzzSplitMCP(f *testing.F) {
 	f.Add("github__create_issue")
 	f.Add("a___b__c")
@@ -63,7 +63,7 @@ func FuzzSplitMCP(f *testing.F) {
 }
 
 // FuzzToolInputObject decodes any tool input: when it is accepted, every
-// path field holds a string (or nothing), so Extract can't skip a path
+// path field holds a string (or nothing), so Extract can't skip a path.
 func FuzzToolInputObject(f *testing.F) {
 	f.Add(`{"path": "a", "paths": ["b"], "files": {"x": {"from": "c"}}}`)
 	f.Add(`{"path": 7}`)

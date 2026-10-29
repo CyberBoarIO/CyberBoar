@@ -29,15 +29,15 @@ import (
 // root and the tss group. What the TPM adds is that the key can't leave the machine
 
 // tpmOpener opens the TPM keys are made and used in, or returns an error
-// wrapping ErrUnavailable. Keys use this machine's TPM, which openPlatformTPM opens
+// wrapping ErrUnavailable. Keys use this machine's TPM, which openPlatformTPM opens.
 type tpmOpener func() (transport.TPMCloser, error)
 
 // oidLoadableKey is the TPM 2.0 key file format's type for a key loaded
-// under a parent with TPM2_Load
+// under a parent with TPM2_Load.
 var oidLoadableKey = asn1.ObjectIdentifier{2, 23, 133, 10, 1, 3}
 
 // tssKey is the TPM 2.0 key file's ASN.1 form, without the optional policy,
-// secret and authPolicy fields. A key file holding any of them fails to parse
+// secret and authPolicy fields. A key file holding any of them fails to parse.
 type tssKey struct {
 	Type      asn1.ObjectIdentifier
 	EmptyAuth bool `asn1:"explicit,tag:0,optional"`
@@ -48,10 +48,10 @@ type tssKey struct {
 
 // srkTemplate is the template of the parent, the TCG's reference ECC P-256
 // storage root key. The key file format assumes that parent for a key whose
-// parent is a hierarchy
+// parent is a hierarchy.
 var srkTemplate = tpm2.ECCSRKTemplate
 
-// withSRK runs f with the storage root key loaded, and flushes it after
+// withSRK runs f with the storage root key loaded, and flushes it after.
 func withSRK(t transport.TPM, f func(srk tpm2.AuthHandle) error) error {
 	rsp, err := tpm2.CreatePrimary{
 		PrimaryHandle: tpm2.AuthHandle{Handle: tpm2.TPMRHOwner, Auth: tpm2.PasswordAuth(nil)},
@@ -65,15 +65,15 @@ func withSRK(t transport.TPM, f func(srk tpm2.AuthHandle) error) error {
 }
 
 // flush frees a transient object. Its error is ignored, because the
-// resource manager frees what a closed connection left anyway
+// resource manager frees what a closed connection left anyway.
 func flush(t transport.TPM, h tpm2.TPMHandle) {
 	_, _ = tpm2.FlushContext{FlushHandle: h}.Execute(t)
 }
 
 // loadTPM returns the key in a TPM key file's DER. The public area must be
 // what createTSS (tpm_create.go) asks the TPM for, so a key file for a key
-// the TPM would let out, or one that can decrypt, is refused
-// The TPM itself checks the private area against the public one when it loads the key
+// the TPM would let out, or one that can decrypt, is refused.
+// The TPM itself checks the private area against the public one when it loads the key.
 func loadTPM(der []byte, openTPM tpmOpener) (*Key, error) {
 	var tk tssKey
 	rest, err := asn1.Unmarshal(der, &tk)
@@ -133,7 +133,7 @@ func loadTPM(der []byte, openTPM tpmOpener) (*Key, error) {
 	return &Key{Signer: &signerFunc{pub: ecPub, sign: sign}, Storage: TPM}, nil
 }
 
-// strictUnmarshal decodes a TPM structure that must take up all of data
+// strictUnmarshal decodes a TPM structure that must take up all of data.
 func strictUnmarshal[T tpm2.Marshallable, P interface {
 	*T
 	tpm2.Unmarshallable
@@ -149,7 +149,7 @@ func strictUnmarshal[T tpm2.Marshallable, P interface {
 }
 
 // checkTPMPublic returns the key in a public area if the area is exactly
-// what keyTemplate (tpm_create.go) asks for, apart from the point itself
+// what keyTemplate (tpm_create.go) asks for, apart from the point itself.
 func checkTPMPublic(b *tpm2.TPM2BPublic) (*ecdsa.PublicKey, error) {
 	p, err := b.Contents()
 	if err != nil {

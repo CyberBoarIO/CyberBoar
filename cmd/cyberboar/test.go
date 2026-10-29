@@ -18,7 +18,7 @@ import (
 	"cyberboar.dev/cyberboar/pkg/brand"
 )
 
-// policyCases are separate from the enforceable policy schema
+// policyCases are separate from the enforceable policy schema.
 type policyCases struct {
 	Tests []policyCase `json:"tests"`
 }

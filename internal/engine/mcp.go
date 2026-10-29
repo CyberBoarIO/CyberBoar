@@ -12,24 +12,24 @@ import (
 	"cyberboar.dev/cyberboar/internal/policy"
 )
 
-// mcpRule is a compiled MCP rule. id is the rule ID verdicts report
+// mcpRule is a compiled MCP rule. id is the rule ID verdicts report.
 type mcpRule struct {
 	id           string
 	server, tool string // globs, where tool "" matches every tool
-	// The globs as they match names an agent rewrote (MCPCall.Names)
+	// The globs as they match names an agent rewrote (MCPCall.Names).
 	opencodeServer, opencodeTool             string
 	copilotServer, copilotTool               string
 	copilotUnicodeServer, copilotUnicodeTool string
 	codexServer, codexTool                   string
 }
 
-// mcpRules holds the compiled MCP rules by kind
+// mcpRules holds the compiled MCP rules by kind.
 type mcpRules struct {
 	deny, ask, allow []mcpRule
 }
 
 // compileMCPRules compiles the MCP patterns of a policy. Rule IDs number each
-// list from zero: mcp.deny[0], mcp.ask[0] and so on
+// list from zero: mcp.deny[0], mcp.ask[0] and so on.
 func compileMCPRules(r policy.Rules) mcpRules {
 	build := func(list string, pats []string) []mcpRule {
 		out := make([]mcpRule, len(pats))
@@ -52,7 +52,7 @@ func compileMCPRules(r policy.Rules) mcpRules {
 // case. Folding a bracket expression can change what it holds ([A-z] becomes
 // [a-z]), so the folded form only adds matches to the written one. For
 // names an agent rewrote, deny and ask rules also match with their globs
-// rewritten the same way, so a rule for write.file still covers write_file
+// rewritten the same way, so a rule for write.file still covers write_file.
 func (r mcpRule) match(c MCPCall, folded bool) bool {
 	if c.Names == NamesVSCode {
 		return r.matchVSCode(c, folded)
@@ -105,7 +105,7 @@ func (r mcpRule) matchNames(rs, rt string, c MCPCall, folded bool) (bool, error)
 // matchVSCode matches VS Code's names, whose server part doesn't name the
 // server (NamesVSCode). A deny or ask rule matches the tool of any server,
 // as written or rewritten; an allow rule matches only if it allows every
-// server
+// server.
 func (r mcpRule) matchVSCode(c MCPCall, folded bool) bool {
 	// VS Code cuts mcp_<prefix>_<tool> at 64 characters
 	cut := vscodeCut(c)
@@ -148,13 +148,13 @@ func (r mcpRule) matchVSCode(c MCPCall, folded bool) bool {
 	return false
 }
 
-// vscodeCut reports whether VS Code may have cut the call's name short
+// vscodeCut reports whether VS Code may have cut the call's name short.
 func vscodeCut(c MCPCall) bool {
 	return len(VSCodeMCPPrefix)+len(c.Server)+1+len(c.Tool) >= vscodeNameMax
 }
 
 // globTokens splits a path.Match pattern into the pieces that each match
-// one character, or any run of them ("*")
+// one character, or any run of them ("*").
 func globTokens(pattern string) ([]string, error) {
 	var out []string
 	for i := 0; i < len(pattern); {
@@ -197,7 +197,7 @@ func globTokens(pattern string) ([]string, error) {
 
 // globMatchesStart reports whether pattern may match a name that starts
 // with name: whether some leading tokens of the pattern match name. The
-// tokens that follow are taken to match some ending, which errs toward a match
+// tokens that follow are taken to match some ending, which errs toward a match.
 func globMatchesStart(pattern, name string) (bool, error) {
 	toks, err := globTokens(pattern)
 	if err != nil {
@@ -214,18 +214,18 @@ func globMatchesStart(pattern, name string) (bool, error) {
 
 // VSCodeMCPPrefix starts the name of every MCP tool VS Code offers the
 // model: VSCodeMCPPrefix, the server's prefix, "_" and the tool, cut at
-// vscodeNameMax characters
+// vscodeNameMax characters.
 const VSCodeMCPPrefix = "mcp_"
 
 const vscodeNameMax = 64
 
-// copilotNameMax is the length Copilot CLI cuts server-tool names to
+// copilotNameMax is the length Copilot CLI cuts server-tool names to.
 const copilotNameMax = 64
 
 // matchCodex matches Codex's names. Codex adds "_" and 12 hex digits to a name
 // that would collide with another or be too long, after cutting it short, so
 // a server with that suffix also matches without it, and a tool with it may
-// be any tool of the server
+// be any tool of the server.
 func (r mcpRule) matchCodex(c MCPCall, folded bool) (bool, error) {
 	tool := r.codexTool
 	if codexHashed(c.Tool) {
@@ -239,7 +239,7 @@ func (r mcpRule) matchCodex(c MCPCall, folded bool) (bool, error) {
 	return ok, err
 }
 
-// codexHashLen is the length of Codex's hash suffix, "_" and 12 hex digits
+// codexHashLen is the length of Codex's hash suffix, "_" and 12 hex digits.
 const codexHashLen = 13
 
 func codexHashed(name string) bool {
@@ -257,7 +257,7 @@ func codexHashed(name string) bool {
 // opencodeGlob rewrites a tool glob the way opencode rewrites tool names: a
 // literal character outside [A-Za-z0-9_-] becomes "_", or "__" if UTF-16
 // needs two code units for it. A "?" becomes "?*" so it also covers a
-// character that became "__"
+// character that became "__".
 func opencodeGlob(p string) string {
 	return substGlob(p, nameChar, "?*", func(r rune) string {
 		if utf16.RuneLen(r) == 2 {
@@ -269,7 +269,7 @@ func opencodeGlob(p string) string {
 
 // codexGlob rewrites a server or tool glob the way Codex rewrites MCP names
 // (sanitize_responses_api_tool_name in codex-rs): a literal character outside
-// [A-Za-z0-9_], "-" among them, becomes "_"
+// [A-Za-z0-9_], "-" among them, becomes "_".
 func codexGlob(p string) string {
 	return substGlob(p, codexChar, "?", func(rune) string { return "_" })
 }
@@ -277,7 +277,7 @@ func codexGlob(p string) string {
 // substGlob replaces each literal character of a glob that keep refuses with
 // sub of it, and each "?" with question. A bracket expression that could match
 // such a character, or that is negated, becomes "*", which only matches more.
-// The result serves deny and ask rules, where matching more is the safe side
+// The result serves deny and ask rules, where matching more is the safe side.
 func substGlob(p string, keep func(rune) bool, question string, sub func(rune) string) string {
 	var b strings.Builder
 	lit := func(r rune) {
@@ -325,8 +325,8 @@ func substGlob(p string, keep func(rune) bool, question string, sub func(rune) s
 // bracket returns the index of the "]" that closes a bracket expression whose
 // body starts rs, or -1, and whether the expression only holds characters
 // keep accepts and isn't negated. A range counts as plain when both ends
-// are letters of one case or both are digits
-// The syntax is path.Match's
+// are letters of one case or both are digits.
+// The syntax is path.Match's.
 func bracket(rs []rune, keep func(rune) bool) (end int, plain bool) {
 	i := 0
 	plain = true
@@ -373,7 +373,7 @@ func bracket(rs []rune, keep func(rune) bool) (end int, plain bool) {
 // so does each run between them that holds a non-ASCII character, or a
 // bracket expression that could match one. "*" only matches more, which is
 // the safe side for deny and ask rules. For a reported name with punycode,
-// wildcards may stand for Unicode too, so their whole run becomes "*"
+// wildcards may stand for Unicode too, so their whole run becomes "*".
 func copilotGlob(p string, punycode bool) string {
 	var b, run strings.Builder
 	wild := false // the run must become "*"
@@ -431,7 +431,7 @@ func copilotGlob(p string, punycode bool) string {
 	return b.String()
 }
 
-// codexChar reports whether Codex keeps r in an MCP name
+// codexChar reports whether Codex keeps r in an MCP name.
 func codexChar(r rune) bool {
 	return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_'
 }
@@ -449,8 +449,8 @@ func sameClass(lo, hi rune) bool {
 	return false
 }
 
-// matchMCP reports whether the server glob rs and the tool glob rt cover server and tool
-// An empty rt covers every tool
+// matchMCP reports whether the server glob rs and the tool glob rt cover server and tool.
+// An empty rt covers every tool.
 func matchMCP(rs, rt, server, tool string) (bool, error) {
 	ok, err := path.Match(rs, server)
 	if err != nil || !ok || rt == "" {
@@ -459,7 +459,7 @@ func matchMCP(rs, rt, server, tool string) (bool, error) {
 	return path.Match(rt, tool)
 }
 
-// firstMCP returns the ID of the first rule that covers the call
+// firstMCP returns the ID of the first rule that covers the call.
 func firstMCP(rules []mcpRule, c MCPCall, folded bool) (string, bool) {
 	for _, r := range rules {
 		if r.match(c, folded) {
@@ -469,7 +469,7 @@ func firstMCP(rules []mcpRule, c MCPCall, folded bool) (string, bool) {
 	return "", false
 }
 
-// evalMCP decides a call to an MCP tool
+// evalMCP decides a call to an MCP tool.
 func (c *Compiled) evalMCP(a Action) Verdict {
 	name := a.MCP.Server + "/" + a.MCP.Tool
 	hint := ""

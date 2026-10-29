@@ -5,7 +5,7 @@ package main
 import "syscall"
 
 // shortPathName returns the 8.3 short form of an existing path, which has no
-// spaces where the volume keeps short names (C:\PROGRA~1)
+// spaces where the volume keeps short names (C:\PROGRA~1).
 func shortPathName(path string) (string, error) {
 	p, err := syscall.UTF16PtrFromString(path)
 	if err != nil {

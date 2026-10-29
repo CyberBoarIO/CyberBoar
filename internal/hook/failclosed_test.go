@@ -74,7 +74,7 @@ type panickingReader struct{}
 func (panickingReader) Read([]byte) (int, error) { panic("boom") }
 
 // assertDenied asserts a deny by rule that exits 2, or for Codex exits 0
-// with its JSON deny, which survives PowerShell (codex.Adapter.Respond)
+// with its JSON deny, which survives PowerShell (codex.Adapter.Respond).
 func assertDenied(t *testing.T, r hook.Result, rule string) {
 	t.Helper()
 	answered := r.Exit == 2 || (r.Exit == 0 && bytes.Contains(r.Stdout, []byte(`"permissionDecision":"deny"`)))
@@ -312,7 +312,7 @@ func TestUnsupportedPlatformDenies(t *testing.T) {
 }
 
 // A policy may require a minimum release; an older hook, or one whose
-// version can't be placed, denies every call and tells the user why
+// version can't be placed, denies every call and tells the user why.
 func TestMinimumVersion(t *testing.T) {
 	pol := []byte("apiVersion: " + brand.APIVersion + "\nkind: Policy\nmetadata: {name: floor}\nspec: {minimumVersion: v1.4.2}\n")
 	for _, tc := range []struct {
@@ -356,7 +356,7 @@ func TestMinimumVersion(t *testing.T) {
 
 // Outside native Windows the PowerShell tool can't be checked, so every call
 // is denied whatever the policy says. The agent is sent to the Bash tool,
-// where the same command is checked, and the user is told why
+// where the same command is checked, and the user is told why.
 func TestPowerShellPointsToBash(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("on native Windows PowerShell is analysed")
@@ -393,7 +393,7 @@ func TestPowerShellPointsToBash(t *testing.T) {
 }
 
 // The audit log is kept and shipped: it never holds a credential the hook
-// saw, whether the policy acts on secrets or not
+// saw, whether the policy acts on secrets or not.
 func TestAuditRedactsSecrets(t *testing.T) {
 	secret, _ := secretstest.Fake("github-pat")
 	off := strings.Replace(string(baselinePolicy(t)), "\nspec:\n", "\nspec:\n  secrets: {action: \"off\"}\n", 1)

@@ -42,7 +42,7 @@ func golden(t *testing.T, name string, got []byte) {
 	}
 }
 
-// Generated configuration is reviewed as diffs of golden files
+// Generated configuration is reviewed as diffs of golden files.
 func TestRequirementsGolden(t *testing.T) {
 	out, notes := Requirements(loadPolicy(t, "baseline.yaml"), FragmentOptions{Scope: ScopeManaged,
 		Command: "/usr/local/bin/cyberboar", Policy: "/etc/cyberboar/policy.yaml", Audit: "/var/log/cyberboar/audit.jsonl",
@@ -86,7 +86,7 @@ func TestHookCommandQuoting(t *testing.T) {
 }
 
 // On Windows the line must work in PowerShell, where a quoted first word is a
-// string, and in cmd.exe, which has no call operator: the program goes bare
+// string, and in cmd.exe, which has no call operator: the program goes bare.
 func TestHookCommandWindows(t *testing.T) {
 	o := FragmentOptions{Scope: ScopeUser, Command: `C:\Users\Łukasz\cb\cyberboar.exe`, Policy: `C:\my policies\p.yaml`, Deadline: "5s", Windows: true}
 	got := HookCommand(o)
@@ -111,7 +111,7 @@ func TestTOMLString(t *testing.T) {
 }
 
 // The briefing adds a SessionStart handler next to the user's own, and an
-// apply with the briefing off removes it again
+// apply with the briefing off removes it again.
 func TestMergeHooksJSONBriefing(t *testing.T) {
 	existing := []byte(`{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"./motd.sh"}]}]}}`)
 	on := FragmentOptions{Scope: ScopeUser, Command: "/bin/cb", Policy: "/p.yaml", PubKey: "/k.pub", Deadline: "5s", Briefing: true}

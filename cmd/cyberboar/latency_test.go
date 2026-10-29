@@ -15,17 +15,17 @@ import (
 var latency = flag.Bool("latency", false, "run TestLatencyBudget (scripts/quality-checks.sh does, on its own)")
 
 // Budget is the latency budget of docs/latency.md: the median wall time of
-// one hook process, start to exit, for an everyday tool call
+// one hook process, start to exit, for an everyday tool call.
 const budget = 50 * time.Millisecond
 
 // latencyRuns is how many times each call runs; the median is checked, so
-// one slow run on a busy machine doesn't fail CI
+// one slow run on a busy machine doesn't fail CI.
 const latencyRuns = 15
 
 // TestLatencyBudget runs the real binary as an agent does, with a signed
 // policy, an audit log and a state directory, and holds every everyday call
-// to the budget (docs/latency.md)
-// It only runs with -latency: alone, so parallel packages don't skew the timing
+// to the budget (docs/latency.md).
+// It only runs with -latency: alone, so parallel packages don't skew the timing.
 func TestLatencyBudget(t *testing.T) {
 	if !*latency {
 		t.Skip("run with -args -latency (scripts/quality-checks.sh does)")

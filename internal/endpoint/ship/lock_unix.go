@@ -9,8 +9,8 @@ import (
 	"syscall"
 )
 
-// lock takes an exclusive, non-blocking lock on stateDir/ship.lock
-// The kernel releases it if the process dies, so a crash never wedges shipping
+// lock takes an exclusive, non-blocking lock on stateDir/ship.lock.
+// The kernel releases it if the process dies, so a crash never wedges shipping.
 func lock(stateDir string) (unlock func(), err error) {
 	if err := os.MkdirAll(stateDir, 0o700); err != nil {
 		return nil, err

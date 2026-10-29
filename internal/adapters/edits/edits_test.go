@@ -67,7 +67,7 @@ func TestStrings(t *testing.T) {
 	}
 }
 
-// Every loose reading doubles the results; past maxResults it is an error
+// Every loose reading doubles the results; past maxResults it is an error.
 func TestStringsBounded(t *testing.T) {
 	old := strings.Repeat(" a1 \n", 1) + " a2 \n a3 \n"
 	es := []Replace{{Old: "a1", New: "b1"}, {Old: "a2", New: "b2"}, {Old: "a3", New: "b3"}}
@@ -127,7 +127,7 @@ func TestRewriteSizeOverflow(t *testing.T) {
 }
 
 // opencode's matching: line endings as in the file, and an error where its
-// looser matchers may change other text than the loose match
+// looser matchers may change other text than the loose match.
 func TestStringsOpencode(t *testing.T) {
 	for _, c := range []struct {
 		name, old string
@@ -197,7 +197,7 @@ func TestStringsOpencode(t *testing.T) {
 	}
 }
 
-// The anchor check takes time in the size of the file, not in its lines times the old text's
+// The anchor check takes time in the size of the file, not in its lines times the old text's.
 func TestAnchorElsewhereLinear(t *testing.T) {
 	old := strings.Repeat("x\n", 400_000) + "x\ny  z\nw\n"
 	find := strings.Repeat("x\n", 1000) + "y z\nw"
@@ -272,7 +272,7 @@ func TestInsertOutputLimit(t *testing.T) {
 
 func patch(body string) string { return "*** Begin Patch\n" + body + "*** End Patch\n" }
 
-// Cases from Codex's own tests (codex-rs/apply-patch lib.rs), and its matching rules
+// Cases from Codex's own tests (codex-rs/apply-patch lib.rs), and its matching rules.
 func TestPatch(t *testing.T) {
 	for _, c := range []struct {
 		name, doc, path, old string

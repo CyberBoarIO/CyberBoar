@@ -35,13 +35,13 @@ var update = flag.Bool("update", false, "rewrite the golden files in testdata/pr
 
 const authDir = "../../testdata/protocol/auth"
 
-// The clock and endpoint every golden file is made for (docs/protocol)
+// The clock and endpoint every golden file is made for (docs/protocol).
 var (
 	goldenNow = time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
 	goldenID  = "3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24"
 )
 
-// deterministic signs with RFC 6979 nonces, so the golden files are the same on every run
+// deterministic signs with RFC 6979 nonces, so the golden files are the same on every run.
 // Real signers are randomized.
 type deterministic struct{ *ecdsa.PrivateKey }
 
@@ -90,7 +90,7 @@ func goldenNonce(name string) string {
 	return base64.RawURLEncoding.EncodeToString(sum[:16])
 }
 
-// rawRequest writes req as HTTP/1.1, headers in a fixed order
+// rawRequest writes req as HTTP/1.1, headers in a fixed order.
 func rawRequest(req *http.Request, body []byte) []byte {
 	var b bytes.Buffer
 	fmt.Fprintf(&b, "%s %s HTTP/1.1\r\nHost: %s\r\n", req.Method, req.URL.RequestURI(), req.URL.Host)
@@ -120,7 +120,7 @@ func writeAuthHeaders(b *bytes.Buffer, h http.Header) {
 	}
 }
 
-// goldenCert issues a client certificate for the golden endpoint
+// goldenCert issues a client certificate for the golden endpoint.
 func goldenCert(t *testing.T, ca *x509.Certificate, caKey crypto.Signer, pub *ecdsa.PublicKey, serial int64) string {
 	u, _ := url.Parse(EndpointURI(goldenID))
 	tmpl := &x509.Certificate{
@@ -147,7 +147,7 @@ func jsonLine(t *testing.T, v any) []byte {
 	return append(data, '\n')
 }
 
-// goldenFiles builds every file in testdata/protocol/auth but the keys
+// goldenFiles builds every file in testdata/protocol/auth but the keys.
 func goldenFiles(t *testing.T) map[string][]byte {
 	endpoint, console, other, caKey := goldenKey(t, "insecure-endpoint"), goldenKey(t, "insecure-console"),
 		goldenKey(t, "insecure-other"), goldenKey(t, "insecure-ca")
@@ -287,7 +287,7 @@ func goldenFiles(t *testing.T) map[string][]byte {
 }
 
 // The golden files are what this package produces. Other implementations
-// test against them (docs/protocol) - change here is a change to the protocol
+// test against them (docs/protocol) - change here is a change to the protocol.
 func TestGoldenFiles(t *testing.T) {
 	files := goldenFiles(t)
 	if *update {
@@ -364,7 +364,7 @@ func readRequest(t *testing.T, name string) (*http.Request, []byte) {
 }
 
 // verifier is a console's request check as docs/protocol lists it, minus
-// the client certificate, which the golden files can't carry
+// the client certificate, which the golden files can't carry.
 type verifier struct {
 	keys   map[string]*ecdsa.PublicKey
 	nonces map[string]bool
@@ -405,7 +405,7 @@ func (v *verifier) check(req *http.Request, body []byte, now time.Time) error {
 }
 
 // The golden requests get the verdicts their names give, checked in the
-// order docs/protocol prescribes: accept-* in name order, then reject-*
+// order docs/protocol prescribes: accept-* in name order, then reject-*.
 func TestGoldenRequests(t *testing.T) {
 	v := &verifier{keys: map[string]*ecdsa.PublicKey{goldenID: readPublic(t, "insecure-endpoint.pub")}, nonces: map[string]bool{}}
 	names, _ := filepath.Glob(filepath.Join(authDir, "requests", "*.http"))
@@ -440,8 +440,8 @@ func TestGoldenRequests(t *testing.T) {
 	}
 }
 
-// Valid response fixtures must verify with the console's public key for the matching request
-// Returned certificates must match the endpoint's ID and public key
+// Valid response fixtures must verify with the console's public key for the matching request.
+// Returned certificates must match the endpoint's ID and public key.
 func TestGoldenResponses(t *testing.T) {
 	consolePub := readPublic(t, "insecure-console.pub")
 	endpointPub := readPublic(t, "insecure-endpoint.pub")

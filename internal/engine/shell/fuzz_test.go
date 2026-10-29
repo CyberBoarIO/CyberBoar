@@ -9,7 +9,7 @@ import (
 )
 
 // FuzzAnalyze checks the analyzer never panics or hangs, and that it either
-// fails with one of its documented errors or returns well-formed commands
+// fails with one of its documented errors or returns well-formed commands.
 func FuzzAnalyze(f *testing.F) {
 	for _, s := range []string{
 		"terraform apply", "sudo -u root nice timeout 5 terraform apply",

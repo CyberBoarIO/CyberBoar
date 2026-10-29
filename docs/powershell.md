@@ -29,7 +29,11 @@ rules; it does not make nested PowerShell checkable.
   `Move-Item`, `Remove-Item`, `Rename-Item`, `New-Item`, `Test-Path`, `Out-File`,
   `Tee-Object`, `Select-String` and others), item properties, ACLs, CSV, CLIXML and
   archives, plus `Start-Process`, `Invoke-WebRequest` and `Invoke-RestMethod`.
-  A cmdlet not in this set is read like a program.
+  A cmdlet not in this set is read like a program. A web cmdlet's `-Uri` that names a
+  local file (a `file:` URL or a drive path, which Windows PowerShell 5.1 reads) is
+  checked as a read, and so is a `-Form` value that may be a file object. A variable
+  name given to `-OutVariable` and the like is checked as a variable written:
+  `env:X` sets an environment variable, a drive path writes a file.
 - **Aliases** (`ls`, `cat`, `gc`, `rm`, `iex`) resolve to their cmdlets. A policy
   allow rule for an alias or its cmdlet allows both. `explain` on Linux or macOS reads
   `ls` and `cat` as the programs, as pwsh does there.
@@ -37,13 +41,19 @@ rules; it does not make nested PowerShell checkable.
   trailing dots, streams, junctions and 8.3 names. UNC and device paths are denied.
 - **Bash started from PowerShell** (`bash -c '…'`) is read as Bash, with Git Bash's
   paths.
+- **Secrets** are looked for in every string as PowerShell reads it, escapes removed
+  (``gh`p_…``) and expansions left out, and in the strings run together, as `+`, `-join`
+  or `-f` may join them.
 
 The following count as **inline code**, which `denyInterpreters` denies:
 - `Invoke-Expression`;
 - `[scriptblock]` casts;
 - `Add-Type`, except for loading an assembly by name;
 - `New-Object` with a COM object or a type outside a short list of harmless ones;
-- a nested `pwsh -Command` or `-EncodedCommand`.
+- a nested `pwsh -Command` or `-EncodedCommand`;
+- an environment variable that a program reads as code (`GIT_SSH_COMMAND`,
+  `GIT_CONFIG_*`), set with `$env:` or for one program with `Start-Process -Environment`,
+  whose map counts as inline code when it is only known at run time.
 
 A script block run in place (`& { … }`, `ForEach-Object { … }`) is analyzed as part of
 the command.
@@ -51,8 +61,9 @@ the command.
 These leave the meaning only known at run time:
 - variables;
 - a command name built at run time;
-- an alias defined on the command line (`Set-Alias`), which makes every later name
-  unknown;
+- an alias defined on the command line (`Set-Alias`): calls to that name are
+  unknown, and an alias whose name is only known at run time makes every command
+  name unknown;
 - a drive defined with `New-PSDrive`, which makes every drive path unknown.
 
 As for Bash, a deny or ask rule that such a command might match asks for confirmation

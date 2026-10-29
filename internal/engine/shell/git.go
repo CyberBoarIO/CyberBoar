@@ -10,9 +10,9 @@ import (
 // command works, subcommands such as clone, rebase and difftool take options
 // that name a program, and git config can set keys that git later runs as programs
 
-// wrapGit strips git's global options so "git -C dir push" is "git push"
-// Options that can run arbitrary programs make the command unknown
-func wrapGit(_ *analyzer, name string, args []Elem) unwrapped {
+// wrapGit strips git's global options so "git -C dir push" is "git push".
+// Options that can run arbitrary programs make the command unknown.
+func wrapGit(_ *analyzer, _ string, args []Elem) unwrapped {
 	withValue := set("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env",
 		"--super-prefix", "--list-cmds")
 	unknown := false
@@ -59,8 +59,8 @@ func wrapGit(_ *analyzer, name string, args []Elem) unwrapped {
 	return u
 }
 
-// gitDir is where git -C next moves from prev (nil: the current directory)
-// An empty path leaves it unchanged; a second one isn't followed
+// gitDir is where git -C next moves from prev (nil: the current directory).
+// An empty path leaves it unchanged; a second one isn't followed.
 func gitDir(prev *Elem, next Elem) *Elem {
 	switch {
 	case next.Kind == Lit && next.Text == "":
@@ -72,7 +72,7 @@ func gitDir(prev *Elem, next Elem) *Elem {
 }
 
 // gitSubcommand finds the program-running options of git subcommands, and
-// config writes that make git run programs later
+// config writes that make git run programs later.
 func gitSubcommand(sub string, args []Elem) unwrapped {
 	var u unwrapped
 	valueOf := func(i int, opt string) (Elem, int, bool) {
@@ -157,14 +157,14 @@ func gitSubcommand(sub string, args []Elem) unwrapped {
 }
 
 // gitExecKey matches config keys whose values git runs as programs, or that
-// point git at hooks or other config
+// point git at hooks or other config.
 var gitExecKey = regexp.MustCompile(`^(alias\..+|core\.(sshcommand|editor|pager|fsmonitor|hookspath|askpass|gitproxy)|` +
 	`sequence\.editor|diff\.external|diff\..+\.(command|textconv)|.+\.textconv|filter\..+|merge\..+\.driver|` +
 	`credential(\..+)?\.helper|gpg(\..+)?\.program|uploadpack\.packobjectshook|include(if\..+)?\.path|` +
 	`pager\..+|browser\..+\.cmd|man\..+\.cmd|difftool\..+\.cmd|mergetool\..+\.cmd)$`)
 
 // gitConfigWrite returns the key a `git config` invocation sets
-// ok is false when it can't tell (run-time words)
+// ok is false when it can't tell (run-time words).
 func gitConfigWrite(args []Elem) (key string, ok bool) {
 	var ops []string
 	for i := 0; i < len(args); i++ {
@@ -197,7 +197,7 @@ func gitConfigWrite(args []Elem) (key string, ok bool) {
 }
 
 // gitTrees are the work trees a git command names with -C, --work-tree or
-// --git-dir, whose whole tree it may change
+// --git-dir, whose whole tree it may change.
 func (a *analyzer) gitTrees(raw []Elem, d dir) []FileRef {
 	var out []FileRef
 	for i, e := range raw {

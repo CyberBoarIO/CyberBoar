@@ -1,12 +1,17 @@
 package shell
 
 import (
+	"encoding/hex"
 	"errors"
 	"io/fs"
 	"path"
+	"regexp"
+	"slices"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
+	"mvdan.cc/sh/v3/pattern"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -35,19 +40,20 @@ type FileRef struct {
 	// it (git stash, git reset --hard).
 	Modifies bool
 	Repo     bool
-	// Windows only. Refused says why the path is denied outright (UNC,
-	// drive-relative, an unknown mount). Mount is the cleaned Git Bash path
-	// of a word outside the drives, for Git Bash's emulated /proc and /dev,
-	// which the built-in rules decide first. Alts are the other readings of
-	// Path: Git Bash's own, where ".." or a name makes it differ (see
-	// gitBashNames). All are checked.
+	// Refused and Mount are for Windows only. Refused says why the path is
+	// denied outright (UNC, drive-relative, an unknown mount). Mount is the
+	// cleaned Git Bash path of a word outside the drives, for Git Bash's
+	// emulated /proc and /dev, which the built-in rules decide first.
 	Refused string
 	Mount   string
-	Alts    []string
+	// Alts are the other readings of Path, all checked: on Windows Git Bash's
+	// own, where ".." or a name makes it differ (see gitBashNames), and on
+	// POSIX the kernel's, after a cd whose ".." left a link (dir.alt).
+	Alts []string
 	// Shape is the run-time word's Elem.Shape when Certain is false, so the
-	// built-in rules can check what its literal parts pin it to
+	// built-in rules can check what its literal parts pin it to.
 	Shape string
-	// Src is the word as written ("$C/x") when Display is its shape ("*/x"), for messages
+	// Src is the word as written ("$C/x") when Display is its shape ("*/x"), for messages.
 	Src string
 }
 
@@ -65,8 +71,8 @@ var namesOnly = set("cd", "pushd", "popd", "ls", "dir", "mkdir", "rmdir", "stat"
 
 // innerName is the command a wrapper chain finally runs.
 func innerName(layers [][]Elem) (string, []Elem) {
-	for i := len(layers) - 1; i >= 0; i-- {
-		l := layers[i]
+	for _, l := range slices.Backward(layers) {
+
 		if len(l) > 0 && l[0].Kind == Lit {
 			return l[0].Text, l
 		}
@@ -406,7 +412,11 @@ func (a *analyzer) wordRefs(e Elem, d dir, glob globOpts, printing bool, add fun
 				add(FileRef{Display: e.Text})
 			}
 		case len(matches) == 0:
-			add(a.pathRef(e.Text, d)) // no match: bash passes the pattern on
+			// No match: bash passes the pattern on, read as any other word
+			// (file:///x?q, where curl drops the query)
+			for _, c := range pathCandidates(e.Text) {
+				add(a.pathRef(c, d))
+			}
 		default:
 			for _, m := range matches {
 				add(FileRef{Path: m, Display: a.fs.Show(m), Certain: true})
@@ -437,6 +447,8 @@ func (a *analyzer) pathRef(p string, d dir) FileRef {
 		return FileRef{Path: p, Display: p, Certain: true}
 	case !d.known:
 		return FileRef{Display: p, Rel: p} // relative to a directory only known at run time
+	case d.alt != "":
+		return FileRef{Path: d.path + "/" + p, Display: p, Certain: true, Alts: []string{d.alt + "/" + p}}
 	default:
 		return FileRef{Path: d.path + "/" + p, Display: p, Certain: true}
 	}
@@ -462,10 +474,8 @@ func pathCandidates(w string) []string {
 		if before, _, ok := strings.Cut(v, ";"); ok {
 			addValue(before)
 		}
-		if rest, ok := strings.CutPrefix(v, "file://"); ok {
-			if i := strings.IndexByte(rest, '/'); i >= 0 {
-				addValue(rest[i:]) // drop the host part
-			}
+		if p, ok := fileURLPath(v); ok {
+			addValue(p)
 		}
 	}
 	addValue(w)
@@ -476,6 +486,42 @@ func pathCandidates(w string) []string {
 		addValue(w[2:])
 	}
 	return out
+}
+
+// fileURLPath returns the path a file URL names as curl opens it: the
+// scheme in any case, file:/x or file://host/x, without the query or
+// fragment, %XX decoded and a "%" that starts no escape kept. Dot
+// segments it removes are the lexical reading checkPath adds.
+func fileURLPath(v string) (string, bool) {
+	if len(v) < 5 || !strings.EqualFold(v[:5], "file:") {
+		return "", false
+	}
+	p := v[5:]
+	if rest, ok := strings.CutPrefix(p, "//"); ok {
+		i := strings.IndexByte(rest, '/')
+		if i < 0 {
+			return "", false
+		}
+		p = rest[i:] // drop the host part
+	}
+	if !strings.HasPrefix(p, "/") {
+		return "", false
+	}
+	if i := strings.IndexAny(p, "?#"); i >= 0 {
+		p = p[:i]
+	}
+	var b strings.Builder
+	for i := 0; i < len(p); i++ {
+		if p[i] == '%' && i+2 < len(p) {
+			if c, err := hex.DecodeString(p[i+1 : i+3]); err == nil {
+				b.Write(c)
+				i += 2
+				continue
+			}
+		}
+		b.WriteByte(p[i])
+	}
+	return b.String(), true
 }
 
 // redirectRefs collects the files a statement's redirections open.
@@ -587,7 +633,7 @@ func (a *analyzer) expandGlob(pattern string, d dir, o globOpts) (matches []stri
 	base := "/"
 	rel := strings.TrimPrefix(pattern, "/")
 	if !path.IsAbs(pattern) {
-		if !d.known {
+		if !d.known || d.alt != "" {
 			return nil, false
 		}
 		base = d.path
@@ -619,7 +665,7 @@ func (a *analyzer) expandGlob(pattern string, d dir, o globOpts) (matches []stri
 				}
 				return nil, false
 			}
-			segPat := strings.Replace(seg, "[!", "[^", -1)
+			match := a.globMatcher(seg, o.nocaseglob)
 			for _, e := range entries {
 				n := e.Name()
 				shown := n
@@ -629,10 +675,7 @@ func (a *analyzer) expandGlob(pattern string, d dir, o globOpts) (matches []stri
 				if strings.HasPrefix(shown, ".") && !strings.HasPrefix(seg, ".") && !o.dotglob {
 					continue
 				}
-				if o.nocaseglob {
-					segPat, shown = strings.ToLower(segPat), strings.ToLower(shown)
-				}
-				if m, err := path.Match(segPat, shown); err != nil {
+				if m, err := match(shown); err != nil {
 					return nil, false
 				} else if m {
 					next = append(next, joinDir(dirPath, n))
@@ -649,6 +692,76 @@ func (a *analyzer) expandGlob(pattern string, d dir, o globOpts) (matches []stri
 	}
 	sort.Strings(current)
 	return current, true
+}
+
+// globMatcher returns what matches one segment of a glob: names bash's
+// grammar matches, with character classes ([[:digit:]]), by character and,
+// as in the C locale, by byte (?? is é), or for PowerShell, which has no
+// classes, path.Match's. An error means the segment can't be read (a
+// collating symbol, an unknown class), so neither can the glob. Neither
+// can a bracket expression for a name that isn't ASCII, whose classes and
+// ranges depend on the locale.
+func (a *analyzer) globMatcher(seg string, nocase bool) func(string) (bool, error) {
+	if a.powershell {
+		seg = strings.Replace(seg, "[!", "[^", -1)
+		if nocase {
+			seg = strings.ToLower(seg)
+		}
+		return func(name string) (bool, error) {
+			if nocase {
+				name = strings.ToLower(name)
+			}
+			return path.Match(seg, name)
+		}
+	}
+	mode := pattern.Filenames | pattern.EntireString | pattern.GlobLeadingDot // expandGlob decides on leading dots
+	if nocase {
+		mode |= pattern.NoGlobCase
+	}
+	compile := func(seg string) (*regexp.Regexp, error) {
+		expr, err := pattern.Regexp(seg, mode)
+		if err != nil {
+			return nil, err
+		}
+		return regexp.Compile(expr)
+	}
+	re, err := compile(seg)
+	bytes := re
+	if err == nil && !isASCII(seg) {
+		bytes, err = compile(bytewise(seg))
+	}
+	bracket := strings.Contains(seg, "[")
+	return func(name string) (bool, error) {
+		switch {
+		case err != nil:
+			return false, err
+		case isASCII(name):
+			return re.MatchString(name), nil
+		case bracket:
+			return false, errLocaleBracket
+		}
+		return re.MatchString(name) || bytes.MatchString(bytewise(name)), nil
+	}
+}
+
+var errLocaleBracket = errors.New("a bracket expression matches a name that isn't ASCII by the locale")
+
+// bytewise spells s with one character per byte.
+func bytewise(s string) string {
+	r := make([]rune, len(s))
+	for i := 0; i < len(s); i++ {
+		r[i] = rune(s[i])
+	}
+	return string(r)
+}
+
+func isASCII(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] >= utf8.RuneSelf {
+			return false
+		}
+	}
+	return true
 }
 
 // joinDir joins a directory and a name without doubling the root's "/":

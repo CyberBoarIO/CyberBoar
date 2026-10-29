@@ -44,7 +44,7 @@ func TestInvalidUTF8BeforeComposedUnicode(t *testing.T) {
 	}
 }
 
-// Folding is idempotent and never turns a non-ASCII rune into glob syntax
+// Folding is idempotent and never turns a non-ASCII rune into glob syntax.
 func FuzzString(f *testing.F) {
 	for _, s := range []string{".e\u200Cnv", "CLE\u0301S", "\u017F\u212A", "a*b?[c]{d}\\e", "\xff\xfe", "\xf2\u03af"} {
 		f.Add(s)

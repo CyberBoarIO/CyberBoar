@@ -9,7 +9,7 @@ import (
 	"cyberboar.dev/cyberboar/internal/policy"
 )
 
-// fuzzPolicies loads the example policies, the configurations users start from
+// fuzzPolicies loads the example policies, the configurations users start from.
 func fuzzPolicies(f *testing.F) []*Compiled {
 	f.Helper()
 	var out []*Compiled
@@ -31,7 +31,7 @@ func fuzzPolicies(f *testing.F) []*Compiled {
 	return out
 }
 
-// fuzzFixture is a small home with a repo and secrets, used as cwd and home
+// fuzzFixture is a small home with a repo and secrets, used as cwd and home.
 func fuzzFixture(f *testing.F) (home, repo string) {
 	f.Helper()
 	root, err := filepath.EvalSymlinks(f.TempDir())
@@ -66,7 +66,7 @@ func checkVerdict(t *testing.T, v Verdict) {
 	}
 }
 
-// FuzzEvaluateShell runs arbitrary command lines through the whole engine
+// FuzzEvaluateShell runs arbitrary command lines through the whole engine.
 func FuzzEvaluateShell(f *testing.F) {
 	policies := fuzzPolicies(f)
 	home, repo := fuzzFixture(f)
@@ -106,7 +106,7 @@ func FuzzEvaluateShell(f *testing.F) {
 	})
 }
 
-// FuzzEvaluatePath runs arbitrary paths through the native read and write checks
+// FuzzEvaluatePath runs arbitrary paths through the native read and write checks.
 func FuzzEvaluatePath(f *testing.F) {
 	policies := fuzzPolicies(f)
 	home, repo := fuzzFixture(f)

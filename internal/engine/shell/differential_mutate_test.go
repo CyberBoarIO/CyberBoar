@@ -15,12 +15,12 @@ import (
 // runs deleted or repeated, two lines spliced. The variations are what nobody
 // writes by hand, which is where parsers disagree. The seed is fixed, so a
 // run is reproducible; CYBERBOAR_BASH_DIFF_VARIATIONS sets how many (default
-// 3000) and CYBERBOAR_BASH_DIFF_SEED another seed
+// 3000) and CYBERBOAR_BASH_DIFF_SEED another seed.
 //
 // Variations are less predictable than the corpus, so on top of the containment
 // in TestBashDifferential bash runs in fresh user and network namespaces
 // (unshare -rn): no network, and no privileges outside them. Without unshare
-// the test skips rather than run unconfined
+// the test skips rather than run unconfined.
 func TestBashDifferentialMutated(t *testing.T) {
 	if os.Getenv("CYBERBOAR_BASH_DIFF") != "1" {
 		t.Skip("set CYBERBOAR_BASH_DIFF=1 (scripts/bash-differential.sh)")
@@ -77,7 +77,7 @@ func TestBashDifferentialMutated(t *testing.T) {
 }
 
 // fragments are what mutations insert: the characters and short sequences
-// the two parsers treat specially
+// the two parsers treat specially.
 var fragments = []string{
 	`\`, `'`, `"`, "`", `$`, "\n", "\t", " ", `;`, `&`, `|`, `(`, `)`, `{`, `}`, `#`, `!`, `=`, `<`, `>`,
 	`\` + "\n", `$(`, `$((`, `<(`, `>(`, `${`, `$'`, `$"`, `[[ `, ` ]]`, `{a,b}`, `*`, `?`, `[`, `]`,
@@ -86,7 +86,7 @@ var fragments = []string{
 	`declare -a `, `eval `, `\n`, `@(x)`, `~`, `%`, `^`, `,`, `-`, `--`,
 }
 
-// mutate returns a variation of a random seed: one to three edits
+// mutate returns a variation of a random seed: one to three edits.
 func mutate(rng *rand.Rand, seeds []string) string {
 	s := seeds[rng.IntN(len(seeds))]
 	for range 1 + rng.IntN(3) {

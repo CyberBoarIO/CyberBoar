@@ -1,12 +1,12 @@
 // Package ship sends an endpoint's audit log to the console
 // (POST /api/v1/events). The hook itself never talks to the network. It only
 // appends to a local file, and shipping runs separately, so a slow or
-// unreachable console can't delay or block a tool call
+// unreachable console can't delay or block a tool call.
 //
 // Delivery is at least once. The file offset is saved only after the console
 // accepted a batch, so a lost response means the batch is sent again. The
 // client authenticates the endpoint and checks that an acceptance really
-// comes from the console (package enroll), so a forged one can't make events disappear
+// comes from the console (package enroll), so a forged one can't make events disappear.
 package ship
 
 import (
@@ -32,7 +32,7 @@ import (
 )
 
 // maxBatchEvents and maxBatchBytes bound a batch below the console's limits
-// of 1000 events and 4 MiB
+// of 1000 events and 4 MiB.
 const (
 	maxBatchEvents = 1000
 	maxBatchBytes  = 3 << 20
@@ -47,14 +47,14 @@ type Options struct {
 	Version   string
 	// Client sends the batches. It is the enrolled endpoint's client
 	// (enroll.Endpoint.Client), which signs every request and returns an
-	// error for an answer the console didn't sign
+	// error for an answer the console didn't sign.
 	Client *http.Client
 	// Now is the clock a Retry-After date is read against
-	// If nil, time.Now is used
+	// If nil, time.Now is used.
 	Now func() time.Time
 }
 
-// Result counts what one run did
+// Result counts what one run did.
 type Result struct {
 	Sent    int // events the console accepted
 	Skipped int // lines that aren't valid audit events and were passed over
@@ -62,16 +62,16 @@ type Result struct {
 	// Restarted is true when the log had been truncated or replaced since
 	// the last run, so this run shipped it from its start. Lines the old log
 	// got after the last run, if there were any, were not shipped, since the
-	// old log is out of reach
+	// old log is out of reach.
 	Restarted bool
 }
 
-// ErrBusy means another ship run holds the lock
+// ErrBusy means another ship run holds the lock.
 var ErrBusy = errors.New("another ship run is in progress")
 
 // Once ships everything new in the audit log, then returns. When there was
 // nothing to send it sends an empty batch, so the console's fleet view knows
-// the endpoint is alive
+// the endpoint is alive.
 func Once(ctx context.Context, o Options) (Result, error) {
 	var res Result
 	if err := httpsclient.CheckURL(o.Sink); err != nil {
@@ -150,7 +150,7 @@ func Once(ctx context.Context, o Options) (Result, error) {
 	return res, nil
 }
 
-// shipper holds what the batches of one run share
+// shipper holds what the batches of one run share.
 type shipper struct {
 	client    *http.Client
 	sink      string
@@ -165,7 +165,7 @@ type shipper struct {
 // batch reads the complete lines that follow off in the log, up to one
 // batch, sends their events and saves the offset after the last line read.
 // It adds what it did to res and returns the new offset. sent is false when
-// there was no event left to send
+// there was no event left to send.
 func (s *shipper) batch(ctx context.Context, off int64, res *Result) (next int64, sent bool, err error) {
 	// The reader starts every batch at off with nothing buffered. A read
 	// that stops at a line the hook is still writing has already taken that
@@ -199,7 +199,7 @@ func (s *shipper) batch(ctx context.Context, off int64, res *Result) (next int64
 // readBatch reads complete lines from r, which starts at off, until a batch
 // is full or the file ends. It returns the offset after the last complete
 // line. A last line without its newline is still being written, so it is not
-// counted in that offset, although r may have read part of it
+// counted in that offset, although r may have read part of it.
 func readBatch(r *bufio.Reader, off int64) (events []json.RawMessage, next int64, skipped int, err error) {
 	next = off
 	size := 0
@@ -239,7 +239,7 @@ func readBatch(r *bufio.Reader, off int64) (events []json.RawMessage, next int64
 }
 
 // discardLine consumes the rest of an overlong line. done is false when the
-// file ended before its newline
+// file ended before its newline.
 func discardLine(r *bufio.Reader) (n int64, done bool, err error) {
 	for {
 		chunk, err := r.ReadSlice('\n')
@@ -257,8 +257,8 @@ func discardLine(r *bufio.Reader) (n int64, done bool, err error) {
 	}
 }
 
-// send posts one batch to the sink. Only 202 Accepted counts as delivered
-// A Retry-After on 503 or 429 is kept in the error for RetryAfter
+// send posts one batch to the sink. Only 202 Accepted counts as delivered.
+// A Retry-After on 503 or 429 is kept in the error for RetryAfter.
 func (s *shipper) send(ctx context.Context, b audit.Batch) error {
 	body, err := json.Marshal(b)
 	if err != nil {
@@ -306,11 +306,11 @@ func (s *shipper) send(ctx context.Context, b audit.Batch) error {
 	return nil
 }
 
-// MaxRetryAfter bounds how long a console's Retry-After holds shipping back
-// A misconfigured or hostile console must not silence an endpoint for days
+// MaxRetryAfter bounds how long a console's Retry-After holds shipping back.
+// A misconfigured or hostile console must not silence an endpoint for days.
 const MaxRetryAfter = time.Hour
 
-// retryError is a refusal that came with a Retry-After
+// retryError is a refusal that came with a Retry-After.
 type retryError struct {
 	err   error
 	after time.Duration
@@ -321,17 +321,16 @@ func (e *retryError) Unwrap() error { return e.err }
 
 // RetryAfter returns how long the console asked the endpoint to wait before
 // sending again, as recorded in an error Once returned. It returns 0 when the
-// console didn't say
+// console didn't say.
 func RetryAfter(err error) time.Duration {
-	var re *retryError
-	if errors.As(err, &re) {
+	if re, ok := errors.AsType[*retryError](err); ok {
 		return re.after
 	}
 	return 0
 }
 
 // parseRetryAfter reads a Retry-After value, seconds or an HTTP date
-// (RFC 9110 §10.2.3), bounded by MaxRetryAfter. Anything else is 0
+// (RFC 9110 §10.2.3), bounded by MaxRetryAfter. Anything else is 0.
 func parseRetryAfter(v string, now time.Time) time.Duration {
 	var d time.Duration
 	if secs, err := strconv.ParseUint(strings.TrimSpace(v), 10, 32); err == nil {

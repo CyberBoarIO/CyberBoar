@@ -21,7 +21,7 @@ import (
 // the cmdlets in pscmdlets.go, and the constructs that run code. A command
 // whose name is only known at run time could be anything, as in bash
 
-// AnalyzePowerShell is AnalyzeWith for a PowerShell command line
+// AnalyzePowerShell is AnalyzeWith for a PowerShell command line.
 func AnalyzePowerShell(src, home string, o Options) (*Analysis, error) {
 	if len(src) > MaxBytes {
 		return nil, ErrTooLarge
@@ -59,17 +59,17 @@ type psAnalyzer struct {
 	*analyzer
 	src []uint16 // the script being read, in PowerShell's UTF-16 offsets
 	// Aliases defined at run time: names (folded) whose command could be
-	// anything, or any name at all. saw* collect them for the next pass
+	// anything, or any name at all. saw* collect them for the next pass.
 	aliases, sawAliases   map[string]bool
 	anyAlias, sawAnyAlias bool
 	// A drive defined at run time (New-PSDrive) may stand for any
-	// directory, so a cmdlet's path on a drive could be any path
+	// directory, so a cmdlet's path on a drive could be any path.
 	drives, sawDrives bool
-	// err is the first error of a step that records no error itself (fail)
+	// err is the first error of a step that records no error itself (fail).
 	err error
 }
 
-// fail keeps the first error for psScript to return
+// fail keeps the first error for psScript to return.
 func (a *psAnalyzer) fail(err error) {
 	if a.err == nil {
 		a.err = err
@@ -77,7 +77,7 @@ func (a *psAnalyzer) fail(err error) {
 }
 
 // psScript reads one script: the command line, or code it runs
-// (Invoke-Expression 'code'). It returns the ids of its commands
+// (Invoke-Expression 'code'). It returns the ids of its commands.
 func (a *psAnalyzer) psScript(src string, depth int, start dir) ([]int, error) {
 	if depth > MaxDepth {
 		return nil, ErrTooComplex
@@ -154,13 +154,13 @@ func (a *psAnalyzer) psScript(src string, depth int, start dir) ([]int, error) {
 }
 
 // psForeign records code the analysis can't read, which makes a command
-// that could be anything
+// that could be anything.
 func (a *psAnalyzer) psForeign(what string) error {
 	a.code = append(a.code, Code{What: what})
 	return a.markUnknown(-1)
 }
 
-// psSource returns n as written, cut to maxSrc bytes
+// psSource returns n as written, cut to maxSrc bytes.
 func (a *psAnalyzer) psSource(n pwsh.Node) string {
 	e := n.Span()
 	if e.Start < 0 || e.End > len(a.src) || e.Start > e.End {
@@ -179,7 +179,7 @@ func (a *psAnalyzer) psSource(n pwsh.Node) string {
 
 // psCommand records one command and what it runs. It returns its id, or -1
 // for a script block run in place (& { … }), whose commands are its own,
-// and the ids of code it runs (Invoke-Expression)
+// and the ids of code it runs (Invoke-Expression).
 func (a *psAnalyzer) psCommand(c *pwsh.Command, piped pwsh.CommandBase, depth int, d dir) (int, []int, error) {
 	if _, ok := c.Elements[0].(*pwsh.ScriptBlockExpression); ok && c.Invocation != "" {
 		return -1, nil, nil
@@ -205,11 +205,11 @@ func (a *psAnalyzer) psCommand(c *pwsh.Command, piped pwsh.CommandBase, depth in
 		id, inner, err = a.psCmdletCall(c, canon, piped, depth, d)
 		if legacy, ok := psLegacyAliases[folded]; ok && err == nil && canon == legacy {
 			// Windows PowerShell's alias, or PowerShell 7's program
-			err = a.psNative(id, c, name, d, depth, piped)
+			err = a.psNative(id, c, name, d, depth)
 		}
 	default:
 		id = a.addCommand(nil)
-		err = a.psNative(id, c, name, d, depth, piped)
+		err = a.psNative(id, c, name, d, depth)
 	}
 	if err != nil {
 		return 0, nil, err
@@ -222,7 +222,7 @@ func (a *psAnalyzer) psCommand(c *pwsh.Command, piped pwsh.CommandBase, depth in
 	return id, inner, nil
 }
 
-// addCommand records a command with layers and returns its id
+// addCommand records a command with layers and returns its id.
 func (a *psAnalyzer) addCommand(layers [][]Elem) int {
 	a.cmds = append(a.cmds, Command{Layers: layers})
 	return len(a.cmds) - 1
@@ -239,7 +239,7 @@ func (a *psAnalyzer) psName(c *pwsh.Command) (string, bool) {
 
 // psResolve finds the cmdlet a name runs, by alias or by name, with or
 // without its module (Microsoft.PowerShell.Management\Remove-Item). A name
-// that is a path, or that is dot-sourced, runs a script or a program
+// that is a path, or that is dot-sourced, runs a script or a program.
 func (a *psAnalyzer) psResolve(name, invocation string) (string, bool) {
 	if invocation == "." {
 		return "", false
@@ -268,7 +268,7 @@ func (a *psAnalyzer) psResolve(name, invocation string) (string, bool) {
 
 // psArgv converts a command's arguments to argv elements, as written. For a
 // program, a value PowerShell may pass as more than one word, or as none
-// (an empty string, which Windows PowerShell drops), is Many
+// (an empty string, which Windows PowerShell drops), is Many.
 func (a *psAnalyzer) psArgv(args []pwsh.CommandElement, native bool) []Elem {
 	var out []Elem
 	for _, e := range args {
@@ -300,7 +300,7 @@ func (a *psAnalyzer) psArgv(args []pwsh.CommandElement, native bool) []Elem {
 	return out
 }
 
-// psElems converts one argument to the words it stands for
+// psElems converts one argument to the words it stands for.
 func (a *psAnalyzer) psElems(e pwsh.Expression) []Elem {
 	switch v := e.(type) {
 	case *pwsh.StringConstant:
@@ -330,7 +330,7 @@ func (a *psAnalyzer) psElems(e pwsh.Expression) []Elem {
 
 // psShape is the glob an expandable string's value matches: its format
 // with each expansion as "*", or "*" when its literal parts hold a glob
-// character of their own
+// character of their own.
 func psShape(format string) string {
 	var b strings.Builder
 	for i := 0; i < len(format); i++ {
@@ -359,13 +359,13 @@ func psHasWildcard(s string) bool { return strings.ContainsAny(s, "*?[") }
 
 // psNative records a program, a script file or a function: its words are
 // read as bash's are for a program (fileRefs), and the wrappers it is
-// (npx, cmd /c) are followed. id is the command to record it in
-func (a *psAnalyzer) psNative(id int, c *pwsh.Command, name string, d dir, depth int, piped pwsh.CommandBase) error {
+// (npx, cmd /c) are followed. id is the command to record it in.
+func (a *psAnalyzer) psNative(id int, c *pwsh.Command, name string, d dir, depth int) error {
 	raw := append([]Elem{{Kind: Lit, Text: name}}, a.psArgv(c.Elements[1:], true)...)
 	return a.psProgram(id, raw, d, depth)
 }
 
-// psProgram records argv run as a program in d, following its wrappers
+// psProgram records argv run as a program in d, following its wrappers.
 func (a *psAnalyzer) psProgram(id int, raw []Elem, d dir, depth int) error {
 	u, err := a.unwrapAll(a.normalize(raw), 0)
 	if err != nil {
@@ -410,7 +410,7 @@ func (a *psAnalyzer) psProgram(id int, raw []Elem, d dir, depth int) error {
 }
 
 // psGenericRefs checks each word of a command the analysis doesn't know as
-// a path it uses as use says. piped: it may take paths from a pipeline too
+// a path it uses as use says. piped: it may take paths from a pipeline too.
 func (a *psAnalyzer) psGenericRefs(args []Elem, d dir, use psUse, piped bool) {
 	add := a.psAdder(use)
 	for _, e := range args {
@@ -427,7 +427,7 @@ func (a *psAnalyzer) psGenericRefs(args []Elem, d dir, use psUse, piped bool) {
 	}
 }
 
-// psAdder returns a function that records a path used as use says
+// psAdder returns a function that records a path used as use says.
 func (a *psAnalyzer) psAdder(use psUse) func(FileRef) {
 	return func(r FileRef) {
 		r.Accessed = use != psPrint
@@ -437,7 +437,7 @@ func (a *psAnalyzer) psAdder(use psUse) func(FileRef) {
 	}
 }
 
-// psBound is a cmdlet's arguments bound to its parameters
+// psBound is a cmdlet's arguments bound to its parameters.
 type psBound struct {
 	values   map[*psParam][]pwsh.CommandElement
 	switches map[*psParam]bool
@@ -446,7 +446,7 @@ type psBound struct {
 // psBind binds a cmdlet's arguments as PowerShell's binder does, for the
 // parameters the table lists: by name or a unique prefix, then by
 // position. ok is false for anything else (an unknown parameter, splatting,
-// too many positional arguments)
+// too many positional arguments).
 func psBind(c *psCmdlet, args []pwsh.CommandElement) (b psBound, ok bool) {
 	b = psBound{values: map[*psParam][]pwsh.CommandElement{}, switches: map[*psParam]bool{}}
 	var positional []pwsh.CommandElement
@@ -505,7 +505,7 @@ func psBind(c *psCmdlet, args []pwsh.CommandElement) (b psBound, ok bool) {
 	return b, true
 }
 
-// value returns the words bound to the parameter called name
+// value returns the words bound to the parameter called name.
 func (a *psAnalyzer) value(c *psCmdlet, b psBound, name string) ([]Elem, bool) {
 	vals, ok := b.values[c.params[fold.String(name)]]
 	if !ok {
@@ -520,7 +520,7 @@ func (a *psAnalyzer) value(c *psCmdlet, b psBound, name string) ([]Elem, bool) {
 	return out, true
 }
 
-// psCmdletCall records a cmdlet and the paths it uses
+// psCmdletCall records a cmdlet and the paths it uses.
 func (a *psAnalyzer) psCmdletCall(c *pwsh.Command, canon string, piped pwsh.CommandBase, depth int, d dir) (int, []int, error) {
 	args := c.Elements[1:]
 	written := fold.String(c.Elements[0].(*pwsh.StringConstant).Value)
@@ -534,6 +534,18 @@ func (a *psAnalyzer) psCmdletCall(c *pwsh.Command, canon string, piped pwsh.Comm
 		a.cmds[id].Aliases = len(layers) - 1
 	}
 	spec, known := psCmdlets[fold.String(canon)]
+	var b psBound
+	bound := false
+	if known && spec.params != nil {
+		b, bound = psBind(spec, args)
+	}
+	varSpec, vars := spec, b
+	if !bound {
+		varSpec, vars = psCommonParams, psCommonVariables(args)
+	}
+	if err := a.psNamedVariables(varSpec, vars, d); err != nil {
+		return 0, nil, err
+	}
 	if !known {
 		// Verb-Noun the table doesn't know: every word may be a path, and so
 		// may what a pipeline gives it
@@ -560,8 +572,7 @@ func (a *psAnalyzer) psCmdletCall(c *pwsh.Command, canon string, piped pwsh.Comm
 		a.psGenericRefs(argv, d, psPrint, false)
 		return id, nil, a.psPrintCmdlet(id, spec.name, args)
 	}
-	b, ok := psBind(spec, args)
-	if !ok {
+	if !bound {
 		// Read every word as a path, as for an unknown command
 		a.psGenericRefs(argv, d, spec.use, piped != nil && spec.pipePaths)
 		return id, nil, a.psUnbound(id, canon)
@@ -569,6 +580,9 @@ func (a *psAnalyzer) psCmdletCall(c *pwsh.Command, canon string, piped pwsh.Comm
 	var inner []int
 	var err error
 	switch canon {
+	case "Invoke-WebRequest", "Invoke-RestMethod":
+		a.psWebURI(spec, b, d)
+		a.psWebForm(spec, b)
 	case "Invoke-Expression":
 		inner, err = a.psInvokeExpression(id, spec, b, depth, d)
 		return id, inner, err
@@ -602,8 +616,141 @@ func (a *psAnalyzer) psCmdletCall(c *pwsh.Command, canon string, piped pwsh.Comm
 	return id, nil, nil
 }
 
+// psVariableParams are the parameters that name a variable for the cmdlet
+// to set: the common ones, Tee-Object's and the web cmdlets'.
+var psVariableParams = []string{"ErrorVariable", "WarningVariable", "InformationVariable", "OutVariable",
+	"PipelineVariable", "Variable", "SessionVariable", "ResponseHeadersVariable", "StatusCodeVariable"}
+
+// psNamedVariables checks the variables a cmdlet is told to set. A name
+// with a drive is set through it, as in ${C:\x} = …: env: sets an
+// environment variable, a FileSystem drive writes a file. A name only
+// known at run time could be any.
+func (a *psAnalyzer) psNamedVariables(spec *psCmdlet, b psBound, d dir) error {
+	for _, param := range psVariableParams {
+		vals, _ := a.value(spec, b, param)
+		for _, e := range vals {
+			if e.Kind != Lit {
+				a.hidden = append(a.hidden, "a variable named at run time (-"+param+" "+e.Shown()+")")
+				continue
+			}
+			v := &pwsh.Variable{Path: strings.TrimPrefix(e.Text, "+")} // +name appends
+			if fold.String(v.Drive()) == "env" {
+				if err := a.psSetEnv(v.Name(), Elem{Kind: Many, Text: "*"}); err != nil {
+					return err
+				}
+				continue
+			}
+			a.psVariable(v, true, d)
+		}
+	}
+	return nil
+}
+
+// psCommonVariables finds the common parameters that name variables among
+// the arguments of a cmdlet whose other parameters aren't bound (a print
+// cmdlet, one the table doesn't list), for psNamedVariables.
+func psCommonVariables(args []pwsh.CommandElement) psBound {
+	b := psBound{values: map[*psParam][]pwsh.CommandElement{}}
+	for i, e := range args {
+		p, ok := e.(*pwsh.CommandParameter)
+		if !ok {
+			continue
+		}
+		param := psCommonParams.param(p.Name)
+		switch {
+		case param == nil || !slices.Contains(psVariableParams, param.name):
+		case p.Argument != nil:
+			b.values[param] = append(b.values[param], p.Argument)
+		case i+1 < len(args):
+			b.values[param] = append(b.values[param], args[i+1])
+		}
+	}
+	return b
+}
+
+// psWebURI records the file Windows PowerShell 5.1's Invoke-WebRequest and
+// Invoke-RestMethod read for -Uri: a file: URL, or a drive or UNC path,
+// which .NET takes as one. A URI only known at run time may be one too,
+// unless it starts with http://, https:// or ftp://.
+func (a *psAnalyzer) psWebURI(spec *psCmdlet, b psBound, d dir) {
+	vals, _ := a.value(spec, b, "Uri")
+	for _, e := range vals {
+		if e.Kind != Lit {
+			if !psRemoteURI(e.Text) {
+				a.psAdder(psRead)(FileRef{Display: e.Shown(), Shape: e.Shape, Src: e.Src})
+			}
+			continue
+		}
+		if p, ok := psFileURI(e.Text); ok {
+			a.psPathWord(Elem{Kind: Lit, Text: p}, d, false, psRead)
+		}
+	}
+}
+
+// psWebForm records the files -Form uploads: each value that is a file
+// object (Get-ChildItem's output), which only a string or a number is not.
+func (a *psAnalyzer) psWebForm(spec *psCmdlet, b psBound) {
+	vals, ok := b.values[spec.params["form"]]
+	if !ok {
+		return
+	}
+	var h *pwsh.Hashtable
+	if len(vals) == 1 {
+		h, _ = vals[0].(*pwsh.Hashtable)
+	}
+	for i := 0; h == nil || i < len(h.Pairs); i++ {
+		if h == nil || a.psStatementValue(h.Pairs[i].Value).Kind == Many {
+			a.psAdder(psRead)(FileRef{Display: "the files -Form uploads"})
+			return
+		}
+	}
+}
+
+func psRemoteURI(s string) bool {
+	for _, scheme := range []string{"http://", "https://", "ftp://"} {
+		if len(s) >= len(scheme) && strings.EqualFold(s[:len(scheme)], scheme) {
+			return true
+		}
+	}
+	return false
+}
+
+// psFileURI returns the local path .NET's Uri reads s as: a drive or UNC
+// path as it is, or a file: URL's path, decoded as curl decodes it, with
+// a host other than localhost as a UNC server and file://C:/x as C:/x.
+func psFileURI(s string) (string, bool) {
+	t := strings.ReplaceAll(s, `\`, "/")
+	if len(t) >= 3 && isASCIILetter(t[0]) && t[1] == ':' && t[2] == '/' || strings.HasPrefix(t, "//") {
+		return s, true
+	}
+	if len(s) < 5 || !strings.EqualFold(s[:5], "file:") {
+		return "", false
+	}
+	rest, host := s[5:], ""
+	if r, ok := strings.CutPrefix(rest, "//"); ok {
+		var path string
+		host, path, _ = strings.Cut(r, "/")
+		rest = "/" + path
+	}
+	p, ok := fileURLPath("file:" + rest)
+	if !ok {
+		return "", false
+	}
+	if len(p) >= 3 && p[0] == '/' && isASCIILetter(p[1]) && p[2] == ':' {
+		p = p[1:] // file:///C:/x
+	}
+	switch {
+	case host == "" || strings.EqualFold(host, "localhost"):
+	case len(host) == 2 && isASCIILetter(host[0]) && host[1] == ':':
+		p = host + p
+	default:
+		p = "//" + host + p
+	}
+	return p, true
+}
+
 // psUnbound handles a cmdlet whose arguments couldn't be bound: those that
-// run code could run any
+// run code could run any.
 func (a *psAnalyzer) psUnbound(id int, canon string) error {
 	switch canon {
 	case "Invoke-Expression", "New-Object":
@@ -620,7 +767,7 @@ func (a *psAnalyzer) psUnbound(id int, canon string) error {
 	return nil
 }
 
-// psBoundRefs records the paths a bound cmdlet uses
+// psBoundRefs records the paths a bound cmdlet uses.
 func (a *psAnalyzer) psBoundRefs(canon string, spec *psCmdlet, b psBound, d dir, piped pwsh.CommandBase) {
 	// The paths a pipeline may give it bind to -Path or -LiteralPath
 	sourceBound := false
@@ -654,11 +801,11 @@ func (a *psAnalyzer) psBoundRefs(canon string, spec *psCmdlet, b psBound, d dir,
 	}
 }
 
-// implicitPS are the cmdlets that use the working directory without a path
+// implicitPS are the cmdlets that use the working directory without a path.
 var implicitPS = set("Get-ChildItem")
 
 // psEmitsText reports whether a pipeline element only writes strings, which
-// Select-String searches instead of reading them as files
+// Select-String searches instead of reading them as files.
 func (a *psAnalyzer) psEmitsText(el pwsh.CommandBase) bool {
 	c, ok := el.(*pwsh.Command)
 	if !ok {
@@ -675,7 +822,7 @@ func (a *psAnalyzer) psEmitsText(el pwsh.CommandBase) bool {
 	return canon == "Get-Content" || canon == "Out-String" || canon == "Select-String"
 }
 
-// psPathWord records one word given to a path parameter
+// psPathWord records one word given to a path parameter.
 func (a *psAnalyzer) psPathWord(e Elem, d dir, wildcard bool, use psUse) {
 	add := a.psAdder(use)
 	if e.Kind != Lit {
@@ -717,7 +864,7 @@ func (a *psAnalyzer) psPathWord(e Elem, d dir, wildcard bool, use psUse) {
 // it without a FileSystem provider's prefix. ok is false for a path on a
 // drive that holds no files (env:, variable:); a FileRef with Display set
 // is returned for one the analysis doesn't read. hidden is set for a
-// function or alias defined through its drive
+// function or alias defined through its drive.
 func (a *psAnalyzer) psProviderPath(p string, use psUse) (rest string, ref FileRef, ok bool, hidden string) {
 	if i := strings.Index(p, "::"); i >= 0 {
 		provider := fold.String(p[:i])
@@ -746,7 +893,7 @@ func (a *psAnalyzer) psProviderPath(p string, use psUse) (rest string, ref FileR
 }
 
 // psOnDrive reports a path on a named drive (C:\x, X:x) and returns the
-// rest of it, relative to the drive's root, with "/" separators
+// rest of it, relative to the drive's root, with "/" separators.
 func psOnDrive(p string) (tail string, ok bool) {
 	drive, rest, found := strings.Cut(p, ":")
 	if !found || drive == "" || strings.ContainsAny(drive, `/\`) {
@@ -756,7 +903,7 @@ func psOnDrive(p string) (tail string, ok bool) {
 }
 
 // psTilde returns the paths a word can be: PowerShell reads a leading ~ as
-// the home directory in paths it resolves, and passes it on to programs as written
+// the home directory in paths it resolves, and passes it on to programs as written.
 func (a *psAnalyzer) psTilde(w string) []string {
 	rest, ok := strings.CutPrefix(w, "~")
 	if !ok || a.home == "" || rest != "" && rest[0] != '/' && rest[0] != '\\' {
@@ -769,7 +916,7 @@ func (a *psAnalyzer) psTilde(w string) []string {
 	return []string{home + rest, w}
 }
 
-// psNewName records Rename-Item's -NewName, a name in the directory of the item renamed
+// psNewName records Rename-Item's -NewName, a name in the directory of the item renamed.
 func (a *psAnalyzer) psNewName(vals []Elem, spec *psCmdlet, b psBound, d dir) {
 	add := a.psAdder(psModify)
 	src, ok := a.value(spec, b, "Path")
@@ -792,7 +939,7 @@ func (a *psAnalyzer) psNewName(vals []Elem, spec *psCmdlet, b psBound, d dir) {
 }
 
 // psNewItem records New-Item's -Name, in the directory -Path names, and the
-// target of a link it makes (-Value)
+// target of a link it makes (-Value).
 func (a *psAnalyzer) psNewItem(spec *psCmdlet, b psBound, d dir) {
 	add := a.psAdder(psWrite)
 	if names, ok := a.value(spec, b, "Name"); ok {
@@ -820,8 +967,9 @@ func (a *psAnalyzer) psNewItem(spec *psCmdlet, b psBound, d dir) {
 			}
 		}
 		if link {
+			// What the link leads to is reached through it, as ln's target is
 			for _, e := range vals {
-				a.wordRefs(e, d, globOpts{}, true, a.psAdder(psPrint))
+				a.wordRefs(e, d, globOpts{}, false, a.psAdder(psRead))
 			}
 		}
 	}
@@ -830,7 +978,7 @@ func (a *psAnalyzer) psNewItem(spec *psCmdlet, b psBound, d dir) {
 // psPrintCmdlet checks a print cmdlet for what it calls. ForEach-Object and
 // Where-Object run the script blocks they are given, which are read with the
 // rest of the line; one held in a variable could run anything. ForEach-Object
-// given a name calls that member of every object it is passed
+// given a name calls that member of every object it is passed.
 func (a *psAnalyzer) psPrintCmdlet(id int, canon string, args []pwsh.CommandElement) error {
 	switch canon {
 	case "ForEach-Object":
@@ -869,13 +1017,13 @@ func (a *psAnalyzer) psPrintCmdlet(id int, canon string, args []pwsh.CommandElem
 }
 
 // psRunsBlocks are cmdlets that run a script block they are given. Given a
-// script file, or a block only known at run time, they could run anything
+// script file, or a block only known at run time, they could run anything.
 var psRunsBlocks = []string{"Invoke-Command", "Start-Job", "Start-ThreadJob", "Register-ObjectEvent",
 	"Register-EngineEvent", "Register-WmiEvent", "New-Module", "Register-ArgumentCompleter", "Trace-Command",
 	"Measure-Command"}
 
 // psBlockRunner checks a cmdlet of psRunsBlocks: the script blocks written
-// on the line are read with it, and nothing else may be run
+// on the line are read with it, and nothing else may be run.
 func (a *psAnalyzer) psBlockRunner(id int, canon string, args []pwsh.CommandElement) error {
 	block := false
 	for _, e := range args {
@@ -903,7 +1051,7 @@ func (a *psAnalyzer) psBlockRunner(id int, canon string, args []pwsh.CommandElem
 }
 
 // psAddType checks Add-Type, which compiles the code it is given. Loading
-// an assembly by name (-AssemblyName) compiles nothing
+// an assembly by name (-AssemblyName) compiles nothing.
 func (a *psAnalyzer) psAddType(id int, args []pwsh.CommandElement) error {
 	for i := 0; i < len(args); i++ {
 		p, ok := args[i].(*pwsh.CommandParameter)
@@ -925,7 +1073,7 @@ func (a *psAnalyzer) psAddType(id int, args []pwsh.CommandElement) error {
 	return nil
 }
 
-// psInvokeExpression reads the code Invoke-Expression runs, when it is written out
+// psInvokeExpression reads the code Invoke-Expression runs, when it is written out.
 func (a *psAnalyzer) psInvokeExpression(id int, spec *psCmdlet, b psBound, depth int, d dir) ([]int, error) {
 	vals, ok := a.value(spec, b, "Command")
 	if !ok || len(vals) != 1 || vals[0].Kind != Lit {
@@ -937,7 +1085,7 @@ func (a *psAnalyzer) psInvokeExpression(id int, spec *psCmdlet, b psBound, depth
 }
 
 // psStartProcess records the program Start-Process starts. It joins
-// -ArgumentList with spaces, and the program splits them again
+// -ArgumentList with spaces, and the program splits them again.
 func (a *psAnalyzer) psStartProcess(id int, spec *psCmdlet, b psBound, d dir, depth int) error {
 	a.psBoundRefs("Start-Process", spec, b, d, nil)
 	file, _ := a.value(spec, b, "FilePath")
@@ -951,7 +1099,7 @@ func (a *psAnalyzer) psStartProcess(id int, spec *psCmdlet, b psBound, d dir, de
 			argv = append(argv, Elem{Kind: Many, Text: "*", Src: e.Src})
 			continue
 		}
-		for _, w := range strings.Fields(e.Text) {
+		for w := range strings.FieldsSeq(e.Text) {
 			argv = append(argv, Elem{Kind: Lit, Text: w})
 		}
 	}
@@ -961,10 +1109,15 @@ func (a *psAnalyzer) psStartProcess(id int, spec *psCmdlet, b psBound, d dir, de
 			d = a.psCdPath(wd[0].Text, d)
 		}
 	}
+	if env, ok := b.values[spec.params["environment"]]; ok {
+		if err := a.psStartEnv(env); err != nil {
+			return err
+		}
+	}
 	return a.psProgram(id, argv, d, depth)
 }
 
-// psNewObject checks the .NET or COM object New-Object makes
+// psNewObject checks the .NET or COM object New-Object makes.
 func (a *psAnalyzer) psNewObject(spec *psCmdlet, b psBound) error {
 	if _, com := b.values[spec.params["comobject"]]; com {
 		return a.psForeign("New-Object -ComObject")
@@ -981,7 +1134,7 @@ func (a *psAnalyzer) psNewObject(spec *psCmdlet, b psBound) error {
 }
 
 // psDefineAlias records an alias Set-Alias or New-Alias defines: commands
-// with its name could be anything
+// with its name could be anything.
 func (a *psAnalyzer) psDefineAlias(spec *psCmdlet, b psBound) {
 	names, _ := a.value(spec, b, "Name")
 	if len(names) != 1 || names[0].Kind != Lit {
@@ -995,7 +1148,7 @@ func (a *psAnalyzer) psDefineAlias(spec *psCmdlet, b psBound) {
 	a.hidden = append(a.hidden, "an alias defined at run time ("+names[0].Text+")")
 }
 
-// psRedirections records the files a command's redirections write
+// psRedirections records the files a command's redirections write.
 func (a *psAnalyzer) psRedirections(rs []pwsh.Redirection, d dir) {
 	for _, r := range rs {
 		fr, ok := r.(*pwsh.FileRedirection)
@@ -1014,7 +1167,7 @@ func (a *psAnalyzer) psRedirections(rs []pwsh.Redirection, d dir) {
 // psInvokeMember checks a .NET method call. A static method of a type that
 // only computes is allowed, any other runs code the analysis can't read.
 // An instance method other than those that compute on strings and
-// collections may do anything the object can, and needs confirmation
+// collections may do anything the object can, and needs confirmation.
 func (a *psAnalyzer) psInvokeMember(m *pwsh.InvokeMember) error {
 	name, lit := "", false
 	if s, ok := m.Member.(*pwsh.StringConstant); ok {
@@ -1045,7 +1198,7 @@ func (a *psAnalyzer) psInvokeMember(m *pwsh.InvokeMember) error {
 }
 
 // psAssignment checks what an assignment sets: an environment variable a
-// program reads as code, or a file written through its drive (${c:\x} = …)
+// program reads as code, or a file written through its drive (${c:\x} = …).
 func (a *psAnalyzer) psAssignment(as *pwsh.Assignment) error {
 	v, ok := as.Left.(*pwsh.Variable)
 	if !ok {
@@ -1055,21 +1208,49 @@ func (a *psAnalyzer) psAssignment(as *pwsh.Assignment) error {
 		a.psVariable(v, true, unknownDir)
 		return nil
 	}
-	value := Elem{Kind: Many, Text: "*"}
-	var right pwsh.Node = as.Right
+	return a.psSetEnv(v.Name(), a.psStatementValue(as.Right))
+}
+
+// psStatementValue is the value of the right side of an assignment or a
+// hashtable entry: one element, or any.
+func (a *psAnalyzer) psStatementValue(st pwsh.Statement) Elem {
+	var right pwsh.Node = st
 	if p, ok := right.(*pwsh.Pipeline); ok && len(p.Elements) == 1 {
 		right = p.Elements[0]
 	}
 	if ce, ok := right.(*pwsh.CommandExpression); ok {
 		if els := a.psElems(ce.Expression); len(els) == 1 {
-			value = els[0]
+			return els[0]
 		}
 	}
-	return a.psSetEnv(v.Name(), value)
+	return Elem{Kind: Many, Text: "*"}
+}
+
+// psStartEnv checks the variables Start-Process -Environment sets for the
+// program it starts, as assignments to $env: are. A map or a name known
+// only at run time may set any variable, one a program reads as code too.
+func (a *psAnalyzer) psStartEnv(vals []pwsh.CommandElement) error {
+	var h *pwsh.Hashtable
+	if len(vals) == 1 {
+		h, _ = vals[0].(*pwsh.Hashtable)
+	}
+	if h == nil {
+		return a.psForeign("Start-Process -Environment")
+	}
+	for _, kv := range h.Pairs {
+		key := a.psElems(kv.Key)
+		if len(key) != 1 || key[0].Kind != Lit {
+			return a.psForeign("Start-Process -Environment")
+		}
+		if err := a.psSetEnv(key[0].Text, a.psStatementValue(kv.Value)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // psSetEnv checks an environment variable set to value, for the programs
-// that read it as code (envVar)
+// that read it as code (envVar).
 func (a *psAnalyzer) psSetEnv(name string, value Elem) error {
 	if a.windows {
 		name = strings.ToUpper(name) // Windows' environment ignores case
@@ -1083,7 +1264,7 @@ func (a *psAnalyzer) psSetEnv(name string, value Elem) error {
 
 // psEnvWord checks a word naming an environment variable through the env:
 // drive (Set-Item Env:GIT_SSH_COMMAND …), which a cmdlet that writes may
-// set to a value the analysis doesn't follow
+// set to a value the analysis doesn't follow.
 func (a *psAnalyzer) psEnvWord(w string, use psUse) error {
 	drive, name, ok := strings.Cut(w, ":")
 	if !ok || fold.String(drive) != "env" || use == psPrint || use == psNames || use == psRead {
@@ -1093,7 +1274,7 @@ func (a *psAnalyzer) psEnvWord(w string, use psUse) error {
 }
 
 // psVariable checks a variable read or written through a drive: a file on
-// a FileSystem drive (${c:\x}), or a function defined through function:
+// a FileSystem drive (${c:\x}), or a function defined through the function: drive.
 func (a *psAnalyzer) psVariable(v *pwsh.Variable, written bool, d dir) {
 	drive := fold.String(v.Drive())
 	switch drive {
@@ -1121,7 +1302,7 @@ func (a *psAnalyzer) psVariable(v *pwsh.Variable, written bool, d dir) {
 
 // psWinRef is pathRef for a path PowerShell reads on Windows. PowerShell
 // has no mounts: a path starting with one separator is on the working
-// directory's drive
+// directory's drive.
 func (a *analyzer) psWinRef(p string, d dir) FileRef {
 	s := strings.ReplaceAll(p, `\`, "/")
 	if strings.HasPrefix(s, "/") && !strings.HasPrefix(s, "//") {
@@ -1137,7 +1318,7 @@ func (a *analyzer) psWinRef(p string, d dir) FileRef {
 }
 
 // psWinGlob is winGlob for PowerShell: a pattern in the engine's form, with
-// a leading separator on the working directory's drive
+// a leading separator on the working directory's drive.
 func (a *analyzer) psWinGlob(pattern string, d dir) (string, bool, string) {
 	s := strings.ReplaceAll(pattern, `\`, "/")
 	if strings.HasPrefix(s, "/") && !strings.HasPrefix(s, "//") {
@@ -1154,7 +1335,7 @@ func (a *analyzer) psWinGlob(pattern string, d dir) (string, bool, string) {
 }
 
 // psLink records which commands feed which: each pipeline element feeds
-// the next, and the commands in an argument feed the command given it
+// the next, and the commands in an argument feed the command given it.
 func (a *psAnalyzer) psLink(sb *pwsh.ScriptBlock, ids map[*pwsh.Command]int) {
 	// in holds the ids of the commands under each node, in walk order
 	in := map[pwsh.Node][]int{}
@@ -1193,7 +1374,7 @@ func (a *psAnalyzer) psLink(sb *pwsh.ScriptBlock, ids map[*pwsh.Command]int) {
 // psDirs records the directory each command runs in. A literal
 // Set-Location or Push-Location moves the statements after it; anything
 // that may move elsewhere (a script, a computed command, cd in a block)
-// makes the directory unknown from there on
+// makes the directory unknown from there on.
 func (a *psAnalyzer) psDirs(sb *pwsh.ScriptBlock, start dir) map[pwsh.CommandBase]dir {
 	p := &psDirPass{a: a, of: map[pwsh.CommandBase]dir{}}
 	p.scriptBlock(sb, start)
@@ -1252,7 +1433,7 @@ func (p *psDirPass) stmt(st pwsh.Statement, d dir) dir {
 	return d
 }
 
-// psArgsOf returns a command's arguments as one node, or the element itself
+// psArgsOf returns a command's arguments as one node, or the element itself.
 func psArgsOf(el pwsh.CommandBase) pwsh.Node {
 	c, ok := el.(*pwsh.Command)
 	if !ok {
@@ -1276,7 +1457,7 @@ func psExprs(els []pwsh.CommandElement) []pwsh.Expression {
 	return out
 }
 
-// all sets the directory of every command under n not yet set
+// all sets the directory of every command under n not yet set.
 func (p *psDirPass) all(n pwsh.Node, d dir) {
 	pwsh.Inspect(n, func(m pwsh.Node) bool {
 		if cb, ok := m.(pwsh.CommandBase); ok {
@@ -1289,7 +1470,7 @@ func (p *psDirPass) all(n pwsh.Node, d dir) {
 }
 
 // simpleCd returns a statement that is only Set-Location or Push-Location
-// with arguments that run nothing
+// with arguments that run nothing.
 func (p *psDirPass) simpleCd(st pwsh.Statement) *pwsh.Command {
 	pl, ok := st.(*pwsh.Pipeline)
 	if !ok || len(pl.Elements) != 1 || pl.Background {
@@ -1314,7 +1495,7 @@ func (p *psDirPass) simpleCd(st pwsh.Statement) *pwsh.Command {
 	return c
 }
 
-// psChangesDir reports whether anything under n may change the directory
+// psChangesDir reports whether anything under n may change the directory.
 func (a *psAnalyzer) psChangesDir(n pwsh.Node) bool {
 	found := false
 	pwsh.Inspect(n, func(m pwsh.Node) bool {
@@ -1328,7 +1509,7 @@ func (a *psAnalyzer) psChangesDir(n pwsh.Node) bool {
 
 // psMayChangeDir reports a command that may change the location: cd and
 // its kin, a script (the location is the session's, not the script's),
-// code run as a string, and any command whose name isn't known
+// code run as a string, and any command whose name isn't known.
 func (a *psAnalyzer) psMayChangeDir(c *pwsh.Command) bool {
 	if _, ok := c.Elements[0].(*pwsh.ScriptBlockExpression); ok {
 		return false // its commands are inspected themselves
@@ -1354,7 +1535,7 @@ func (a *psAnalyzer) psMayChangeDir(c *pwsh.Command) bool {
 	return !slices.Contains([]string{".exe", ".com", ".bat", ".cmd"}, ext)
 }
 
-// psCd returns the directory a literal Set-Location or Push-Location moves to
+// psCd returns the directory a literal Set-Location or Push-Location moves to.
 func (a *psAnalyzer) psCd(c *pwsh.Command, d dir) dir {
 	canon, _ := a.psResolve(c.Elements[0].(*pwsh.StringConstant).Value, "")
 	spec := psCmdlets[fold.String(canon)]
@@ -1375,7 +1556,7 @@ func (a *psAnalyzer) psCd(c *pwsh.Command, d dir) dir {
 }
 
 // psCdPath returns the directory Set-Location p moves to from d. PowerShell
-// resolves ".." in the path it was given, without following links
+// resolves ".." in the path it was given, without following links.
 func (a *psAnalyzer) psCdPath(p string, d dir) dir {
 	if p == "-" || p == "+" {
 		return unknownDir

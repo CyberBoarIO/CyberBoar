@@ -15,8 +15,8 @@ import (
 // shape below once cost in proportion to the square of its length, which
 // came to seconds of CPU or hundreds of megabytes at the limit. Wall-clock
 // time depends on the machine and its load, so the test compares a quarter of
-// the limit with the whole of it and keeps the fastest of a few runs
-// Linearcost gives a ratio near 4 and quadratic cost one near 16
+// the limit with the whole of it and keeps the fastest of a few runs.
+// Linearcost gives a ratio near 4 and quadratic cost one near 16.
 func TestParseCostIsLinear(t *testing.T) {
 	for _, tc := range []struct{ name, prefix, unit, suffix string }{
 		{"empty script blocks", "f ", "{}", ""},
@@ -52,7 +52,7 @@ func TestParseCostIsLinear(t *testing.T) {
 }
 
 // parseCost parses line, which must parse, and returns the time it took and
-// the bytes it allocated
+// the bytes it allocated.
 func parseCost(t *testing.T, line string) (time.Duration, uint64) {
 	t.Helper()
 	var before, after runtime.MemStats

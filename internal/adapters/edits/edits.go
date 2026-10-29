@@ -2,11 +2,11 @@
 // the secrets check. Each function returns the engine.Rewrite of one kind of
 // edit. The engine reads the file and looks for credentials in what the
 // Rewrite returns that the file didn't hold before, so a secret put together
-// from parts is found as well as a whole one
+// from parts is found as well as a whole one.
 //
 // Where a tool's matching is looser than this package can follow exactly,
 // the Rewrite errs on the side of an error. The engine then denies the
-// write, and the agent retries with text that matches the file
+// write, and the agent retries with text that matches the file.
 package edits
 
 import (
@@ -23,42 +23,42 @@ import (
 )
 
 // maxLoose bounds the size of a file a loose match is looked for in, because
-// the search takes memory for each byte
+// the search takes memory for each byte.
 const maxLoose = 1 << 20
 
 // maxResults bounds the number of contents one Rewrite returns, since each
-// reading of where a loose match ends doubles them
+// reading of where a loose match ends doubles them.
 const maxResults = 4
 
 // Replace is one edit of a file's text, which replaces Old with New. If All
-// is set, every occurrence of Old is replaced
+// is set, every occurrence of Old is replaced.
 type Replace struct {
 	Old, New string
 	All      bool
 }
 
 // Matching says how a tool looks for an edit's old text that isn't in the
-// file as written
+// file as written.
 type Matching int
 
 const (
 	// Loose is Strings' matching, which ignores whitespace, typographic
-	// punctuation and escapes
+	// punctuation and escapes.
 	Loose Matching = iota
 	// Opencode is opencode's edit tool (tool/edit.ts in opencode 1.18.34). It
 	// writes the old and new text with the file's line endings, and its
 	// matching can also take a block by its first and last lines alone
 	// (BlockAnchorReplacer, ContextAwareReplacer), whose lines between may
 	// differ from the old text. Where that or replaceAll may change other text
-	// than Loose finds, the Rewrite is an error
+	// than Loose finds, the Rewrite is an error.
 	Opencode
 )
 
 // Strings returns the Rewrite of edits applied in turn, as Claude Code's
 // Edit and MultiEdit, Copilot's str_replace and opencode's edit apply them.
 // Old must be in the file once (at least once, with All), and an empty Old
-// creates a file that doesn't exist or is empty
-// Every intermediate result is limited to secrets.MaxText bytes before allocation
+// creates a file that doesn't exist or is empty.
+// Every intermediate result is limited to secrets.MaxText bytes before allocation.
 //
 // When Old isn't in the file as written, the tools look for it more loosely,
 // allowing for other whitespace and indentation, typographic quotes and
@@ -66,12 +66,12 @@ const (
 // characters and escapes. A loose match can end in two places, at the
 // matched text or with the blanks around it on its lines, so each such edit
 // yields both results. An edit found nowhere, or in more than one place, is
-// an error, because the tool refuses it or Strings can't tell which place it changes
+// an error, because the tool refuses it or Strings can't tell which place it changes.
 func Strings(edits []Replace) engine.Rewrite {
 	return StringsMatching(edits, Loose)
 }
 
-// StringsMatching is Strings for a tool that matches as m says
+// StringsMatching is Strings for a tool that matches as m says.
 func StringsMatching(edits []Replace, m Matching) engine.Rewrite {
 	return func(old string, exists bool) ([]string, error) {
 		results := []string{old}
@@ -96,16 +96,10 @@ func StringsMatching(edits []Replace, m Matching) engine.Rewrite {
 	}
 }
 
-// appendUnique appends the strings of add that list doesn't hold yet
+// appendUnique appends the strings of add that list doesn't hold yet.
 func appendUnique(list []string, add ...string) []string {
 	for _, s := range add {
-		dup := false
-		for _, t := range list {
-			if s == t {
-				dup = true
-				break
-			}
-		}
+		dup := slices.Contains(list, s)
 		if !dup {
 			list = append(list, s)
 		}
@@ -114,7 +108,7 @@ func appendUnique(list []string, add ...string) []string {
 }
 
 // replace returns the possible results of applying e to content, which exists
-// or not. Each result is one reading of where a loose match ends
+// or not. Each result is one reading of where a loose match ends.
 func replace(content string, exists bool, e Replace, m Matching) ([]string, error) {
 	if m == Opencode && e.Old != "" && strings.Contains(content, "\r\n") {
 		crlf := func(s string) string { return strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\n", "\r\n") }
@@ -172,7 +166,7 @@ func replace(content string, exists bool, e Replace, m Matching) ([]string, erro
 	return appendUnique(nil, tight, wide), nil
 }
 
-// checkSize bounds kept + count*added without overflowing the multiplication
+// checkSize bounds kept + count*added without overflowing the multiplication.
 func checkSize(kept, count, added int) error {
 	if kept > secrets.MaxText || count > 0 && added > (secrets.MaxText-kept)/count {
 		return engine.ErrRewriteTooLarge
@@ -182,7 +176,7 @@ func checkSize(kept, count, added int) error {
 
 // splice replaces each span of content with with. The spans are in order and
 // don't overlap. If wide is set, the blanks around a span on its lines are
-// replaced too
+// replaced too.
 func splice(content string, spans [][2]int, with string, wide bool) string {
 	var b strings.Builder
 	at := 0
@@ -208,7 +202,7 @@ func splice(content string, spans [][2]int, with string, wide bool) string {
 // and typographic punctuation are ignored. The spans of content it returns
 // are in order and don't overlap, and each runs from the first to the last
 // character matched. find is looked for as written first, and then with its
-// escapes read. ambiguous reports that both are found, in different places
+// escapes read. ambiguous reports that both are found, in different places.
 func looseMatches(content, find string) (spans [][2]int, ambiguous bool) {
 	norm, starts := normalize(content)
 	end := func(i int) int {
@@ -255,7 +249,7 @@ func looseMatches(content, find string) (spans [][2]int, ambiguous bool) {
 // ContextAwareReplacer). It errs on the side of true: it ignores how similar
 // the lines between are, and it trims more characters than JavaScript's trim,
 // so that more lines are equal. Replacing span as splice does, tightly or
-// widely, is the same as replacing the block of its lines
+// widely, is the same as replacing the block of its lines.
 func anchorElsewhere(content, find string, span [2]int) bool {
 	fl := strings.Split(find, "\n")
 	if len(fl) < 3 {
@@ -304,7 +298,7 @@ func anchorElsewhere(content, find string, span [2]int) bool {
 }
 
 // trimJS trims what JavaScript's String.prototype.trim does and more, which
-// for the comparisons in anchorElsewhere errs on the side of equal lines
+// for the comparisons in anchorElsewhere errs on the side of equal lines.
 func trimJS(s string) string {
 	return strings.TrimFunc(s, func(r rune) bool { return unicode.IsSpace(r) || r == '\uFEFF' })
 }
@@ -312,7 +306,7 @@ func trimJS(s string) string {
 // normalize drops whitespace from s and maps typographic punctuation to
 // ASCII as Codex's patch matching does (codex-rs/apply-patch
 // seek_sequence.rs). starts[i] is the offset in s of the character that
-// byte i of norm came from
+// byte i of norm came from.
 func normalize(s string) (norm string, starts []int32) {
 	var b strings.Builder
 	for i, r := range s {
@@ -341,7 +335,7 @@ func normalize(s string) (norm string, starts []int32) {
 	return b.String(), starts
 }
 
-// unescape reads the escapes opencode's edit tool also tries (\n, \t, \r, quotes, \\, \$)
+// unescape reads the escapes opencode's edit tool also tries (\n, \t, \r, quotes, \\, \$).
 func unescape(s string) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {
@@ -373,7 +367,7 @@ func unescape(s string) string {
 // Insert returns the Rewrite of text inserted after line n of a file, where
 // 0 is before the first line, as Copilot's str_replace_editor inserts it. The
 // Rewrite returns the file both with and without a line break after the
-// text, since it can't tell which one the tool writes
+// text, since it can't tell which one the tool writes.
 func Insert(n int, text string) engine.Rewrite {
 	return func(old string, exists bool) ([]string, error) {
 		if !exists {
@@ -386,7 +380,7 @@ func Insert(n int, text string) engine.Rewrite {
 			return nil, engine.ErrRewriteTooLarge // the reading with a newline exceeds the limit
 		}
 		pos := 0
-		for i := 0; i < n; i++ {
+		for i := range n {
 			j := strings.IndexByte(old[pos:], '\n')
 			if j < 0 {
 				if i == n-1 && pos < len(old) {

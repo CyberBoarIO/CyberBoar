@@ -11,12 +11,12 @@ import (
 )
 
 // applyClaudeCode installs the hook into Claude Code's settings for the
-// user, the project, the local project or the machine
+// user, the project, the local project or the machine.
 func applyClaudeCode(a applyArgs, stdout io.Writer, getenv func(string) string, fail, usage func(string, ...any) int) int {
 	if a.lock && claudecode.Scope(a.scope) != claudecode.ScopeManaged {
 		return usage("--lock needs --scope managed")
 	}
-	if err := checkDeadline(a.deadline, claudecode.HookTimeout, "Claude Code hook timeout", ": a timed-out hook fails open"); err != nil {
+	if err := checkDeadline(a.deadline, claudecode.HookTimeout, "Claude Code hook timeout", ": releases before 2.1.295 run a call whose hook timed out"); err != nil {
 		return usage("%v", err)
 	}
 	o := claudecode.FragmentOptions{Scope: claudecode.Scope(a.scope), Policy: a.policy, Audit: a.audit, State: a.state,

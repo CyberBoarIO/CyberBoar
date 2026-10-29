@@ -19,7 +19,7 @@ import (
 )
 
 // On native Windows the home is USERPROFILE, HOME must agree with it, and
-// directories may come in Git Bash's form
+// directories may come in Git Bash's form.
 func TestWindowsEnv(t *testing.T) {
 	files := map[string]string{`C:\Git\usr\bin\bash.exe`: "", `C:\Git\etc\fstab`: "none / cygdrive binary 0 0\n"}
 	gitBash := func(getenv func(string) string) gitbash.Env {
@@ -71,7 +71,7 @@ func TestWindowsEnv(t *testing.T) {
 
 // When Git Bash's mount table can't be read (here Git isn't installed), the
 // adapter still answers, and the engine refuses the paths that only the
-// table could place, such as /tmp
+// table could place, such as /tmp.
 func TestWindowsWithoutMounts(t *testing.T) {
 	noGit := gitbash.Env{Getenv: func(string) string { return "" },
 		LookPath: func(string) (string, error) { return "", exec.ErrNotFound },
@@ -122,7 +122,7 @@ func TestWindowsWithoutMounts(t *testing.T) {
 
 // On native Windows the PowerShell tool's command is analysed as PowerShell,
 // also without Git Bash, where Claude Code has no Bash tool. Elsewhere it is
-// denied and the agent is sent to the Bash tool
+// denied and the agent is sent to the Bash tool.
 func TestPowerShellTool(t *testing.T) {
 	noGit := gitbash.Env{Getenv: func(string) string { return "" },
 		LookPath: func(string) (string, error) { return "", exec.ErrNotFound },
@@ -194,7 +194,7 @@ func TestSettingsFiles(t *testing.T) {
 }
 
 // Claude Code loads agents, skills and commands from the project's
-// .claude and those of the folders above it up to the git work tree
+// .claude and those of the folders above it up to the git work tree.
 func TestProjectDirs(t *testing.T) {
 	root := t.TempDir()
 	project := filepath.Join(root, "repo", "packages", "web")
@@ -240,7 +240,7 @@ func TestParent(t *testing.T) {
 }
 
 // Claude Code's Glob searches the base directory of an absolute pattern
-// and ignores its path field. A relative pattern is matched under path
+// and ignores its path field. A relative pattern is matched under path.
 func TestGlobBase(t *testing.T) {
 	for _, tc := range []struct {
 		pattern string
@@ -279,7 +279,7 @@ func TestGlobBase(t *testing.T) {
 	}
 }
 
-// MCP calls say their names are in Claude Code's form, whichever way the split is found
+// MCP calls say their names are in Claude Code's form, whichever way the split is found.
 func TestMCPCallsHaveClaudeCodeNames(t *testing.T) {
 	for _, server := range []string{"", "fs.srv"} {
 		in := &Input{HookEventName: "PreToolUse", Cwd: "/work", ToolName: "mcp__fs_srv__write_file", ToolInput: json.RawMessage(`{}`)}

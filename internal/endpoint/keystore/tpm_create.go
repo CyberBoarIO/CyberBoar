@@ -17,7 +17,7 @@ import (
 // the TPM (sensitiveDataOrigin), can never be duplicated (fixedTPM,
 // fixedParent), signs with ECDSA and SHA-256 only, is used with its empty
 // password (userWithAuth), and is exempt from dictionary-attack lockout,
-// which an empty password can't trigger anyway
+// which an empty password can't trigger anyway.
 var keyTemplate = tpm2.TPMTPublic{
 	Type:    tpm2.TPMAlgECC,
 	NameAlg: tpm2.TPMAlgSHA256,
@@ -41,10 +41,10 @@ var keyTemplate = tpm2.TPMTPublic{
 	Unique: tpm2.NewTPMUPublicID(tpm2.TPMAlgECC, &tpm2.TPMSECCPoint{}),
 }
 
-// createTPM makes a key in the TPM (Linux) or fails with ErrUnavailable
+// createTPM makes a key in the TPM (Linux) or fails with ErrUnavailable.
 func createTPM(openTPM tpmOpener) (*Key, error) { return createTSS(openTPM) }
 
-// createTSS makes a key in the TPM openTPM reaches
+// createTSS makes a key in the TPM openTPM reaches.
 func createTSS(openTPM tpmOpener) (*Key, error) {
 	t, err := openTPM()
 	if err != nil {

@@ -12,7 +12,7 @@ var errNotRegular = errors.New("tripwire state file is not a regular file, or wa
 // openFile opens a state file, refusing a symlink. Windows has no
 // O_NOFOLLOW, so the path is checked before the open, which keeps O_CREATE
 // from creating a link's target, and the open file is compared with the path
-// after it, which catches a link swapped in between
+// after it, which catches a link swapped in between.
 func openFile(path string, flag int, perm os.FileMode) (*os.File, error) {
 	if lst, err := os.Lstat(path); err == nil && !lst.Mode().IsRegular() {
 		return nil, errNotRegular
@@ -32,12 +32,12 @@ func openFile(path string, flag int, perm os.FileMode) (*os.File, error) {
 
 // lockOffset is where the lock byte lies, far past the end of any state
 // file. Windows locks are mandatory, so a lock over the contents would make
-// reads through other handles fail, such as List's
+// reads through other handles fail, such as List's.
 const lockOffset = 1 << 62
 
 // lockShared and lockExclusive wait for a LockFileEx lock on the byte at
 // lockOffset. Windows releases it when the handle is closed or the process
-// dies, so a crashed hook never wedges a session
+// dies, so a crashed hook never wedges a session.
 func lockShared(f *os.File) error    { return lockFile(f, 0) }
 func lockExclusive(f *os.File) error { return lockFile(f, windows.LOCKFILE_EXCLUSIVE_LOCK) }
 

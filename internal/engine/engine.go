@@ -1,6 +1,6 @@
-// Package engine decides whether an agent action is allowed under a policy
+// Package engine decides whether an agent action is allowed under a policy.
 //
-// Evaluate never returns an error: every failure becomes a deny verdict (fail-closed)
+// Evaluate never returns an error: every failure becomes a deny verdict (fail-closed).
 package engine
 
 import (
@@ -11,7 +11,7 @@ import (
 	"cyberboar.dev/cyberboar/internal/policy"
 )
 
-// Compiled is a policy prepared for evaluation
+// Compiled is a policy prepared for evaluation.
 type Compiled struct {
 	policy   *policy.Policy
 	files    fileRules
@@ -19,7 +19,7 @@ type Compiled struct {
 	mcp      mcpRules
 }
 
-// Compile prepares a loaded policy for evaluation
+// Compile prepares a loaded policy for evaluation.
 func Compile(p *policy.Policy) (*Compiled, error) {
 	if p == nil {
 		return nil, errors.New("engine: nil policy")
@@ -36,18 +36,18 @@ func Compile(p *policy.Policy) (*Compiled, error) {
 	}, nil
 }
 
-// Policy returns the policy c was compiled from
+// Policy returns the policy c was compiled from.
 func (c *Compiled) Policy() *policy.Policy { return c.policy }
 
 // allowListed reports whether a kind of action (files, commands or MCP)
 // needs an allow rule. It does under allow-listed posture, and whenever the
 // kind has an allow list, since allow rules under deny-listed posture would
-// otherwise do nothing. A posture this code doesn't know counts as allow-listed
+// otherwise do nothing. A posture this code doesn't know counts as allow-listed.
 func (c *Compiled) allowListed(r policy.Rules) bool {
 	return c.policy.Spec.Defaults.Posture != policy.DenyListed || len(r.Allow) > 0
 }
 
-// Evaluate decides action a under policy c. A nil c (no valid policy) denies
+// Evaluate decides action a under policy c. A nil c (no valid policy) denies.
 func Evaluate(ctx context.Context, c *Compiled, a Action) (v Verdict) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -89,12 +89,12 @@ func Evaluate(ctx context.Context, c *Compiled, a Action) (v Verdict) {
 	return v
 }
 
-// deadlineVerdict is the verdict for an evaluation whose context has ended
+// deadlineVerdict is the verdict for an evaluation whose context has ended.
 func deadlineVerdict() Verdict {
 	return deny(RuleDeadline, "the policy decision timed out, so the action is blocked")
 }
 
-// allowNoRule is the verdict when no rule matched and no allow list applies
+// allowNoRule is the verdict when no rule matched and no allow list applies.
 func allowNoRule() Verdict {
 	return Verdict{Decision: Allow, Reason: "no rule matched", Rule: RulePostureDenyListed}
 }

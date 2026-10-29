@@ -1,5 +1,5 @@
 // Package adapters holds the parsed form of one hook call, the hook's answer
-// and the helpers for tool inputs that every agent adapter shares
+// and the helpers for tool inputs that every agent adapter shares.
 package adapters
 
 import (
@@ -18,20 +18,20 @@ import (
 	"cyberboar.dev/cyberboar/pkg/brand"
 )
 
-// Rule IDs for decisions an adapter makes before the engine is involved
+// Rule IDs for decisions an adapter makes before the engine is involved.
 const (
 	RuleInvalidInput     = "error.invalidInput"
 	RuleUnclassifiedTool = "adapter.unclassifiedTool"
 	// RulePowerShell denies every call of an agent's PowerShell tool, whatever
 	// the policy says, where the engine doesn't analyze PowerShell: outside
-	// native Windows
+	// native Windows.
 	RulePowerShell = "builtin.powershell"
 )
 
 // PowerShell returns the denial of a call to an agent's PowerShell tool
 // outside native Windows, and what the user is told about it. tool is the
 // agent's name for that tool, and bash names the tool the agent should use
-// instead, such as "the Bash tool"
+// instead, such as "the Bash tool".
 func PowerShell(tool, bash string) (err *Error, notice string) {
 	name := brand.DisplayName
 	err = &Error{Rule: RulePowerShell, Msg: fmt.Sprintf("%s checks PowerShell only on native Windows, so here every command for the %s tool is blocked, whatever it does. "+
@@ -42,35 +42,35 @@ func PowerShell(tool, bash string) (err *Error, notice string) {
 	return err, notice
 }
 
-// Error is a hook input an adapter refuses. The hook denies it with Rule
+// Error is a hook input an adapter refuses. The hook denies it with Rule.
 type Error struct {
 	Rule string
 	Msg  string
 }
 
-// Error returns the message
+// Error returns the message.
 func (e *Error) Error() string { return e.Msg }
 
-// Invalid returns an Error for malformed input
+// Invalid returns an Error for malformed input.
 func Invalid(format string, args ...any) *Error {
 	return &Error{Rule: RuleInvalidInput, Msg: fmt.Sprintf(format, args...)}
 }
 
-// Call is one parsed hook invocation
+// Call is one parsed hook invocation.
 type Call struct {
-	// These fields are for the audit event
+	// These fields are for the audit event.
 	Session, ToolUseID, AgentID, AgentType, Mode, Cwd, Project, Tool string
 
 	// Actions are the engine actions to evaluate. When Err is set the call is
-	// denied with Err's rule instead (once a policy has loaded)
+	// denied with Err's rule instead (once a policy has loaded).
 	Actions []engine.Action
 	Err     error
 	// Notice, when set, is told to the user as well as the agent when the call
-	// is denied (engine.Verdict.Notice)
+	// is denied (engine.Verdict.Notice).
 	Notice string
 }
 
-// Output is a hook's answer to the agent
+// Output is a hook's answer to the agent.
 type Output struct {
 	Stdout []byte
 	Stderr string
@@ -78,29 +78,29 @@ type Output struct {
 }
 
 // Briefer is implemented by an Adapter whose agent reads the SessionStart
-// briefing in its own shape
-// Other agents get briefing.SessionStartOutput
+// briefing in its own shape.
+// Other agents get briefing.SessionStartOutput.
 type Briefer interface {
-	// SessionStartOutput returns the hook answer that adds text to the agent's context
-	// Empty text gives no output
+	// SessionStartOutput returns the hook answer that adds text to the agent's context.
+	// Empty text gives no output.
 	SessionStartOutput(text string) []byte
 }
 
-// Adapter speaks one agent's PreToolUse hook protocol
+// Adapter speaks one agent's PreToolUse hook protocol.
 type Adapter interface {
-	// Name returns the agent's ID in flags and audit events, such as "claude-code"
+	// Name returns the agent's ID in flags and audit events, such as "claude-code".
 	Name() string
-	// Parse decodes a hook input
-	// An error means the input itself is unusable
-	// Problems with the tool call go in Call.Err
+	// Parse decodes a hook input.
+	// An error means the input itself is unusable.
+	// Problems with the tool call go in Call.Err.
 	Parse(data []byte, getenv func(string) string) (*Call, error)
-	// Respond turns a verdict into the agent's hook output
-	// It must never answer "allow" in a way that skips the user's own approval
+	// Respond turns a verdict into the agent's hook output.
+	// It must never answer "allow" in a way that skips the user's own approval.
 	Respond(v engine.Verdict, prefix string) Output
 }
 
-// Extract returns the strings at a field path such as "a", "a[]", "a.*" or"a.*.b"
-// It skips values that aren't strings, which CheckFields refuses first
+// Extract returns the strings at a field path such as "a", "a[]", "a.*" or "a.*.b".
+// It skips values that aren't strings, which CheckFields refuses first.
 func Extract(v any, path string) []string {
 	return extract(v, strings.Split(path, "."))
 }
@@ -140,8 +140,8 @@ func extract(v any, segs []string) []string {
 }
 
 // ToolInputObject decodes an agent's tool input, preserving JSON numbers,
-// and checks required fields and the shapes of fields that carry paths
-// Missing optional fields remain valid; each adapter checks its other types
+// and checks required fields and the shapes of fields that carry paths.
+// Missing optional fields remain valid; each adapter checks its other types.
 func ToolInputObject(tool string, data json.RawMessage, required, fields []string) (map[string]any, error) {
 	var input map[string]any
 	dec := json.NewDecoder(bytes.NewReader(data))
@@ -164,7 +164,7 @@ func ToolInputObject(tool string, data json.RawMessage, required, fields []strin
 // them) that Extract would skip although it is there, such as a number where
 // a path should be, or an array or object that no other path in fields reads into
 // Extract skips such values, so without this check a tool input whose path
-// has an unexpected type would be checked as touching nothing
+// has an unexpected type would be checked as touching nothing.
 func CheckFields(v any, fields []string) error {
 	for _, f := range fields {
 		if err := checkField(v, f, "", fields); err != nil {
@@ -224,7 +224,7 @@ func checkField(v any, path, prefix string, fields []string) error {
 }
 
 // unread returns an error for v at prefix unless another field path reads it
-// A string is read if prefix itself is a path, and an array or object if a path goes on below prefix
+// A string is read if prefix itself is a path, and an array or object if a path goes on below prefix.
 func unread(v any, prefix string, fields []string) error {
 	for _, f := range fields {
 		switch v.(type) {
@@ -259,14 +259,14 @@ func typeName(v any) string {
 	return "number"
 }
 
-// ShellQuote quotes s as one POSIX shell word
+// ShellQuote quotes s as one POSIX shell word.
 func ShellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // SplitMCP returns every (server, tool) reading of the part of an MCP tool
 // name after "mcp__". Callers evaluate every reading and keep the strictest
-// verdict, so a server named "a__b" can't hide behind the split (a, b__tool)
+// verdict, so a server named "a__b" can't hide behind the split (a, b__tool).
 func SplitMCP(rest string) []engine.MCPCall {
 	var out []engine.MCPCall
 	for i := 0; i+2 <= len(rest); i++ {
@@ -278,14 +278,14 @@ func SplitMCP(rest string) []engine.MCPCall {
 }
 
 // startupNames are the startup files in the home directory that bash and sh
-// read as login or interactive shells, and run when a login shell exits
+// read as login or interactive shells, and run when a login shell exits.
 var startupNames = []string{".profile", ".bash_profile", ".bash_login", ".bashrc", ".bash_logout"}
 
-// zshStartupNames are zsh's, which it reads from $ZDOTDIR, or the home directory
+// zshStartupNames are zsh's, which it reads from $ZDOTDIR, or the home directory.
 var zshStartupNames = []string{".zshenv", ".zprofile", ".zshrc", ".zlogin", ".zlogout"}
 
 // StartupNames returns the names of the shell startup files in the home
-// directory, as StartupFiles guards them when ZDOTDIR is unset
+// directory, as StartupFiles guards them when ZDOTDIR is unset.
 func StartupNames() []string { return slices.Concat(startupNames, zshStartupNames) }
 
 // StartupFiles returns the shell startup files the agents' shells run
@@ -293,7 +293,7 @@ func StartupNames() []string { return slices.Concat(startupNames, zshStartupName
 // login shell exits. They are bash's and sh's in home, zsh's in home and
 // $ZDOTDIR, and the files $BASH_ENV and $ENV name. What an agent writes
 // there would run in later commands and sessions, so it may not write them
-// (Guard). windows says home is a Windows path, as Git Bash's is on Windows
+// (Guard). windows says home is a Windows path, as Git Bash's is on Windows.
 func StartupFiles(windows bool, home string, getenv func(string) string) []string {
 	if home == "" {
 		return nil
@@ -321,7 +321,7 @@ func StartupFiles(windows bool, home string, getenv func(string) string) []strin
 
 // absPath returns p if it is absolute, on Windows also in Git Bash's form
 // (/c/x), and "" otherwise: a guarded path must be absolute, and a shell
-// reads a relative one from wherever it starts
+// reads a relative one from wherever it starts.
 func absPath(windows bool, p string) string {
 	if windows {
 		p = winpath.FromGitBash(p)
@@ -338,7 +338,7 @@ func absPath(windows bool, p string) string {
 
 // Guard adds paths, the files that install the hook, to the Guarded list of
 // every file and shell action, so that the agent may not change them
-// (builtin.guarded). Empty paths are skipped
+// (builtin.guarded). Empty paths are skipped.
 func Guard(actions []engine.Action, paths ...string) {
 	for i := range actions {
 		if actions[i].Tool == engine.ToolMCP {
@@ -352,8 +352,8 @@ func Guard(actions []engine.Action, paths ...string) {
 	}
 }
 
-// Under joins names below dir with the separator of the platform's paths
-// It returns "" when dir is empty, which means the hook doesn't know it
+// Under joins names below dir with the separator of the platform's paths.
+// It returns "" when dir is empty, which means the hook doesn't know it.
 func Under(windows bool, dir string, names ...string) string {
 	if dir == "" {
 		return ""
@@ -368,12 +368,12 @@ func Under(windows bool, dir string, names ...string) string {
 	return dir + sep + strings.Join(names, sep)
 }
 
-// IsDir reports whether path names an existing directory
-// It follows symbolic links, so a link to a directory lists that directory
+// IsDir reports whether path names an existing directory.
+// It follows symbolic links, so a link to a directory lists that directory.
 // The engine resolves the path itself and checks where it really leads, so this only chooses
 // between listing and reading. An empty path, or one that can't be examined,
 // is not a directory. That is the stricter reading, because the path is then
-// checked as a read
+// checked as a read.
 func IsDir(path string) bool {
 	if path == "" {
 		return false
@@ -383,7 +383,7 @@ func IsDir(path string) bool {
 }
 
 // DecodeHookInput decodes a hook's input, which must be exactly one JSON
-// object. Fields v has no place for are ignored, because agents add them over time
+// object. Fields v has no place for are ignored, because agents add them over time.
 func DecodeHookInput(data []byte, v any) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	if err := dec.Decode(v); err != nil {
@@ -395,10 +395,10 @@ func DecodeHookInput(data []byte, v any) error {
 	return nil
 }
 
-// ShellCommand returns cmd as the engine should read it when the agent runs it with shell
+// ShellCommand returns cmd as the engine should read it when the agent runs it with shell.
 // It is unchanged for bash, sh, dash and zsh. For any other
 // shell it is wrapped as foreign code, as PowerShell or else as fish, which
-// the analyzer doesn't read as bash
+// the analyzer doesn't read as bash.
 func ShellCommand(shell, cmd string) string {
 	name := strings.ToLower(filepath.Base(shell))
 	switch strings.TrimSuffix(name, ".exe") {

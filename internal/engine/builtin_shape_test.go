@@ -9,7 +9,7 @@ import (
 
 // A path only known at run time is denied by the built-in rules when its
 // literal parts pin it under /proc or /dev, as a literal or a glob there is
-// A policy with no rules must not let it through
+// A policy with no rules must not let it through.
 func TestBuiltinRulesCoverRunTimePaths(t *testing.T) {
 	c := mustCompile(t, emptyPolicy(policy.DenyListed))
 	run := func(cmd string) Verdict {

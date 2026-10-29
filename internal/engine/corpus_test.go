@@ -8,7 +8,7 @@ import (
 	"cyberboar.dev/cyberboar/internal/corpustest"
 )
 
-// TestCorpus runs the specification: every case in testdata/corpus against the engine
+// TestCorpus runs the specification: every case in testdata/corpus against the engine.
 func TestCorpus(t *testing.T) {
 	files, err := filepath.Glob(filepath.Join("..", "..", "testdata", "corpus", "*.yaml"))
 	if err != nil || len(files) == 0 {

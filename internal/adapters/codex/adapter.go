@@ -1,5 +1,5 @@
 // Package codex maps Codex CLI's PreToolUse hook input to engine actions and
-// engine verdicts to hook output
+// engine verdicts to hook output.
 //
 // Codex differs from Claude Code in ways that make it weaker to govern:
 //   - The hook sees a command's text but not the directory it starts in or
@@ -28,15 +28,15 @@ import (
 )
 
 // RuleRemoteEnvironment denies a call that runs in a remote environment,
-// where local paths mean nothing
+// where local paths mean nothing.
 const RuleRemoteEnvironment = "adapter.remoteEnvironment"
 
 // RuleInteractiveSession denies a command started with a terminal (tty).
 // Codex then lets the model type into it with write_stdin, which no hook
-// sees, and programs such as more, less and vi run shell commands typed there
+// sees, and programs such as more, less and vi run shell commands typed there.
 const RuleInteractiveSession = "adapter.interactiveSession"
 
-// Input is the part of the PreToolUse hook input CyberBoar uses
+// Input is the part of the PreToolUse hook input CyberBoar uses.
 type Input struct {
 	HookEventName  string          `json:"hook_event_name"`
 	SessionID      string          `json:"session_id"`
@@ -51,7 +51,7 @@ type Input struct {
 	TranscriptPath *string         `json:"transcript_path"`
 }
 
-// ParseInput decodes exactly one JSON object
+// ParseInput decodes exactly one JSON object.
 func ParseInput(data []byte) (*Input, error) {
 	var in Input
 	if err := adapters.DecodeHookInput(data, &in); err != nil {
@@ -66,23 +66,23 @@ func ParseInput(data []byte) (*Input, error) {
 	return &in, nil
 }
 
-// Adapter speaks Codex CLI's hook protocol
+// Adapter speaks Codex CLI's hook protocol.
 type Adapter struct{}
 
-// Name returns "codex", the agent name used on the command line and in audit events
+// Name returns "codex", the agent name used on the command line and in audit events.
 func (Adapter) Name() string { return "codex" }
 
 // Parse uses the session cwd from the hook input as the workspace root.
 // Codex sets it when the session starts, and the model can't change it. The
 // model's per-command `workdir` is a different thing, which the hook input
-// doesn't carry
+// doesn't carry.
 func (Adapter) Parse(data []byte, getenv func(string) string) (*adapters.Call, error) {
 	return parse(data, getenv, runtime.GOOS, documentsDir)
 }
 
 // parse is Parse for the operating system goos, a runtime.GOOS value
 // documents returns the user's Documents folder on Windows, or "" if it
-// can't be found
+// can't be found.
 func parse(data []byte, getenv func(string) string, goos string, documents func() string) (*adapters.Call, error) {
 	in, err := ParseInput(data)
 	if err != nil {
@@ -116,10 +116,10 @@ func parse(data []byte, getenv func(string) string, goos string, documents func(
 	return c, nil
 }
 
-// ConfigFiles returns the Codex paths agents may not change (builtin.guarded)
+// ConfigFiles returns the Codex paths agents may not change (builtin.guarded).
 // They include the user's session transcripts, hook settings in the user's and
 // project's Codex directories, and the managed directory. windows says the
-// paths are Windows paths
+// paths are Windows paths.
 func ConfigFiles(windows bool, codexHome, project, managed string) []string {
 	var out []string
 	for _, dir := range []string{codexHome, adapters.Under(windows, project, ".codex")} {
@@ -133,7 +133,7 @@ func ConfigFiles(windows bool, codexHome, project, managed string) []string {
 // commands in a login shell unless the model asks otherwise, so the profiles
 // run before every command, and a module there loads when one of its commands
 // is named. They are in the Documents folder, which may be redirected, so
-// documents comes from Windows; without it, the one in home is assumed
+// documents comes from Windows; without it, the one in home is assumed.
 func PowerShellDirs(home, documents string) []string {
 	if documents == "" {
 		documents = adapters.Under(true, home, "Documents")
@@ -143,11 +143,11 @@ func PowerShellDirs(home, documents string) []string {
 
 // Respond turns a verdict into hook output. Codex treats an "ask" answer as a
 // failed hook and runs the tool, so ask is answered as deny. Allow produces
-// no output, leaving Codex's own approval flow in charge
+// no output, leaving Codex's own approval flow in charge.
 // A deny is the JSON decision with exit 0: Codex runs hooks in the session's
 // shell, which on Windows is PowerShell, and pwsh -Command turns a program's
-// exit code 2 into 1, which Codex takes for a failed hook and runs the tool
-// A verdict's Notice is sent as systemMessage, Codex's message for the user
+// exit code 2 into 1, which Codex takes for a failed hook and runs the tool.
+// A verdict's Notice is sent as systemMessage, Codex's message for the user.
 func (Adapter) Respond(v engine.Verdict, prefix string) adapters.Output {
 	var reason string
 	switch v.Decision {
@@ -200,22 +200,22 @@ var classification = sync.OnceValues(func() (map[string]toolSpec, error) {
 	return adapters.LoadTools(toolsYAML, func(_ string, s toolSpec) error { return s.valid() })
 })
 
-// Env is what the adapter takes from the hook's environment
+// Env is what the adapter takes from the hook's environment.
 type Env struct {
-	// Home is the user's home: HOME, or USERPROFILE on Windows
+	// Home is the user's home: HOME, or USERPROFILE on Windows.
 	Home string
 	// Shell is the hook's $SHELL, which is the shell Codex uses when the model
-	// names none. Codex on Windows ignores it and uses PowerShell
+	// names none. Codex on Windows ignores it and uses PowerShell.
 	Shell string
-	// CDPath says CDPATH is set, so `cd NAME` may land elsewhere
+	// CDPath says CDPATH is set, so `cd NAME` may land elsewhere.
 	CDPath bool
 	// Windows says Codex runs on native Windows: paths are Windows paths and
-	// commands run in PowerShell
+	// commands run in PowerShell.
 	Windows bool
 }
 
-// Actions maps a hook input to the engine actions to evaluate
-// No actions and no error means the tool touches nothing CyberBoar governs
+// Actions maps a hook input to the engine actions to evaluate.
+// No actions and no error means the tool touches nothing CyberBoar governs.
 func Actions(in *Input, env Env) ([]engine.Action, error) {
 	base := engine.Action{Cwd: in.Cwd, Home: env.Home, Workspaces: []string{in.Cwd}}
 	if env.Windows {
@@ -229,7 +229,7 @@ func Actions(in *Input, env Env) ([]engine.Action, error) {
 	if rest, ok := strings.CutPrefix(in.ToolName, "mcp__"); ok {
 		// Codex doesn't say where the server name ends, so every split is
 		// evaluated and the strictest verdict wins. Codex writes both names
-		// with "_" for other characters, "-" among them (seen in 0.155)
+		// with "_" for other characters, "-" among them (seen in 0.155).
 		var out []engine.Action
 		for _, c := range adapters.SplitMCP(rest) {
 			a := mcp(c.Server, c.Tool)
@@ -320,7 +320,7 @@ func Actions(in *Input, env Env) ([]engine.Action, error) {
 
 // RuleWindowsShell denies a command the model sends to a shell other than
 // PowerShell on native Windows, such as cmd or Git Bash, which the hook
-// can't check there
+// can't check there.
 const RuleWindowsShell = "adapter.windowsShell"
 
 func shellActions(in *Input, cmd string, base engine.Action, env Env) ([]engine.Action, error) {
@@ -371,7 +371,7 @@ func shellActions(in *Input, cmd string, base engine.Action, env Env) ([]engine.
 
 // isPowerShell reports whether Codex reads the shell the model named as
 // PowerShell: pwsh or powershell, alone or as a path's file name with or
-// without its extension, spelled as Codex matches it
+// without its extension, spelled as Codex matches it.
 func isPowerShell(shell string) bool {
 	name := shell[strings.LastIndexAny(shell, `\/`)+1:]
 	if i := strings.LastIndexByte(name, '.'); i > 0 {
@@ -382,7 +382,7 @@ func isPowerShell(shell string) bool {
 
 // joinDir returns rel taken from dir, as Codex joins a command's workdir
 // onto the session cwd: an absolute rel replaces dir. A Windows path that
-// depends on a drive's current directory or names no drive is refused
+// depends on a drive's current directory or names no drive is refused.
 func joinDir(windows bool, dir, rel string) (string, error) {
 	if !windows {
 		if filepath.IsAbs(rel) {

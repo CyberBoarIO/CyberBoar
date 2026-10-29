@@ -11,7 +11,7 @@ import (
 )
 
 // lastArgs returns the argv of the last command as written, with "?" for a
-// word only known at run time
+// word only known at run time.
 func lastArgs(t *testing.T, src string, persistent bool) []string {
 	t.Helper()
 	an, err := shell.AnalyzeWith(src, "/home/u", shell.Options{Cwd: "/w", Persistent: persistent})
@@ -32,7 +32,7 @@ func lastArgs(t *testing.T, src string, persistent bool) []string {
 	return out
 }
 
-// A variable the line sets itself is known where nothing can have changed it
+// A variable the line sets itself is known where nothing can have changed it.
 func TestLineVars(t *testing.T) {
 	for _, c := range []struct {
 		src  string
@@ -125,7 +125,7 @@ func TestLineVars(t *testing.T) {
 }
 
 // A shell that persists between commands may have an alias or a DEBUG trap
-// from an earlier command that assigns the name
+// from an earlier command that assigns the name.
 func TestLineVarsPersistent(t *testing.T) {
 	if got := lastArgs(t, `C=/x; cat "$C"`, true); !slices.Equal(got, []string{"cat", "?"}) {
 		t.Errorf("got %q", got)
@@ -133,7 +133,7 @@ func TestLineVarsPersistent(t *testing.T) {
 }
 
 // Code a nested shell runs doesn't see the line's unexported variables, but
-// a double-quoted argument is expanded before it gets there
+// a double-quoted argument is expanded before it gets there.
 func TestLineVarsNested(t *testing.T) {
 	an, err := shell.Analyze(`C=/x; bash -c "cat $C/a"; bash -c 'cat $C/b'`, "/home/u", "/w")
 	if err != nil {
@@ -154,8 +154,8 @@ func TestLineVarsNested(t *testing.T) {
 	}
 }
 
-// Every value the analysis claims to know is the one bash and zsh print
-// The lines only assign and run printf
+// Every value the analysis claims to know is the one bash and zsh print.
+// The lines only assign and run printf.
 func TestLineVarsMatchShells(t *testing.T) {
 	lines := []string{
 		`C=/x; printf '<%s>' "$C"`,

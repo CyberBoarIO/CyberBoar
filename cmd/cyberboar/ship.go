@@ -17,12 +17,13 @@ import (
 
 // runShip sends the audit log to the console the endpoint is enrolled
 // with, once or every --every. Every request is authenticated and every
-// acceptance checked (docs/protocol)
+// acceptance checked (docs/protocol).
 func runShip(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	auditPath := fs.String("audit", h.getenv(envName("audit")), "the hook's audit log (env "+envName("audit")+")")
 	sink := fs.String("sink", h.getenv(envName("sink")), "the console's events URL; only checked: it must be the enrolled console's (env "+envName("sink")+")")
-	policyPath := fs.String("policy", h.getenv(envName("policy")), "policy file with spec.sync.shipEvery and spec.audit.sink, if set, matching the enrolled console's events URL (env "+envName("policy")+")")
+	policyPath := fs.String("policy", h.getenv(envName("policy")),
+		"policy file with spec.sync.shipEvery and spec.audit.sink, if set, matching the enrolled console's events URL (env "+envName("policy")+")")
 	stateDir := fs.String("state", h.getenv(envName("state")), "state directory: the enrollment, endpoint ID and shipping offsets (env "+envName("state")+"; default: $XDG_STATE_HOME/"+brand.Name+")")
 	every := fs.Duration("every", 0, "keep running and ship at this interval (at least 1s); overrides spec.sync.shipEvery; 0 ships once")
 	tlsOpts := tlsFlags(fs, h.getenv)
@@ -137,7 +138,7 @@ func runShip(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stder
 }
 
 // nextShip returns how long --every waits after a run. That is the interval,
-// or longer if the console answered with a Retry-After (docs/protocol)
+// or longer if the console answered with a Retry-After (docs/protocol).
 func nextShip(every time.Duration, err error) time.Duration {
 	return max(every, ship.RetryAfter(err))
 }

@@ -10,7 +10,7 @@ package pwsh
 
 import "strconv"
 
-// check returns the first post-parse error in the tree, or nil
+// check returns the first post-parse error in the tree, or nil.
 func check(sb *ScriptBlock) *Error {
 	var err *Error
 	var walk func(n, parent Node)
@@ -45,7 +45,7 @@ func check(sb *ScriptBlock) *Error {
 
 // checkAssignmentTarget is CheckAssignmentTarget. It accepts a variable, a
 // property, an element, a list of them for a plain =, and any of these in
-// parentheses or under a type constraint or an attribute
+// parentheses or under a type constraint or an attribute.
 func checkAssignmentTarget(e Expression, simple bool, msg string) *Error {
 	switch v := e.(type) {
 	case *ArrayLiteral:
@@ -75,7 +75,7 @@ func checkAssignmentTarget(e Expression, simple bool, msg string) *Error {
 
 // pureExpression is PipelineAst.GetPureExpression. It returns the
 // expression of a pipeline that is one expression without redirections, and
-// nil for any other statement
+// nil for any other statement.
 func pureExpression(s Statement) Expression {
 	p, ok := s.(*Pipeline)
 	if !ok || len(p.Elements) != 1 {
@@ -91,7 +91,7 @@ func pureExpression(s Statement) Expression {
 // It compares keys as PowerShell does, ignoring case, but only where Go is
 // sure to agree. Strings compare with ASCII case folding only. Integers
 // compare as their decimal text, as in PowerShell, so @{1=1; "1"=2} has a
-// duplicate key
+// duplicate key.
 func checkDuplicateKeys(h *Hashtable) *Error {
 	seen := map[string]bool{}
 	for _, kv := range h.Pairs {
@@ -117,7 +117,7 @@ func checkDuplicateKeys(h *Hashtable) *Error {
 
 // checkAttributed is VisitAttributedExpression. An attribute other than a
 // type constraint may only stand before a variable, with any number of
-// attributes and type constraints between the two
+// attributes and type constraints between the two.
 func checkAttributed(a *AttributedExpression) *Error {
 	for e := Expression(a); ; {
 		switch v := e.(type) {

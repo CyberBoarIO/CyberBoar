@@ -116,7 +116,7 @@ func TestIsDir(t *testing.T) {
 
 // The startup files are bash's and sh's in the home directory, zsh's there
 // and in an absolute ZDOTDIR, and absolute BASH_ENV and ENV; a relative one
-// can't be guarded and is left out. On Windows Git Bash's form is read
+// can't be guarded and is left out. On Windows Git Bash's form is read.
 func TestStartupFiles(t *testing.T) {
 	env := func(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
 	got := adapters.StartupFiles(false, "/home/dev", env(map[string]string{"ZDOTDIR": "/home/dev/.config/zsh", "BASH_ENV": "rel.sh", "ENV": "/etc/shrc.local"}))

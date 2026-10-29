@@ -23,8 +23,8 @@ This reference is generated from ` + "`" + `internal/adapters/matrix_data_test.g
 
 `
 
-// This checks document freshness against manually maintained Matrix prose
-// Behavioral adapter tests establish the capability claims
+// This checks document freshness against manually maintained Matrix prose.
+// Behavioral adapter tests establish the capability claims.
 func TestMatrixDocUpToDate(t *testing.T) {
 	var b bytes.Buffer
 	b.WriteString(matrixHeader)

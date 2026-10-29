@@ -28,7 +28,7 @@ import (
 // can't open it by name. The key file records the provider, the key's name
 // and its public key, and Load checks the provider's key against that public key
 
-// The providers, by their registered names
+// The providers, by their registered names.
 const (
 	platformProvider = "Microsoft Platform Crypto Provider"
 	softwareProvider = "Microsoft Software Key Storage Provider"
@@ -58,7 +58,7 @@ const (
 	eccPublicP256Magic  = 0x31534345 // BCRYPT_ECDSA_PUBLIC_P256_MAGIC, "ECS1"
 )
 
-// cngError turns a SECURITY_STATUS into an error, nil for success
+// cngError turns a SECURITY_STATUS into an error, nil for success.
 func cngError(what string, r uintptr) error {
 	if r == 0 {
 		return nil
@@ -66,7 +66,7 @@ func cngError(what string, r uintptr) error {
 	return fmt.Errorf("%s: %w", what, windows.Errno(r))
 }
 
-// utf16 returns s as a NUL-terminated UTF-16 string for the CNG calls
+// utf16 returns s as a NUL-terminated UTF-16 string for the CNG calls.
 func utf16(s string) *uint16 {
 	p, err := windows.UTF16PtrFromString(s)
 	if err != nil {
@@ -75,10 +75,10 @@ func utf16(s string) *uint16 {
 	return p
 }
 
-// freeObject releases a CNG handle
+// freeObject releases a CNG handle.
 func freeObject(h uintptr) { _, _, _ = procFreeObject.Call(h) }
 
-// openProvider opens a key storage provider
+// openProvider opens a key storage provider.
 func openProvider(name string) (uintptr, error) {
 	if err := procOpenStorageProvider.Find(); err != nil {
 		return 0, fmt.Errorf("ncrypt.dll: %v: %w", err, ErrUnavailable)
@@ -91,7 +91,7 @@ func openProvider(name string) (uintptr, error) {
 	return h, nil
 }
 
-// cngKeyFile is what a CNG key file holds, as JSON in the PEM block
+// cngKeyFile is what a CNG key file holds, as JSON in the PEM block.
 type cngKeyFile struct {
 	Provider  string `json:"provider"`
 	Name      string `json:"name"`
@@ -102,7 +102,7 @@ func createTPM(tpmOpener) (*Key, error) { return createCNG(platformProvider, TPM
 func createOS() (*Key, error)           { return createCNG(softwareProvider, OS) }
 
 // storageOf returns the Storage a provider's keys are kept in, and whether
-// this package uses that provider at all
+// this package uses that provider at all.
 func storageOf(provider string) (Storage, bool) {
 	switch provider {
 	case platformProvider:
@@ -115,7 +115,7 @@ func storageOf(provider string) (Storage, bool) {
 
 // createCNG makes a new persisted ECDSA P-256 key named for this endpoint in
 // provider. A key in the OS store is made non-exportable before it is
-// finished, so it never exists in an exportable state
+// finished, so it never exists in an exportable state.
 func createCNG(provider string, s Storage) (*Key, error) {
 	prov, err := openProvider(provider)
 	if err != nil {
@@ -137,7 +137,7 @@ func createCNG(provider string, s Storage) (*Key, error) {
 	}()
 	if s == OS {
 		// The software provider's default follows group policy, which can
-		// allow export, and this key must never leave the machine
+		// allow export, and this key must never leave the machine.
 		var policy uint32
 		r, _, _ = procSetProperty.Call(key, uintptr(unsafe.Pointer(utf16("Export Policy"))),
 			uintptr(unsafe.Pointer(&policy)), 4, ncryptPersistFlag|ncryptSilentFlag)
@@ -173,7 +173,7 @@ func createCNG(provider string, s Storage) (*Key, error) {
 
 // checkCNGKey returns an open key's public key, after checking that the
 // software provider won't export it. The Platform Crypto Provider never
-// exports a private key, so its policy isn't read
+// exports a private key, so its policy isn't read.
 func checkCNGKey(key uintptr, s Storage) (*ecdsa.PublicKey, error) {
 	if s == OS {
 		var policy, n uint32
@@ -204,7 +204,7 @@ func checkCNGKey(key uintptr, s Storage) (*ecdsa.PublicKey, error) {
 	return pub, nil
 }
 
-// openCNG opens the key name in provider
+// openCNG opens the key name in provider.
 func openCNG(provider, name string) (prov, key uintptr, err error) {
 	prov, err = openProvider(provider)
 	if err != nil {
@@ -218,7 +218,7 @@ func openCNG(provider, name string) (prov, key uintptr, err error) {
 	return prov, key, nil
 }
 
-// deleteCNG deletes the named key from provider
+// deleteCNG deletes the named key from provider.
 func deleteCNG(provider, name string) error {
 	prov, key, err := openCNG(provider, name)
 	if err != nil {
@@ -234,7 +234,7 @@ func deleteCNG(provider, name string) error {
 }
 
 // cngSign returns a signing function that opens the key by name for each
-// signature, so no handle is kept between calls
+// signature, so no handle is kept between calls.
 func cngSign(provider, name string, pub *ecdsa.PublicKey) func([]byte) ([]byte, error) {
 	return func(digest []byte) ([]byte, error) {
 		prov, key, err := openCNG(provider, name)
@@ -258,7 +258,7 @@ func cngSign(provider, name string, pub *ecdsa.PublicKey) func([]byte) ([]byte, 
 }
 
 // loadCNG reads a CNG key file and checks that its key is in the provider
-// it names, with the public key it records
+// it names, with the public key it records.
 func loadCNG(data []byte) (*Key, error) {
 	var f cngKeyFile
 	if err := strictjson.Decode(data, &f); err != nil {

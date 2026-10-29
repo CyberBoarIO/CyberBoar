@@ -30,8 +30,8 @@ var (
 // TestParseGolden replays the differential offline: trees.jsonl holds what
 // PowerShell's parser made of every input in testdata/differential
 // (its tree, or that it failed), recorded by TestPowerShellDifferential, and
-// Parse must agree with it as the differential requires
-// It needs no PowerShell
+// Parse must agree with it as the differential requires.
+// It needs no PowerShell.
 func TestParseGolden(t *testing.T) {
 	version, golden := readGolden(t)
 	inputs := pwshInputs(t)
@@ -53,7 +53,7 @@ func TestParseGolden(t *testing.T) {
 // (docs/powershell.md): scripts/pwsh-ast.ps1 has Parser.ParseInput read every
 // input in testdata/differential and writes its syntax tree, and
 // the tree Parse builds must be the same, node for node and offset for
-// offset. PowerShell only parses; nothing runs
+// offset. PowerShell only parses; nothing runs.
 //
 // What PowerShell accepts and Parse refuses (docs/powershell.md) is counted,
 // not an error: the engine denies it. Everything else that differs is an
@@ -63,7 +63,7 @@ func TestParseGolden(t *testing.T) {
 // PowerShell would run nothing, and the post-parse checks that need types
 // resolved are not ported (check.go). It needs pwsh (or Windows PowerShell)
 // and CYBERBOAR_PWSH_DIFF=1 (scripts/pwsh-differential.sh); -update rewrites
-// trees.jsonl, which TestParseGolden replays without PowerShell
+// trees.jsonl, which TestParseGolden replays without PowerShell.
 func TestPowerShellDifferential(t *testing.T) {
 	pwsh := needPwsh(t)
 	inputs := pwshInputs(t)
@@ -99,7 +99,7 @@ func TestPowerShellDifferential(t *testing.T) {
 // or repeated, two inputs spliced. The variations are what nobody writes by
 // hand, which is where parsers disagree. The seed is fixed, so a run is
 // reproducible; CYBERBOAR_PWSH_DIFF_VARIATIONS sets how many (default 5000) and
-// CYBERBOAR_PWSH_DIFF_SEED another seed
+// CYBERBOAR_PWSH_DIFF_SEED another seed.
 func TestPowerShellDifferentialMutated(t *testing.T) {
 	pwsh := needPwsh(t)
 	n, seed := 5000, uint64(1)
@@ -133,7 +133,7 @@ func TestPowerShellDifferentialMutated(t *testing.T) {
 // FuzzParsePowerShell corpus, the directory in CYBERBOAR_PWSH_DIFF_FUZZ
 // (under go env GOCACHE, fuzz/cyberboar.dev/cyberboar/internal/engine/shell/pwsh/
 // FuzzParsePowerShell): what the fuzzer found interesting in our parser,
-// read by PowerShell's
+// read by PowerShell's.
 func TestPowerShellDifferentialFuzzCorpus(t *testing.T) {
 	dir := os.Getenv("CYBERBOAR_PWSH_DIFF_FUZZ")
 	if dir == "" {
@@ -181,8 +181,8 @@ func needPwsh(t *testing.T) string {
 }
 
 // pwshInputs reads testdata/differential/*.txt: inputs separated
-// by lines holding only "---"; a block starting with # is a comment
-// They come back sorted, without duplicates
+// by lines holding only "---"; a block starting with # is a comment.
+// They come back sorted, without duplicates.
 func pwshInputs(t testing.TB) []string {
 	t.Helper()
 	files, err := filepath.Glob(filepath.Join(inputsDir, "*.txt"))
@@ -195,7 +195,7 @@ func pwshInputs(t testing.TB) []string {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, block := range strings.Split(string(data), "\n---\n") {
+		for block := range strings.SplitSeq(string(data), "\n---\n") {
 			if block = strings.Trim(block, "\n"); block != "" && !strings.HasPrefix(block, "#") {
 				inputs = append(inputs, block)
 			}
@@ -206,7 +206,7 @@ func pwshInputs(t testing.TB) []string {
 }
 
 // pwshResult is PowerShell's reading of one input: its tree, or OK false
-// when it reports a parse error
+// when it reports a parse error.
 type pwshResult struct {
 	OK  bool   `json:"ok"`
 	AST string `json:"ast,omitempty"`
@@ -257,7 +257,7 @@ type goldenEntry struct {
 }
 
 // readGolden reads trees.jsonl: a first line {"version": …}, then an entry
-// per input, sorted
+// per input, sorted.
 func readGolden(t *testing.T) (string, map[string]pwshResult) {
 	t.Helper()
 	f, err := os.Open(goldenPath)
@@ -306,7 +306,7 @@ func writeGolden(t *testing.T, version string, inputs []string, results []pwshRe
 }
 
 // compareResults checks Parse against PowerShell's results, as
-// TestPowerShellDifferential describes
+// TestPowerShellDifferential describes.
 func compareResults(t *testing.T, inputs []string, results []pwshResult, label string) {
 	t.Helper()
 	var same, refused, overLimit, bothRejected, overAccepted int
@@ -343,7 +343,7 @@ func compareResults(t *testing.T, inputs []string, results []pwshResult, label s
 }
 
 // pwshFragments are what mutations insert: the characters and short
-// sequences PowerShell's tokenizer treats specially
+// sequences PowerShell's tokenizer treats specially.
 var pwshFragments = []string{
 	"`", `'`, `"`, `$`, "\n", "\r", "\r\n", "\t", " ", `;`, `&`, `|`, `(`, `)`, `{`, `}`, `#`, `!`, `=`,
 	`<`, `>`, "`\n", `$(`, `@(`, `@{`, `${`, `[`, `]`, `::`, `.`, `..`, `,`, `-`, `--`, `--%`, `&&`,
@@ -354,7 +354,7 @@ var pwshFragments = []string{
 	`return `, `break `, `exit `, `throw `, `‘`, `’`, `“`, `”`, `–`, " ", " ", "\u0085",
 }
 
-// mutatePwsh returns a variation of a random seed: one to three edits
+// mutatePwsh returns a variation of a random seed: one to three edits.
 func mutatePwsh(rng *rand.Rand, seeds []string) string {
 	s := seeds[rng.IntN(len(seeds))]
 	for range 1 + rng.IntN(3) {

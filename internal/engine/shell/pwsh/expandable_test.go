@@ -7,9 +7,9 @@ import (
 )
 
 // An expandable string keeps the format string PowerShell builds for it,
-// which is what PowerShell formats at run time
-// An escaped $ and an expansion share a Value but not a Format
-// The expected formats follow PowerShell's tokenizer, including the braces it leaves single in a bare word
+// which is what PowerShell formats at run time.
+// An escaped $ and an expansion share a Value but not a Format.
+// The expected formats follow PowerShell's tokenizer, including the braces it leaves single in a bare word.
 func TestExpandableStringFormat(t *testing.T) {
 	for _, tc := range []struct{ in, value, format string }{
 		{"f \"`$x $x\"", "$x $x", "$x {0}"},

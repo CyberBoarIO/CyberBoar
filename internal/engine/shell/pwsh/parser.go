@@ -2,6 +2,7 @@ package pwsh
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"unicode/utf16"
@@ -11,9 +12,9 @@ import (
 )
 
 // Error reports a command line this package can't read, because of a syntax
-// error, a construct it refuses (Refused) or a limit
+// error, a construct it refuses (Refused) or a limit.
 // It wraps limits.ErrUnparseable, or limits.ErrTooLarge or limits.ErrTooComplex for a
-// limit, so the engine treats it as it treats bash it can't analyze
+// limit, so the engine treats it as it treats bash it can't analyze.
 type Error struct {
 	Offset  int // in UTF-16 units, as PowerShell counts
 	Msg     string
@@ -21,7 +22,7 @@ type Error struct {
 	limit   error
 }
 
-// Error returns the message, prefixed with the offset in UTF-16 units
+// Error returns the message, prefixed with the offset in UTF-16 units.
 func (e *Error) Error() string {
 	if e.Refused {
 		return fmt.Sprintf("PowerShell at offset %d: not analyzed: %s", e.Offset, e.Msg)
@@ -29,7 +30,7 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("PowerShell at offset %d: %s", e.Offset, e.Msg)
 }
 
-// Unwrap returns the shell error the engine knows
+// Unwrap returns the shell error the engine knows.
 func (e *Error) Unwrap() error {
 	if e.limit != nil {
 		return e.limit
@@ -39,16 +40,16 @@ func (e *Error) Unwrap() error {
 
 // maxNesting bounds the parser's recursion. Each level of parentheses, braces
 // or nested statements costs a few units. PowerShell's own limit is the size
-// of its stack
+// of its stack.
 const maxNesting = 200
 
 // Parse parses a PowerShell command line as PowerShell's
 // Parser.ParseInput does, into a ScriptBlock. It fails, wrapping
 // limits.ErrUnparseable, on anything PowerShell would report as an error and
-// on constructs this package refuses to analyze (see docs/powershell.md)
+// on constructs this package refuses to analyze (see docs/powershell.md).
 // Whatever PowerShell would run is either read the way PowerShell reads it,
 // or not at all. Input over limits.MaxBytes, or with more than
-// limits.MaxCommands commands, fails with the shell package's limit errors
+// limits.MaxCommands commands, fails with the shell package's limit errors.
 func Parse(src string) (sb *ScriptBlock, err error) {
 	if len(src) > limits.MaxBytes {
 		return nil, &Error{Msg: "command line is too large", limit: limits.ErrTooLarge}
@@ -56,8 +57,8 @@ func Parse(src string) (sb *ScriptBlock, err error) {
 	if !utf8.ValidString(src) {
 		return nil, &Error{Msg: "command line is not valid UTF-8"}
 	}
-	if i := strings.IndexByte(src, 0); i >= 0 {
-		return nil, &Error{Offset: len(utf16.Encode([]rune(src[:i]))), Msg: "NUL in a command line", Refused: true}
+	if before, _, ok := strings.Cut(src, "\x00"); ok {
+		return nil, &Error{Offset: len(utf16.Encode([]rune(before))), Msg: "NUL in a command line", Refused: true}
 	}
 	u := utf16.Encode([]rune(src))
 	p := &parser{lx: &lexer{src: u}, src: u}
@@ -144,7 +145,7 @@ func (p *parser) resync(start int) {
 }
 
 // restorePoint returns the position to resync to, which is the lookahead's
-// start if there is one
+// start if there is one.
 func (p *parser) restorePoint() int {
 	if p.ungot != nil {
 		return p.ungot.pos
@@ -194,8 +195,8 @@ func extent(start, end *token) Extent { return Extent{Start: start.pos, End: end
 
 func endOf(n Node) int { return n.Span().End }
 
-// column is PowerShell's column number of an offset, counted from 1
-// Lines end at \n, \r\n or a lone \r
+// column is PowerShell's column number of an offset, counted from 1.
+// Lines end at \n, \r\n or a lone \r.
 func (p *parser) column(off int) int {
 	if p.lines == nil {
 		p.lines = []int{0}
@@ -209,7 +210,7 @@ func (p *parser) column(off int) int {
 	return off - p.lines[i] + 1
 }
 
-// scriptExtent returns the whole input's extent, which is a script's own
+// scriptExtent returns the whole input's extent, which is a script's own.
 func (p *parser) scriptExtent() Extent { return Extent{End: len(p.src)} }
 
 // Script blocks and statements
@@ -649,8 +650,8 @@ func (p *parser) statementBlockRule() *StatementBlock {
 	return body
 }
 
-// statementListRule parses statements into body and sets its extent to span them, first to last
-// With no statements, it leaves the extent zero, which is PowerShell's empty extent
+// statementListRule parses statements into body and sets its extent to span them, first to last.
+// With no statements, it leaves the extent zero, which is PowerShell's empty extent.
 func (p *parser) statementListRule(body *StatementBlock) {
 	p.skipNewlinesAndSemicolons()
 	for first := true; ; first = false {
@@ -970,7 +971,7 @@ func (p *parser) forStatementRule(forTok *token) Statement {
 	return nilIfEmptyStatements(s)
 }
 
-// nilIfEmptyStatements keeps absent parts of a for statement as nil interfaces
+// nilIfEmptyStatements keeps absent parts of a for statement as nil interfaces.
 func nilIfEmptyStatements(s *For) *For {
 	for _, st := range []*Statement{&s.Initializer, &s.Condition, &s.Iterator} {
 		if *st != nil && isNilStatement(*st) {
@@ -1193,7 +1194,7 @@ func (p *parser) pipelineChainRule() Statement {
 				right = ce
 			}
 		}
-		return &Assignment{Extent: Extent{Start: expr.Pos(), End: endOf(right)}, Left: expr, Operator: kindName(assign), Right: right}
+		return &Assignment{Start: expr.Pos(), End: endOf(right), Left: expr, Operator: kindName(assign), Right: right}
 	}
 	var chain Statement
 	var chainOp *token
@@ -1230,13 +1231,13 @@ func (p *parser) pipelineChainRule() Statement {
 				next.Background = background
 				return next
 			}
-			return &PipelineChain{Extent: Extent{Start: chain.Pos(), End: next.End}, Left: chain, Right: next,
+			return &PipelineChain{Start: chain.Pos(), End: next.End, Left: chain, Right: next,
 				Operator: kindName(chainOp), Background: background}
 		}
 		if chain == nil {
 			chain = next
 		} else {
-			chain = &PipelineChain{Extent: Extent{Start: chain.Pos(), End: next.End}, Left: chain, Right: next, Operator: kindName(chainOp)}
+			chain = &PipelineChain{Start: chain.Pos(), End: next.End, Left: chain, Right: next, Operator: kindName(chainOp)}
 		}
 		chainOp = t
 		if p.peekToken().kind == tokEndOfInput {
@@ -1267,7 +1268,7 @@ func (p *parser) pipelineRule(start Expression) *Pipeline {
 				p.skipToken()
 				end = endOf(p.redirectionRule(t, &redirs))
 			}
-			ce := &CommandExpression{Extent: Extent{Start: expr.Pos(), End: end}, Expression: expr, Redirections: collect(redirs)}
+			ce := &CommandExpression{Start: expr.Pos(), End: end, Expression: expr, Redirections: collect(redirs)}
 			p.counted(expr.Pos())
 			cmd = ce
 		} else if c := p.commandRule(); c != nil {
@@ -1313,8 +1314,8 @@ func collect(redirs [7]Redirection) []Redirection {
 	return out
 }
 
-// redirectionRule reads a redirection's target
-// PowerShell keeps one per stream, in stream order
+// redirectionRule reads a redirection's target.
+// PowerShell keeps one per stream, in stream order.
 func (p *parser) redirectionRule(t *token, redirs *[7]Redirection) Redirection {
 	var r Redirection
 	var from Stream
@@ -1326,7 +1327,7 @@ func (p *parser) redirectionRule(t *token, redirs *[7]Redirection) Redirection {
 		if t.kind == tokRedirectInStd {
 			p.fail(t, "the < operator is reserved for future use")
 		}
-		r = &FileRedirection{Extent: Extent{Start: t.pos, End: endOf(file)}, From: t.from, Append: t.append, Location: file}
+		r = &FileRedirection{Start: t.pos, End: endOf(file), From: t.from, Append: t.append, Location: file}
 		from = t.from
 	} else {
 		if t.to != StreamOutput || t.from == t.to {
@@ -1409,7 +1410,7 @@ func (p *parser) commandArgument(ctx argContext, t *token) Expression {
 				return expr
 			}
 			args = append(args, expr)
-			return &ArrayLiteral{Extent: Extent{Start: args[0].Pos(), End: endOf(expr)}, Elements: args}
+			return &ArrayLiteral{Start: args[0].Pos(), End: endOf(expr), Elements: args}
 		}
 		comma = next
 		args = append(args, expr)
@@ -1505,9 +1506,9 @@ scan:
 
 // Expressions
 
-// expressionRule is ExpressionRule
-// PowerShell's takes a flag that ends a number at ? or : which only the branches of a ternary expression set
-// Ternary expressions are refused, so the flag is left out
+// expressionRule is ExpressionRule.
+// PowerShell's takes a flag that ends a number at ? or : which only the branches of a ternary expression set.
+// Ternary expressions are refused, so the flag is left out.
 func (p *parser) expressionRule() Expression {
 	oldMode := p.lx.mode
 	defer p.setMode(oldMode)
@@ -1574,14 +1575,14 @@ func (p *parser) binaryExpressionRule() Expression {
 		prec = newPrec
 	}
 	rhs := operands[len(operands)-1]
-	for i := len(ops) - 1; i >= 0; i-- {
-		rhs = binary(operands[i], ops[i], rhs)
+	for i, op := range slices.Backward(ops) {
+		rhs = binary(operands[i], op, rhs)
 	}
 	return rhs
 }
 
 func binary(lhs Expression, op *token, rhs Expression) Expression {
-	return &Binary{Extent: Extent{Start: lhs.Pos(), End: endOf(rhs)}, Operator: kindName(op), Left: lhs, Right: rhs}
+	return &Binary{Start: lhs.Pos(), End: endOf(rhs), Operator: kindName(op), Left: lhs, Right: rhs}
 }
 
 func (p *parser) arrayLiteralRule(endTernary bool) Expression {
@@ -1604,7 +1605,7 @@ func (p *parser) arrayLiteralRule(endTernary bool) Expression {
 		values = append(values, last)
 		comma = p.peekToken()
 	}
-	return &ArrayLiteral{Extent: Extent{Start: values[0].Pos(), End: endOf(last)}, Elements: values}
+	return &ArrayLiteral{Start: values[0].Pos(), End: endOf(last), Elements: values}
 }
 
 func (p *parser) unaryExpressionRule(endTernary bool) Expression {
@@ -1631,9 +1632,9 @@ func (p *parser) unaryExpressionRule(endTernary bool) Expression {
 			p.fail(t, "missing an expression after "+t.text)
 		}
 		if t.kind == tokComma {
-			expr = &ArrayLiteral{Extent: Extent{Start: t.pos, End: endOf(child)}, Elements: []Expression{child}}
+			expr = &ArrayLiteral{Start: t.pos, End: endOf(child), Elements: []Expression{child}}
 		} else {
-			expr = &Unary{Extent: Extent{Start: t.pos, End: endOf(child)}, Operator: kindName(t), Child: child}
+			expr = &Unary{Start: t.pos, End: endOf(child), Operator: kindName(t), Child: child}
 		}
 	case t.kind == tokLBracket:
 		attrs := p.attributeListRule(true)
@@ -1652,7 +1653,7 @@ func (p *parser) unaryExpressionRule(endTernary bool) Expression {
 			if child == nil {
 				p.fail(t, "an attribute must be followed by an expression")
 			}
-			expr = &AttributedExpression{Extent: Extent{Start: attr.Start, End: endOf(child)}, Attribute: attr, Child: child}
+			expr = &AttributedExpression{Start: attr.Start, End: endOf(child), Attribute: attr, Child: child}
 		} else {
 			tc := last.(*TypeConstraint)
 			var mat *token
@@ -1663,7 +1664,7 @@ func (p *parser) unaryExpressionRule(endTernary bool) Expression {
 				expr = p.checkPostPrimaryExpressionOperators(mat, &TypeExpression{Extent: tc.Extent, Type: tc.TypeName})
 			} else if t := p.peekToken(); t.kind != tokNewLine && t.kind != tokComma {
 				if child := p.unaryExpressionRule(true); child != nil {
-					expr = &Convert{Extent: Extent{Start: tc.Start, End: endOf(child)}, Type: tc, Child: child}
+					expr = &Convert{Start: tc.Start, End: endOf(child), Type: tc, Child: child}
 				}
 			}
 			if expr == nil {
@@ -1673,9 +1674,9 @@ func (p *parser) unaryExpressionRule(endTernary bool) Expression {
 		for i := len(attrs) - 2; i >= 0; i-- {
 			switch a := attrs[i].(type) {
 			case *TypeConstraint:
-				expr = &Convert{Extent: Extent{Start: a.Start, End: endOf(expr)}, Type: a, Child: expr}
+				expr = &Convert{Start: a.Start, End: endOf(expr), Type: a, Child: expr}
 			case *Attribute:
-				expr = &AttributedExpression{Extent: Extent{Start: a.Start, End: endOf(expr)}, Attribute: a, Child: expr}
+				expr = &AttributedExpression{Start: a.Start, End: endOf(expr), Attribute: a, Child: expr}
 			}
 		}
 	default:
@@ -1685,7 +1686,7 @@ func (p *parser) unaryExpressionRule(endTernary bool) Expression {
 		t := p.peekToken()
 		if t.kind == tokPlusPlus || t.kind == tokMinusMinus {
 			p.skipToken()
-			expr = &Unary{Extent: Extent{Start: expr.Pos(), End: t.endPos}, Operator: "Postfix" + kindName(t), Child: expr}
+			expr = &Unary{Start: expr.Pos(), End: t.endPos, Operator: "Postfix" + kindName(t), Child: expr}
 		}
 	}
 	return expr
@@ -1849,10 +1850,10 @@ func (p *parser) parenthesizedExpressionRule(lParen *token) Expression {
 	return &Paren{Extent: extent(lParen, rParen), Pipeline: pl}
 }
 
-// nestedExpressions parses the $variables and $(...) of an expandable string
-// The lexer cut each subexpression's text by counting parentheses
+// nestedExpressions parses the $variables and $(...) of an expandable string.
+// The lexer cut each subexpression's text by counting parentheses.
 // PowerShell parses one primary expression from that text and ignores the
-// rest, and so does this parser
+// rest, and so does this parser.
 func (p *parser) nestedExpressions(t *token) []Expression {
 	var out []Expression
 	for _, n := range t.nested {
@@ -1917,10 +1918,10 @@ func (p *parser) memberAccessRule(target Expression, op *token) Expression {
 			p.resync(rp)
 		}
 	}
-	return &Member{Extent: Extent{Start: target.Pos(), End: endOf(member)}, Target: target, Member: member, Static: static}
+	return &Member{Start: target.Pos(), End: endOf(member), Target: target, Member: member, Static: static}
 }
 
-// genericMethodArgumentsRule reads the [T] of $x.Method[T](...), which is new in PowerShell 7.3
+// genericMethodArgumentsRule reads the [T] of $x.Method[T](...), which is new in PowerShell 7.3.
 // It reports whether type arguments were read and whether a ] closed them.
 func (p *parser) genericMethodArgumentsRule(rp int) (bool, bool) {
 	lBracket := p.nextToken()
@@ -2006,5 +2007,5 @@ func (p *parser) elementAccessRule(target Expression, lBracket *token) Expressio
 	if rBracket.kind != tokRBracket {
 		p.fail(rBracket, "missing ] after an index")
 	}
-	return &Index{Extent: Extent{Start: target.Pos(), End: rBracket.endPos}, Target: target, Index: index}
+	return &Index{Start: target.Pos(), End: rBracket.endPos, Target: target, Index: index}
 }

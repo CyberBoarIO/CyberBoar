@@ -9,7 +9,7 @@ import (
 )
 
 // On Windows, ~user is a run-time directory even when the OS knows the user:
-// Git Bash's idea of that home may differ
+// Git Bash's idea of that home may differ.
 func TestWindowsOtherUserHomeIsUnknown(t *testing.T) {
 	u, err := user.Current()
 	if err != nil || u.HomeDir == "" {
@@ -122,7 +122,7 @@ func TestGitBashNamesRoundTrip(t *testing.T) {
 		if got != want {
 			t.Errorf("gitBashNames(%q) = %q, want %q", in, got, want)
 		}
-		for _, n := range strings.Split(got, "/") {
+		for n := range strings.SplitSeq(got, "/") {
 			if back := gitBashView(n); gitBashNames(back) != n {
 				t.Errorf("gitBashView(%q) = %q does not map back", n, back)
 			}

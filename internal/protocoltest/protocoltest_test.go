@@ -26,7 +26,7 @@ import (
 	"cyberboar.dev/cyberboar/pkg/endpointauth"
 )
 
-// The golden event batches in testdata/protocol/events are accepted or rejected as their names say
+// The golden event batches in testdata/protocol/events are accepted or rejected as their names say.
 func TestGoldenBatches(t *testing.T) {
 	files, _ := filepath.Glob("../../testdata/protocol/events/*.json")
 	if len(files) == 0 {
@@ -51,7 +51,7 @@ func TestGoldenBatches(t *testing.T) {
 
 // The golden requests in testdata/protocol/auth get the verdicts their
 // names give from this console's checks (docs/protocol, "Golden files"),
-// with the client certificate from the golden renewal answer
+// with the client certificate from the golden renewal answer.
 func TestGoldenRequests(t *testing.T) {
 	const dir = "../../testdata/protocol/auth/"
 	c := newConsole(t, "", nil)
@@ -108,7 +108,7 @@ func TestGoldenRequests(t *testing.T) {
 	}
 }
 
-// Policy assignment and revocation can run while requests are being checked or answered
+// Policy assignment and revocation can run while requests are being checked or answered.
 func TestConcurrentEndpointUpdates(t *testing.T) {
 	for _, mode := range []string{"authenticate-assign", "authenticate-revoke", "enroll-assign"} {
 		t.Run(mode, func(t *testing.T) {

@@ -1,6 +1,8 @@
 package shell
 
 import (
+	"errors"
+	"io/fs"
 	"path"
 	"slices"
 	"strings"
@@ -9,18 +11,22 @@ import (
 )
 
 // dir is the working directory a statement runs in: an absolute path (not
-// cleaned, so symlinks resolve like the kernel's) or unknown
+// cleaned, so symlinks resolve like the kernel's) or unknown.
 type dir struct {
 	path  string
 	known bool
 	// posix is the directory in Git Bash's own form when it was reached
-	// through one of its mounts (/tmp); "" when that is path (Windows only)
+	// through one of its mounts (/tmp); "" when that is path (Windows only).
 	posix string
+	// alt is the other directory the shell may be in, when a cd's ".."
+	// left a symbolic link: path is the shell's logical reading, alt the
+	// kernel's (POSIX only).
+	alt string
 }
 
 var unknownDir = dir{}
 
-// either is the directory after one of two paths ran: known only if both agree
+// either is the directory after one of two paths ran: known only if both agree.
 func either(a, b dir) dir {
 	if a == b {
 		return a
@@ -29,7 +35,7 @@ func either(a, b dir) dir {
 }
 
 // cwdPass records the directory every statement runs in, following literal
-// cd/pushd with the shell's scoping. Anything uncertain becomes unknown
+// cd/pushd with the shell's scoping. Anything uncertain becomes unknown.
 type cwdPass struct {
 	a       *analyzer
 	of      map[*syntax.Stmt]dir
@@ -69,7 +75,7 @@ func (a *analyzer) newCwdPass(f *syntax.File) *cwdPass {
 	return p
 }
 
-// changesDir reports a cd, pushd or popd anywhere in n
+// changesDir reports a cd, pushd or popd anywhere in n.
 func changesDir(n syntax.Node) bool {
 	found := false
 	syntax.Walk(n, func(x syntax.Node) bool {
@@ -88,7 +94,7 @@ func changesDir(n syntax.Node) bool {
 
 // outcome is where a statement leaves the shell: ok if it succeeded (what the
 // next command of an && chain starts in), any whatever happened (what the next
-// statement after ; starts in; a cd may fail)
+// statement after ; starts in; a cd may fail).
 type outcome struct {
 	ok, any dir
 }
@@ -103,7 +109,7 @@ func (p *cwdPass) list(stmts []*syntax.Stmt, d dir) outcome {
 	return o
 }
 
-// stmt records d for st and everything nested in it
+// stmt records d for st and everything nested in it.
 func (p *cwdPass) stmt(st *syntax.Stmt, d dir) outcome {
 	p.of[st] = d
 	p.a.vars = p.a.varsAt[st]
@@ -190,7 +196,7 @@ func (p *cwdPass) ifClause(c *syntax.IfClause, d dir) outcome {
 }
 
 // loop runs body once; if it changes the directory, later iterations start
-// elsewhere, so the body is recorded again with an unknown directory
+// elsewhere, so the body is recorded again with an unknown directory.
 func (p *cwdPass) loop(d dir, body func(dir) dir) outcome {
 	if after := body(d); after != d {
 		body(unknownDir)
@@ -200,7 +206,7 @@ func (p *cwdPass) loop(d dir, body func(dir) dir) outcome {
 }
 
 // nested records d for statements inside substitutions in n; they run in
-// subshells, so they don't change d
+// subshells, so they don't change d.
 func (p *cwdPass) nested(n syntax.Node, d dir) {
 	if n == nil {
 		return
@@ -218,7 +224,7 @@ func (p *cwdPass) nested(n syntax.Node, d dir) {
 	})
 }
 
-// call returns where a simple command leaves the shell
+// call returns where a simple command leaves the shell.
 func (p *cwdPass) call(c *syntax.CallExpr, d dir) outcome {
 	u, err := p.a.unwrapAll(p.a.normalize(p.a.words(c.Args)), 0)
 	if err != nil {
@@ -232,10 +238,8 @@ func (p *cwdPass) call(c *syntax.CallExpr, d dir) outcome {
 		if len(l) == 0 || l[0].Kind != Lit {
 			continue
 		}
-		for _, body := range p.a.aliasBodies(l[0].Text) {
-			if mayChangeDir(body) {
-				return same(unknownDir)
-			}
+		if slices.ContainsFunc(p.a.aliasBodies(l[0].Text), mayChangeDir) {
+			return same(unknownDir)
 		}
 	}
 	switch name := inner[0].Text; {
@@ -253,12 +257,12 @@ func (p *cwdPass) call(c *syntax.CallExpr, d dir) outcome {
 }
 
 // mayChangeDir reports code that may change directory (eval, an alias):
-// any mention of cd, pushd or popd counts
+// any mention of cd, pushd or popd counts.
 func mayChangeDir(code string) bool {
 	return strings.Contains(code, "cd") || strings.Contains(code, "pushd") || strings.Contains(code, "popd")
 }
 
-// cd returns the directory after `cd ARGS`
+// cd returns the directory after `cd ARGS`.
 func (p *cwdPass) cd(args []Elem, d dir) dir {
 	for len(args) > 0 && args[0].Kind == Lit && strings.HasPrefix(args[0].Text, "-") && args[0].Text != "-" {
 		if args[0].Text == "--" {
@@ -283,17 +287,69 @@ func (p *cwdPass) cd(args []Elem, d dir) dir {
 		}
 		return p.a.winCd(t.Text, d)
 	case path.IsAbs(t.Text):
-		return dir{path: t.Text, known: true}
+		return p.a.posixCd(t.Text, dir{})
 	case p.a.cdUnsure && !startsDot(t.Text):
 		return unknownDir // CDPATH or cdable_vars may send it elsewhere
 	case !d.known:
 		return unknownDir
 	default:
-		return dir{path: d.path + "/" + t.Text, known: true}
+		return p.a.posixCd(t.Text, d)
 	}
 }
 
-// startsDot reports a cd argument bash never looks up in CDPATH
+// posixCd returns the directory `cd to` moves to from d (zero for an
+// absolute to). Shells apply ".." to the path as written (cd -L), so that
+// link/.. is the directory holding the link, where the kernel goes to the
+// target's parent. That is also where cd -P, set -P or zsh's chase_links
+// go, and bash when the logical directory doesn't exist, so where a ".."
+// leaves a link both readings are kept.
+func (a *analyzer) posixCd(to string, d dir) dir {
+	full := to
+	next := dir{known: true}
+	if !path.IsAbs(to) {
+		full = d.path + "/" + to
+		if d.alt != "" {
+			next.alt = d.alt + "/" + to
+		}
+	}
+	if !hasDotDot(to) {
+		next.path = full
+		return next
+	}
+	if next.alt != "" {
+		return unknownDir // a third reading; not followed
+	}
+	next.path = path.Clean(full)
+	if a.dotDotLeavesLink(full) {
+		next.alt = full
+	}
+	return next
+}
+
+// dotDotLeavesLink reports a ".." in the absolute path p that follows a
+// symbolic link, or a name that can't be checked.
+func (a *analyzer) dotDotLeavesLink(p string) bool {
+	cur := "/"
+	for c := range strings.SplitSeq(p, "/") {
+		switch c {
+		case "", ".":
+		case "..":
+			if cur == "/" {
+				continue
+			}
+			fi, err := a.fs.Lstat(cur)
+			if err != nil && !errors.Is(err, fs.ErrNotExist) || err == nil && fi.Mode()&fs.ModeSymlink != 0 {
+				return true
+			}
+			cur = path.Dir(cur)
+		default:
+			cur = joinDir(cur, c)
+		}
+	}
+	return false
+}
+
+// startsDot reports a cd argument bash never looks up in CDPATH.
 func startsDot(s string) bool {
 	return s == "." || s == ".." || strings.HasPrefix(s, "./") || strings.HasPrefix(s, "../")
 }
@@ -303,7 +359,7 @@ func litIndex(args []Elem, word string) int {
 }
 
 // aliasBodies returns the bodies of the aliases called name, in order; none
-// while name's own body is being analyzed
+// while name's own body is being analyzed.
 func (a *analyzer) aliasBodies(name string) []string {
 	if a.expanding[name] {
 		return nil
@@ -319,7 +375,7 @@ func (a *analyzer) aliasBodies(name string) []string {
 }
 
 // shoptOption notes a shopt option that changes what globs match or where
-// cd goes. One known only at run time may be any of them
+// cd goes. One known only at run time may be any of them.
 func (a *analyzer) shoptOption(o Elem) {
 	switch {
 	case o.Kind != Lit:
@@ -337,14 +393,14 @@ func (a *analyzer) shoptOption(o Elem) {
 	}
 }
 
-// mayChangeShell notes code that may set any variable or shell option
+// mayChangeShell notes code that may set any variable or shell option.
 func (a *analyzer) mayChangeShell() {
 	a.sawHome, a.sawCd = true, true
 	a.sawGlobs = globOpts{true, true, true}
 	a.sawLastpipe = true
 }
 
-// setsVars are commands that may assign a variable named by an argument
+// setsVars are commands that may assign a variable named by an argument.
 var setsVars = set("read", "readarray", "mapfile", "export", "declare", "typeset", "local",
 	"readonly", "unset", "getopts", "let", "source", ".", "eval", "shopt")
 
@@ -352,7 +408,7 @@ var setsVars = set("read", "readarray", "mapfile", "export", "declare", "typeset
 // names (sawCd: CDPATH, cdable_vars) or what globs match (GLOBIGNORE,
 // BASHOPTS). It over-approximates: any literal mentioning one of them other
 // than a plain read of $HOME counts, and so does a run-time word given to a
-// command that assigns variables
+// command that assigns variables.
 func (a *analyzer) scanEnvChanges(f *syntax.File) {
 	reads := map[*syntax.Lit]bool{}
 	syntax.Walk(f, func(n syntax.Node) bool {
@@ -422,7 +478,7 @@ func (a *analyzer) scanEnvChanges(f *syntax.File) {
 	})
 }
 
-// isQuotedLit reports a word made only of literal and single-quoted parts
+// isQuotedLit reports a word made only of literal and single-quoted parts.
 func isQuotedLit(w *syntax.Word) bool {
 	for _, p := range w.Parts {
 		switch p.(type) {

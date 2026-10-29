@@ -32,13 +32,13 @@ import (
 	"cyberboar.dev/cyberboar/pkg/endpointauth"
 )
 
-// line uses the Unix epoch so fuzz seeds remain reproducible
+// line uses the Unix epoch so fuzz seeds remain reproducible.
 func line(i int, decision string) string {
 	timestamp := time.Unix(int64(i%60), 0).UTC().Format(time.RFC3339)
 	return fmt.Sprintf(`{"time":%q,"agent":"claude-code","decision":%q,"rule":"r%d","reason":"x","durationMs":1}`, timestamp, decision, i) + "\n"
 }
 
-// console records accepted batches; fail makes it answer 503
+// console records accepted batches; fail makes it answer 503.
 type console struct {
 	mu      sync.Mutex
 	batches []audit.Batch
@@ -108,7 +108,7 @@ func setup(t *testing.T) (*console, Options) {
 }
 
 // client is httpsclient.New(tc), which must succeed. Enrolled endpoints wrap it
-// to authenticate (package enroll); this package's tests don't need that
+// to authenticate (package enroll); this package's tests don't need that.
 func client(t *testing.T, tc httpsclient.TLS) *http.Client {
 	t.Helper()
 	c, err := httpsclient.New(tc)
@@ -233,7 +233,7 @@ func TestTruncatedLogStartsOver(t *testing.T) {
 }
 
 // A rotated log that has already grown past the saved offset is still new:
-// its first lines must be sent, not skipped
+// its first lines must be sent, not skipped.
 func TestReplacedLogStartsOver(t *testing.T) {
 	c, o := setup(t)
 	appendTo(t, o.AuditPath, line(1, "deny"))
@@ -250,7 +250,7 @@ func TestReplacedLogStartsOver(t *testing.T) {
 
 // A run that finds the log rotated reports it, since lines the old log got
 // after the last run were never sent. It reports it once, even when the new
-// log has nothing to send yet
+// log has nothing to send yet.
 func TestRotationIsReported(t *testing.T) {
 	c, o := setup(t)
 	appendTo(t, o.AuditPath, line(1, "deny"))
@@ -286,7 +286,7 @@ func TestRotationIsReported(t *testing.T) {
 	}
 }
 
-// Saved offsets require a complete log fingerprint before any events are sent
+// Saved offsets require a complete log fingerprint before any events are sent.
 func TestOffsetRequiresHead(t *testing.T) {
 	for _, tc := range []struct {
 		name, head string
@@ -346,7 +346,7 @@ func TestUnterminatedOverlongLineWaits(t *testing.T) {
 
 // The hook can still be writing the last line when ship reads it. When the
 // write completes while the batch before it is being sent, the next batch
-// must read the whole line from its start, not the rest of it as a line of its own
+// must read the whole line from its start, not the rest of it as a line of its own.
 func TestLineCompletedDuringSendIsShipped(t *testing.T) {
 	overlong := `{"reason":"` + strings.Repeat("x", 2*audit.MaxLineBytes) + `"}` + "\n"
 	for _, tc := range []struct {
@@ -412,7 +412,7 @@ func TestRedirectIsNotFollowed(t *testing.T) {
 	}
 }
 
-// tls12Server accepts anything, but speaks at most TLS 1.2
+// tls12Server accepts anything, but speaks at most TLS 1.2.
 func tls12Server(t *testing.T) *httptest.Server {
 	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(202) }))
 	srv.TLS = &tls.Config{MaxVersion: tls.VersionTLS12}
@@ -421,7 +421,7 @@ func tls12Server(t *testing.T) *httptest.Server {
 	return srv
 }
 
-// otherCA writes a self-signed CA certificate that has nothing to do with the test servers
+// otherCA writes a self-signed CA certificate that has nothing to do with the test servers.
 func otherCA(t *testing.T) string {
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -439,8 +439,8 @@ func otherCA(t *testing.T) string {
 	return path
 }
 
-// Nothing is sent without TLS 1.3 to a verified server
-// Every failure keeps the events for the next run
+// Nothing is sent without TLS 1.3 to a verified server.
+// Every failure keeps the events for the next run.
 func TestTransportFailsClosed(t *testing.T) {
 	plain := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(202) }))
 	defer plain.Close()
@@ -478,7 +478,7 @@ func TestTransportFailsClosed(t *testing.T) {
 	}
 }
 
-// --insecure-skip-verify still encrypts, and still refuses TLS 1.2
+// --insecure-skip-verify still encrypts, and still refuses TLS 1.2.
 func TestSkipVerify(t *testing.T) {
 	c, o := setup(t)
 	appendTo(t, o.AuditPath, line(1, "deny"))
@@ -528,7 +528,7 @@ func TestConcurrentRunIsRefused(t *testing.T) {
 
 // A console that is overloaded says when to come back; the endpoint is told,
 // within limits. A date is read against the caller's clock, which here is
-// years away from the real one
+// years away from the real one.
 func TestRetryAfter(t *testing.T) {
 	now := time.Now().UTC().AddDate(5, 0, 0).Truncate(time.Second)
 	for _, tc := range []struct {

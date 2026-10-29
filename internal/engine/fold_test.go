@@ -19,7 +19,7 @@ import (
 // a name as written matches it in the engine too, for bracket expressions
 // that case folding changes. File patterns are doublestar globs, MCP and
 // command patterns path.Match globs, and each is checked against every
-// printable ASCII character and a few letters with unusual case mappings
+// printable ASCII character and a few letters with unusual case mappings.
 func TestFoldingNeverNarrows(t *testing.T) {
 	classes := []string{
 		"[A-z]", "[Z-a]", "[!e]", "[^e]", "[!a-z]", "[^A-Z]", "[a-zA-Z]",
@@ -62,7 +62,7 @@ func TestFoldingNeverNarrows(t *testing.T) {
 	}
 }
 
-// compileRule compiles a policy with one rule: pattern in section's kind list
+// compileRule compiles a policy with one rule: pattern in section's kind list.
 func compileRule(t *testing.T, section, kind, pattern string) *engine.Compiled {
 	t.Helper()
 	doc, err := json.Marshal(map[string]any{
@@ -104,7 +104,7 @@ func describe(a engine.Action) string {
 	}
 }
 
-// shellQuote quotes s as one shell word
+// shellQuote quotes s as one shell word.
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }

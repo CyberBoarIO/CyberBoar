@@ -136,7 +136,7 @@ func TestTruncateKeepsUTF8(t *testing.T) {
 }
 
 // The field name is part of the protocol: the golden batch in
-// testdata/protocol carries it as consoles will receive it
+// testdata/protocol carries it as consoles will receive it.
 func TestActionsOmittedIsTheProtocolName(t *testing.T) {
 	data, err := os.ReadFile("../../testdata/protocol/events/accept-actions-omitted.json")
 	if err != nil {

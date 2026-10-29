@@ -7,14 +7,14 @@ import "strings"
 
 // version is a parsed version: the numeric core and the pre-release
 // identifiers, each as written (digits only, no leading zeros, in the numeric
-// ones). Build metadata takes no part in precedence and is dropped
+// ones). Build metadata takes no part in precedence and is dropped.
 type version struct {
 	core [3]string
 	pre  []string
 }
 
 // parse reads s, with or without a leading "v". It reports false for
-// anything that isn't a semantic version
+// anything that isn't a semantic version.
 func parse(s string) (version, bool) {
 	s = strings.TrimPrefix(s, "v")
 	if i := strings.IndexByte(s, '+'); i >= 0 {
@@ -45,7 +45,7 @@ func parse(s string) (version, bool) {
 }
 
 // identifiers reports whether s is a dot-separated list of non-empty
-// identifiers of ASCII letters, digits and hyphens
+// identifiers of ASCII letters, digits and hyphens.
 func identifiers(s string, pre bool) bool {
 	for id := range strings.SplitSeq(s, ".") {
 		if id == "" {
@@ -69,7 +69,7 @@ func identifiers(s string, pre bool) bool {
 	return true
 }
 
-// numeric reports whether s is a number without leading zeros
+// numeric reports whether s is a number without leading zeros.
 func numeric(s string) bool {
 	if s == "" || (len(s) > 1 && s[0] == '0') {
 		return false
@@ -82,7 +82,7 @@ func numeric(s string) bool {
 	return true
 }
 
-// compareNumbers compares two numbers without leading zeros, of any length
+// compareNumbers compares two numbers without leading zeros, of any length.
 func compareNumbers(a, b string) int {
 	if len(a) != len(b) {
 		if len(a) < len(b) {
@@ -93,7 +93,7 @@ func compareNumbers(a, b string) int {
 	return strings.Compare(a, b)
 }
 
-// compare orders a and b by semantic version precedence
+// compare orders a and b by semantic version precedence.
 func compare(a, b version) int {
 	for i := range a.core {
 		if c := compareNumbers(a.core[i], b.core[i]); c != 0 {
@@ -136,7 +136,7 @@ func compare(a, b version) int {
 	return 0
 }
 
-// Valid reports whether s is a semantic version, with or without a leading "v"
+// Valid reports whether s is a semantic version, with or without a leading "v".
 func Valid(s string) bool {
 	_, ok := parse(s)
 	return ok
@@ -144,7 +144,7 @@ func Valid(s string) bool {
 
 // AtLeast reports whether version is minimum or a later one. A version that
 // doesn't parse, such as a development build's "dev", is never at least
-// anything: a check that can't place a binary doesn't let it through
+// anything: a check that can't place a binary doesn't let it through.
 func AtLeast(version, minimum string) bool {
 	v, ok := parse(version)
 	if !ok {

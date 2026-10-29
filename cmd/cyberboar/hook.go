@@ -18,7 +18,7 @@ import (
 
 // runHook must fail closed on everything, flag errors included, because any
 // exit code other than 2 lets Claude Code run the tool call. Codex is the
-// exception: its deny is the JSON answer with exit 0 (codex.Adapter.Respond)
+// exception: its deny is the JSON answer with exit 0 (codex.Adapter.Respond).
 func runHook(h host, fs *flag.FlagSet, args []string, stdin io.Reader, stdout, stderr io.Writer) (code int) {
 	// Read before parsing, which a flag error stops
 	forCodex := agentArg(args) == "codex"
@@ -114,7 +114,7 @@ func runHook(h host, fs *flag.FlagSet, args []string, stdin io.Reader, stdout, s
 }
 
 // agentArg returns the --agent value as the flag package will read it, the
-// last one given, without parsing the other flags
+// last one given, without parsing the other flags.
 func agentArg(args []string) string {
 	agent := ""
 	for i := 0; i < len(args); i++ {

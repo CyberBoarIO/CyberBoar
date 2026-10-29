@@ -18,7 +18,7 @@ import (
 
 const baseline = "../../examples/baseline.yaml"
 
-// The advanced baseline enables the session tripwire
+// The advanced baseline enables the session tripwire.
 const advancedBaseline = "../../examples/advanced-baseline.yaml"
 
 func testEnv(k string) string {
@@ -30,7 +30,7 @@ func call(t *testing.T, stdin string, args ...string) (code int, stdout, stderr 
 	return callAt(t, time.Now, stdin, args...)
 }
 
-// callAt is call with the clock the commands read given by now
+// callAt is call with the clock the commands read given by now.
 func callAt(t *testing.T, now func() time.Time, stdin string, args ...string) (code int, stdout, stderr string) {
 	t.Helper()
 	var out, errb bytes.Buffer
@@ -57,7 +57,7 @@ func TestHookDeniesAndStaysSilent(t *testing.T) {
 	}
 }
 
-// Misconfiguration must deny with exit 2: any other exit code lets the call run
+// Misconfiguration must deny with exit 2: any other exit code lets the call run.
 func TestHookMisconfigurationDenies(t *testing.T) {
 	for _, args := range [][]string{
 		{"hook", "--no-such-flag"},
@@ -116,13 +116,13 @@ func TestAgentArg(t *testing.T) {
 	}
 }
 
-// panicWriter is an output whose every write panics
+// panicWriter is an output whose every write panics.
 type panicWriter struct{}
 
 func (panicWriter) Write([]byte) (int, error) { panic("write to a closed pipe") }
 
-// When writing the answer panics, the deny goes to stderr alone, with exit 2
-// Writing it to the same output again would panic once more
+// When writing the answer panics, the deny goes to stderr alone, with exit 2.
+// Writing it to the same output again would panic once more.
 func TestHookAnswerWritePanics(t *testing.T) {
 	for _, input := range []string{catEnv, lsSrc} {
 		var errb bytes.Buffer
@@ -245,7 +245,7 @@ func TestExplainVerboseAliases(t *testing.T) {
 	}
 }
 
-// The exit code of the real process is what Claude Code sees
+// The exit code of the real process is what Claude Code sees.
 func TestBinaryExitCodes(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds the binary")
@@ -338,7 +338,7 @@ func TestUnlock(t *testing.T) {
 
 // The agent's environment can come from the project it opened, so the hook
 // takes none of its configuration from it: not the policy or its key, not the
-// audit log, not the state directory, and unlock agrees with the hook about the state
+// audit log, not the state directory, and unlock agrees with the hook about the state.
 func TestHookIgnoresEnvironment(t *testing.T) {
 	state := t.TempDir()
 	env := func(k string) string {
@@ -369,7 +369,7 @@ func TestHookIgnoresEnvironment(t *testing.T) {
 	}
 }
 
-// A relative --state could point anywhere the agent's cwd leads: deny
+// A relative --state could point anywhere the agent's cwd leads: deny.
 func TestHookRelativeStateDenies(t *testing.T) {
 	if code, out, _ := call(t, lsSrc, "hook", "--policy", baseline, "--state", "rel/dir"); code != 2 || !strings.Contains(out, "not an absolute path") {
 		t.Fatalf("exit %d %q", code, out)
@@ -406,7 +406,7 @@ type brokenWriter struct{}
 func (brokenWriter) Write([]byte) (int, error) { return 0, os.ErrClosed }
 
 // An answer the agent never reads must not exit 0: for an ask, and for
-// Cursor's deny, that would let the call run
+// Cursor's deny, that would let the call run.
 func TestHookUnwritableAnswerDenies(t *testing.T) {
 	gitPush := `{"hook_event_name":"PreToolUse","tool_name":"Bash","cwd":"/work/repo","tool_input":{"command":"git push"}}`
 	cursorEnv := `{"hook_event_name":"beforeShellExecution","command":"cat .env","workspace_roots":["/work/repo"]}`
@@ -431,7 +431,7 @@ func TestHookUnwritableAnswerDenies(t *testing.T) {
 }
 
 // A version from -ldflags wins; without one, the module version Go recorded
-// stands in for "dev" unless there is none
+// stands in for "dev" unless there is none.
 func TestBuildVersion(t *testing.T) {
 	mod := func(v string) *debug.BuildInfo {
 		return &debug.BuildInfo{Main: debug.Module{Path: "cyberboar.dev/cyberboar", Version: v}}

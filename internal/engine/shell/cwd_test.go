@@ -3,7 +3,7 @@ package shell
 import "testing"
 
 // Relative files stay uncertain after a construct that may change the parent
-// shell's directory, while ordinary pipelines and separate case arms keep it
+// shell's directory, while ordinary pipelines and separate case arms keep it.
 func TestCwdPipelineAndCaseScope(t *testing.T) {
 	for _, tc := range []struct {
 		name, src           string

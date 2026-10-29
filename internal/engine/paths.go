@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -13,11 +14,11 @@ import (
 	"cyberboar.dev/cyberboar/internal/winpath"
 )
 
-// maxSymlinks matches Linux's MAXSYMLINKS. More links than this are treated as a loop
+// maxSymlinks matches Linux's MAXSYMLINKS. More links than this are treated as a loop.
 const maxSymlinks = 40
 
 // absPath turns an action path into an absolute path WITHOUT cleaning it, so
-// resolvePath can apply ".." after symlinks the way the kernel does
+// resolvePath can apply ".." after symlinks the way the kernel does.
 func absPath(p, cwd, home string) (string, error) {
 	switch {
 	case p == "~":
@@ -33,7 +34,7 @@ func absPath(p, cwd, home string) (string, error) {
 	}
 }
 
-// shortPathMax is the smallest PATH_MAX of the systems the hook runs on (macOS)
+// shortPathMax is the smallest PATH_MAX of the systems the hook runs on (macOS).
 const shortPathMax = 1024
 
 // nameTooLong reports whether looking up p failed because its last
@@ -41,7 +42,7 @@ const shortPathMax = 1024
 // name: a word such as a long sed script, which every command line word is
 // checked as. The path as a whole must be short, since a path over
 // PATH_MAX also fails this way, but a program can still reach the file by
-// a relative path from a directory along it
+// a relative path from a directory along it.
 func nameTooLong(p string, err error) bool {
 	return errors.Is(err, syscall.ENAMETOOLONG) && len(p) < shortPathMax
 }
@@ -50,15 +51,15 @@ func nameTooLong(p string, err error) bool {
 // components left to right and replaces a symlink by its target before it
 // applies any ".." that follows. Cleaning the path first would be wrong,
 // since for "link/../x" path.Clean yields the lexical parent, not the
-// parent of the link's target
+// parent of the link's target.
 //
 // Once a component does not exist, the rest is appended lexically, so the
-// target of a write that creates new files still resolves
+// target of a write that creates new files still resolves.
 //
 // On Windows the first component is the drive, ".." stops at the drive's
 // root, link targets are Windows paths, junctions are links too, and every
 // existing name is replaced by its long form, since it may be an 8.3 short
-// name, which need not contain "~" (fsutil file setshortname)
+// name, which need not contain "~" (fsutil file setshortname).
 func resolvePath(fsys osfs.FS, abs string) (string, error) {
 	dest, _, err := resolveLinks(fsys, abs)
 	return dest, err
@@ -68,7 +69,7 @@ func resolvePath(fsys osfs.FS, abs string) (string, error) {
 // with after each link it follows, which is the link's target joined with
 // the rest. The built-in rules check these paths, since a link to
 // /dev/stdin ends where the hook's own standard input is (/proc/self/fd/0,
-// then a pipe or /dev/null), not where the agent's is
+// then a pipe or /dev/null), not where the agent's is.
 func resolveLinks(fsys osfs.FS, abs string) (dest string, hops []string, err error) {
 	if !path.IsAbs(abs) {
 		return "", nil, fmt.Errorf("%q is not absolute", abs)
@@ -141,7 +142,7 @@ func resolveLinks(fsys osfs.FS, abs string) (dest string, hops []string, err err
 }
 
 // isLink reports whether fi may be a link to follow. Windows reports
-// junctions (mount points) as irregular files, not symlinks
+// junctions (mount points) as irregular files, not symlinks.
 func isLink(fsys osfs.FS, fi fs.FileInfo) bool {
 	m := fi.Mode()
 	return m&fs.ModeSymlink != 0 || fsys.Windows && m&fs.ModeIrregular != 0
@@ -151,13 +152,13 @@ func isLink(fsys osfs.FS, fi fs.FileInfo) bool {
 // #nosec G115 -- r < 0x80, so it fits in a byte
 func forbidden(r rune) bool { return r < 0x80 && winpath.Forbidden(byte(r)) }
 
-// isDriveRoot reports whether p is a Windows drive's root, /x
+// isDriveRoot reports whether p is a Windows drive's root, /x.
 func isDriveRoot(p string) bool {
 	_, rest, ok := osfs.SplitDrive(p)
 	return ok && rest == ""
 }
 
-// cleanPath is path.Clean, except that on Windows ".." stops at the drive's root, as it does at "/"
+// cleanPath is path.Clean, except that on Windows ".." stops at the drive's root, as it does at "/".
 func cleanPath(p string, windows bool) string {
 	if windows {
 		if drive, rest, ok := osfs.SplitDrive(p); ok {
@@ -167,7 +168,7 @@ func cleanPath(p string, windows bool) string {
 	return path.Clean(p)
 }
 
-// globEscape escapes doublestar metacharacters so a literal path (a home or workspace root) can be joined with a pattern
+// globEscape escapes doublestar metacharacters so a literal path (a home or workspace root) can be joined with a pattern.
 func globEscape(s string) string {
 	var b strings.Builder
 	for _, r := range s {
@@ -180,22 +181,16 @@ func globEscape(s string) string {
 }
 
 // isSameOrAncestor reports whether dir is p or one of p's ancestors, folded
-// (a case-insensitive filesystem makes /HOME/dev the home directory)
+// (a case-insensitive filesystem makes /HOME/dev the home directory).
 func isSameOrAncestor(dir, p string) bool {
 	dir, p = fold.String(dir), fold.String(p)
 	return dir == "/" || dir == p || strings.HasPrefix(p, dir+"/")
 }
 
-// appendUnique appends the values not already in list
+// appendUnique appends the values not already in list.
 func appendUnique(list []string, vs ...string) []string {
 	for _, v := range vs {
-		dup := false
-		for _, have := range list {
-			if have == v {
-				dup = true
-				break
-			}
-		}
+		dup := slices.Contains(list, v)
 		if !dup {
 			list = append(list, v)
 		}
@@ -204,7 +199,7 @@ func appendUnique(list []string, vs ...string) []string {
 }
 
 // repoRoot returns the git work tree that holds p, which is the nearest
-// directory at or above it with a .git entry, or p itself when there is none
+// directory at or above it with a .git entry, or p itself when there is none.
 func repoRoot(fsys osfs.FS, p string) string {
 	d, err := resolvePath(fsys, p)
 	if err != nil {
