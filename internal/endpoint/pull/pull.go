@@ -176,8 +176,8 @@ func install(out string, data, sig []byte, h sign.Header) (changed bool, err err
 }
 
 // installedSerial returns the serial of the policy installed at out, which
-// is the rollback floor. It is 0 when no signature is installed
-// An invalid signature file blocks installation because its serial is unknown
+// is the rollback floor. It is 0 when no signature is installed.
+// An invalid signature file blocks installation because its serial is unknown.
 func installedSerial(out string) (uint64, error) {
 	sig, err := sign.ReadSig(out)
 	switch {

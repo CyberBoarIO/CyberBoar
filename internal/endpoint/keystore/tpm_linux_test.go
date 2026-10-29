@@ -24,11 +24,11 @@ import (
 )
 
 // swtpm is a software TPM in a child process, reached over a Unix socket
-// that carries raw TPM commands
+// that carries raw TPM commands.
 type swtpm struct{ sock string }
 
-// startSWTPM starts a fresh software TPM
-// Without swtpm the test is skipped, except in CI, which installs it
+// startSWTPM starts a fresh software TPM.
+// Without swtpm the test is skipped, except in CI, which installs it.
 func startSWTPM(t *testing.T) *swtpm {
 	t.Helper()
 	bin, err := exec.LookPath("swtpm")
@@ -123,7 +123,7 @@ func TestAutoPrefersTPM(t *testing.T) {
 }
 
 // A TPM key works only in the TPM that made it, and only while that TPM
-// can be reached; neither failure falls back to anything
+// can be reached; neither failure falls back to anything.
 func TestTPMKeyStaysWithItsTPM(t *testing.T) {
 	a, b := startSWTPM(t), startSWTPM(t)
 	k, err := createWith(TPM, a.open)
@@ -145,7 +145,7 @@ func TestTPMKeyStaysWithItsTPM(t *testing.T) {
 	}
 }
 
-// tamper rewrites a TPM key file's ASN.1
+// tamper rewrites a TPM key file's ASN.1.
 func tamper(t *testing.T, keyFile []byte, f func(*tssKey)) []byte {
 	t.Helper()
 	b, _ := pem.Decode(keyFile)
@@ -161,7 +161,7 @@ func tamper(t *testing.T, keyFile []byte, f func(*tssKey)) []byte {
 	return pem.EncodeToMemory(&pem.Block{Type: pemTPM, Bytes: der})
 }
 
-// public rewrites the key's public area
+// public rewrites the key's public area.
 func public(t *testing.T, f func(*tpm2.TPMTPublic)) func(*tssKey) {
 	return func(tk *tssKey) {
 		b, err := tpm2.Unmarshal[tpm2.TPM2BPublic](tk.PubKey)
@@ -224,7 +224,7 @@ func TestTPMKeyFileRefused(t *testing.T) {
 }
 
 // A public area that passes every check but isn't the one the private area
-// was made with is caught by the TPM when it loads the key
+// was made with is caught by the TPM when it loads the key.
 func TestTPMChecksPrivateAgainstPublic(t *testing.T) {
 	tpm := startSWTPM(t)
 	k1, err := createWith(TPM, tpm.open)

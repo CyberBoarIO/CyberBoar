@@ -16,11 +16,11 @@ import (
 // number (names.go).
 
 // readArgOpts are the options of read that take an argument, and mapfileArgOpts
-// those of mapfile and readarray, where -t is a flag. unset takes none
+// those of mapfile and readarray, where -t is a flag. unset takes none.
 var readArgOpts = set("-a", "-d", "-i", "-n", "-N", "-p", "-t", "-u")
 var mapfileArgOpts = set("-c", "-C", "-d", "-n", "-O", "-s", "-u")
 
-// Why a declaration, an integer parameter or a name reference asks
+// Why a declaration, an integer parameter or a name reference asks.
 const (
 	integerWhat     = "an integer variable, whose value is evaluated as arithmetic"
 	nameRefWhat     = "a name reference, whose target is looked up on each use"
@@ -30,7 +30,7 @@ const (
 
 // hiddenCode records the constructs in f that evaluate a run-time value as code
 // or as a name: prompt expansion, indirect expansion, arithmetic on a name, and
-// a subscripted name given to test -v, printf -v, unset or read
+// a subscripted name given to test -v, printf -v, unset or read.
 func (a *analyzer) hiddenCode(f *syntax.File) {
 	safe := a.safeNames(f)
 	var whats []string
@@ -118,7 +118,7 @@ func (a *analyzer) hiddenCode(f *syntax.File) {
 // nameArgs records the name arguments of the commands that look a name up with
 // its subscript: a subscript is evaluated as arithmetic, and test or [ compare
 // their operands as integers. It also records the declarations that make a
-// name an integer or a name reference
+// name an integer or a name reference.
 func (a *analyzer) nameArgs(words []*syntax.Word, safe *nameSafety, add func(string)) {
 	if len(words) == 0 {
 		return
@@ -169,7 +169,7 @@ func (a *analyzer) nameArgs(words []*syntax.Word, safe *nameSafety, add func(str
 }
 
 // nameWord reports a name argument that could be a subscripted name: one with
-// a [ in it, or one only known at run time, which could be any name
+// a [ in it, or one only known at run time, which could be any name.
 func (a *analyzer) nameWord(w *syntax.Word, add func(string)) {
 	if s, ok := a.literalWord(w); !ok || strings.Contains(s, "[") {
 		add(subscriptedWhat)
@@ -179,7 +179,7 @@ func (a *analyzer) nameWord(w *syntax.Word, add func(string)) {
 // printName records the name that printf -v or print -v assigns. The option
 // can take the name in the next word (-v a[1]) or attached (-va[1]), and it can
 // sit in a cluster (-rv), so the options are read as writer reads them. A word
-// that could be an option but isn't literal could name anything
+// that could be an option but isn't literal could name anything.
 func (a *analyzer) printName(words []*syntax.Word, add func(string)) {
 	for i := 1; i < len(words); i++ {
 		s, ok := a.literalWord(words[i])
@@ -217,7 +217,7 @@ func (a *analyzer) printName(words []*syntax.Word, add func(string)) {
 
 // declWord checks an argument of declare, local, export and the like. A flag
 // -n makes a name reference and -i an integer. A name must be literal, since
-// a dynamic one could be any name, and a subscripted one is evaluated
+// a dynamic one could be any name, and a subscripted one is evaluated.
 func (a *analyzer) declWord(w *syntax.Word, add func(string)) {
 	if s, ok := a.literalWord(w); ok && strings.HasPrefix(s, "-") {
 		if strings.Contains(s, "n") {
@@ -234,7 +234,7 @@ func (a *analyzer) declWord(w *syntax.Word, add func(string)) {
 }
 
 // declName returns the name in a declaration argument, the text before its =
-// or the whole word without one. ok is false when that text is not literal
+// or the whole word without one. ok is false when that text is not literal.
 func (a *analyzer) declName(w *syntax.Word) (string, bool) {
 	if s, ok := a.literalWord(w); ok {
 		if i := strings.IndexByte(s, '='); i >= 0 {
@@ -257,7 +257,7 @@ func (a *analyzer) declName(w *syntax.Word) (string, bool) {
 	return prefix[:i], true
 }
 
-// numberWord reports whether w is absent or a literal number
+// numberWord reports whether w is absent or a literal number.
 func (a *analyzer) numberWord(w *syntax.Word) bool {
 	if w == nil {
 		return true
@@ -266,7 +266,7 @@ func (a *analyzer) numberWord(w *syntax.Word) bool {
 	return ok && plainNumber(s)
 }
 
-// arithTestOp reports whether a [[ ]] operator compares integers
+// arithTestOp reports whether a [[ ]] operator compares integers.
 func arithTestOp(op syntax.BinTestOperator) bool {
 	switch op {
 	case syntax.TsEql, syntax.TsNeq, syntax.TsLeq, syntax.TsGeq, syntax.TsLss, syntax.TsGtr:
@@ -277,7 +277,7 @@ func arithTestOp(op syntax.BinTestOperator) bool {
 
 // hasLiteralCode reports whether f holds code as text: $( or a backquote in a
 // literal or single-quoted word. Such text is code only once a value expands it
-// (as in y='$(cmd)'; : "${y@P}"), so it is what makes a hidden construct inline code
+// (as in y='$(cmd)'; : "${y@P}"), so it is what makes a hidden construct inline code.
 func hasLiteralCode(f *syntax.File) bool {
 	found := false
 	syntax.Walk(f, func(n syntax.Node) bool {
@@ -293,7 +293,7 @@ func hasLiteralCode(f *syntax.File) bool {
 	return found
 }
 
-// codeText reports whether s has $( or a backquote in it
+// codeText reports whether s has $( or a backquote in it.
 func codeText(s string) bool {
 	return strings.Contains(s, "$(") || strings.Contains(s, "`")
 }

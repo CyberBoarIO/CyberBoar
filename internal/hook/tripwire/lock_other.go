@@ -11,7 +11,7 @@ var errUnsupported = errors.New("the tripwire is not supported on this platform 
 
 // openFile always fails, because without file locks concurrent calls could
 // lose denials. Failing the open, not only the lock, makes Check fail on the
-// first call of a session too, so the hook denies every call from the start
+// first call of a session too, so the hook denies every call from the start.
 func openFile(string, int, os.FileMode) (*os.File, error) { return nil, errUnsupported }
 
 func lockShared(*os.File) error    { return errUnsupported }

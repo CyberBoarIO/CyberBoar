@@ -61,8 +61,9 @@ the command.
 These leave the meaning only known at run time:
 - variables;
 - a command name built at run time;
-- an alias defined on the command line (`Set-Alias`), which makes every later name
-  unknown;
+- an alias defined on the command line (`Set-Alias`): calls to that name are
+  unknown, and an alias whose name is only known at run time makes every command
+  name unknown;
 - a drive defined with `New-PSDrive`, which makes every drive path unknown.
 
 As for Bash, a deny or ask rule that such a command might match asks for confirmation

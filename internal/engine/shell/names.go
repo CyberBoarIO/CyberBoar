@@ -18,23 +18,23 @@ import (
 
 // nameWrite is one write of a name on the line: ok when the value it stores is
 // a number, an arithmetic result or a plain word, and deps are the names that
-// value reads
+// value reads.
 type nameWrite struct {
 	ok   bool
 	deps []string
 }
 
-// nameSafety tells which names on a line an arithmetic evaluation can read
+// nameSafety tells which names on a line an arithmetic evaluation can read.
 type nameSafety struct {
 	wild   bool                   // a write the analysis can't follow: no name is safe
 	writes map[string][]nameWrite // the writes of each name on the line
 	safe   map[string]bool        // the written names that are safe
 }
 
-// specialNumbers are the special parameters that always hold a number
+// specialNumbers are the special parameters that always hold a number.
 var specialNumbers = set("#", "?", "$", "!")
 
-// safeNames works out which names of f are safe to read in arithmetic
+// safeNames works out which names of f are safe to read in arithmetic.
 func (a *analyzer) safeNames(f *syntax.File) *nameSafety {
 	s := &nameSafety{writes: map[string][]nameWrite{}}
 	if a.persistent {
@@ -96,7 +96,7 @@ func (a *analyzer) safeNames(f *syntax.File) *nameSafety {
 	return s
 }
 
-// assign records the write of an assignment on the line
+// assign records the write of an assignment on the line.
 func (s *nameSafety) assign(a *analyzer, x *syntax.Assign) {
 	if x.Name == nil {
 		s.wild = true // declare "$v=…"
@@ -130,7 +130,7 @@ func (s *nameSafety) assign(a *analyzer, x *syntax.Assign) {
 }
 
 // loop records the writes of a for loop's variable: each item is a number or a
-// plain word. Without items the loop runs over the positional parameters
+// plain word. Without items the loop runs over the positional parameters.
 func (s *nameSafety) loop(a *analyzer, x *syntax.WordIter) {
 	name := x.Name.Value
 	if len(x.Items) == 0 {
@@ -158,7 +158,7 @@ func (s *nameSafety) add(name string, w nameWrite) {
 
 // settle works out which written names are safe. It starts from all of them
 // safe and drops any with a write that isn't, until nothing changes, so a name
-// that reads itself (n=$((n+1))) stays safe when its other writes are
+// that reads itself (n=$((n+1))) stays safe when its other writes are.
 func (s *nameSafety) settle() {
 	s.safe = map[string]bool{}
 	for name := range s.writes {
@@ -177,7 +177,7 @@ func (s *nameSafety) settle() {
 	}
 }
 
-// allSafe reports whether every name in names is safe
+// allSafe reports whether every name in names is safe.
 func (s *nameSafety) allSafe(names []string) bool {
 	for _, name := range names {
 		if s.wild {
@@ -191,7 +191,7 @@ func (s *nameSafety) allSafe(names []string) bool {
 }
 
 // arithSafe reports whether arithmetic on n reads only safe names. A nil n
-// (an omitted part of a C-style loop or substring) reads nothing
+// (an omitted part of a C-style loop or substring) reads nothing.
 func (s *nameSafety) arithSafe(n syntax.Node) bool {
 	if n == nil {
 		return true
@@ -202,7 +202,7 @@ func (s *nameSafety) arithSafe(n syntax.Node) bool {
 
 // readNames returns the names that arithmetic on n reads. ok is false when n
 // holds more than names, numbers and operators: a substitution, a positional
-// parameter, or a parameter with an operator or subscript
+// parameter, or a parameter with an operator or subscript.
 func readNames(n syntax.Node) (names []string, ok bool) {
 	ok = true
 	syntax.Walk(n, func(m syntax.Node) bool {
@@ -233,7 +233,7 @@ func readNames(n syntax.Node) (names []string, ok bool) {
 	return names, ok
 }
 
-// arithAssign reports whether an arithmetic operator assigns its left operand
+// arithAssign reports whether an arithmetic operator assigns its left operand.
 func arithAssign(op syntax.BinAritOperator) bool {
 	switch op {
 	case syntax.Assgn, syntax.AddAssgn, syntax.SubAssgn, syntax.MulAssgn, syntax.QuoAssgn,
@@ -245,7 +245,7 @@ func arithAssign(op syntax.BinAritOperator) bool {
 }
 
 // arithName returns the name that an assignment or increment in arithmetic
-// writes. ok is false for anything else, such as an element of an array
+// writes. ok is false for anything else, such as an element of an array.
 func arithName(e syntax.ArithmExpr) (string, bool) {
 	w, ok := e.(*syntax.Word)
 	if !ok {
@@ -256,7 +256,7 @@ func arithName(e syntax.ArithmExpr) (string, bool) {
 }
 
 // identsIn returns the names in arithmetic text: a letter or _, then letters,
-// digits or _
+// digits or _.
 func identsIn(s string) []string {
 	var names []string
 	for i := 0; i < len(s); {
@@ -274,7 +274,7 @@ func identsIn(s string) []string {
 	return names
 }
 
-// plainName reports whether s is a name: a letter or _, then letters, digits or _
+// plainName reports whether s is a name: a letter or _, then letters, digits or _.
 func plainName(s string) bool {
 	if s == "" || !identStart(s[0]) {
 		return false
@@ -288,7 +288,7 @@ func plainName(s string) bool {
 }
 
 // plainNumber reports whether s is an integer, optionally negative, or empty
-// (which arithmetic reads as 0)
+// (which arithmetic reads as 0).
 func plainNumber(s string) bool {
 	return strings.Trim(strings.TrimPrefix(s, "-"), "0123456789") == ""
 }

@@ -1,5 +1,5 @@
 // Package audit writes one JSON line per decision and defines
-// the events and batches an endpoint sends to a console (docs/protocol)
+// the events and batches an endpoint sends to a console (docs/protocol).
 package audit
 
 import (
@@ -16,11 +16,11 @@ import (
 	"unicode/utf8"
 )
 
-// maxField bounds free text (commands, paths) in an event
+// maxField bounds free text (commands, paths) in an event.
 const maxField = 4096
 
-// Event is one hook decision
-// Fields may be added but never renamed
+// Event is one hook decision.
+// Fields may be added but never renamed.
 type Event struct {
 	Time       string   `json:"time"` // RFC 3339, UTC
 	Agent      string   `json:"agent"`
@@ -40,11 +40,11 @@ type Event struct {
 	PolicyName string   `json:"policyName,omitempty"`
 	PolicyHash string   `json:"policySha256,omitempty"`
 	DurationMs float64  `json:"durationMs"`
-	// ActionsOmitted counts actions left out of Actions to keep the line within MaxLineBytes
+	// ActionsOmitted counts actions left out of Actions to keep the line within MaxLineBytes.
 	ActionsOmitted int `json:"actionsOmitted,omitempty"`
 }
 
-// Action is one engine action the tool call became
+// Action is one engine action the tool call became.
 type Action struct {
 	Tool    string `json:"tool"`
 	Command string `json:"command,omitempty"`
@@ -53,28 +53,28 @@ type Action struct {
 	MCPTool string `json:"mcpTool,omitempty"`
 }
 
-// Endpoint identifies the machine that sends events to the console
-// Add fields, never rename them
+// Endpoint identifies the machine that sends events to the console.
+// Add fields, never rename them.
 type Endpoint struct {
 	ID       string `json:"id"` // random UUID, lowercase, kept in a local state file
 	Hostname string `json:"hostname,omitempty"`
 	Version  string `json:"version"` // cyberboar version
 }
 
-// Batch is the body of the console's POST /api/v1/events
-// Fields a newer endpoint adds are kept
+// Batch is the body of the console's POST /api/v1/events.
+// Fields a newer endpoint adds are kept.
 type Batch struct {
 	Endpoint Endpoint          `json:"endpoint"`
 	Events   []json.RawMessage `json:"events"`
 }
 
-// MaxLineBytes bounds one audit line the console accepts
-// Truncate keeps the hook's lines well below it
+// MaxLineBytes bounds one audit line the console accepts.
+// Truncate keeps the hook's lines well below it.
 const MaxLineBytes = 64 << 10
 
 // ParseLine parses one audit line and checks what the console relies on: a
-// known decision, an RFC 3339 time and keys as CheckKeys requires
-// Unknown fields are ignored, so lines from newer versions still parse
+// known decision, an RFC 3339 time and keys as CheckKeys requires.
+// Unknown fields are ignored, so lines from newer versions still parse.
 func ParseLine(line []byte) (Event, error) {
 	var ev Event
 	if len(line) > MaxLineBytes {
@@ -92,7 +92,7 @@ func ParseLine(line []byte) (Event, error) {
 		return ev, fmt.Errorf("decision %q is not allow, ask or deny", ev.Decision)
 	}
 	if _, err := time.Parse(time.RFC3339Nano, ev.Time); err != nil {
-		return ev, fmt.Errorf("time: %v", err)
+		return ev, fmt.Errorf("time: %w", err)
 	}
 	return ev, nil
 }
@@ -125,7 +125,7 @@ func CheckKeys(data []byte, v any) error {
 var rawMessage = reflect.TypeFor[json.RawMessage]()
 
 // checkValue reads one value from dec
-// t is the Go type it decodes into, or nil when it has none
+// t is the Go type it decodes into, or nil when it has none.
 func checkValue(dec *json.Decoder, t reflect.Type, depth int) error {
 	tok, err := dec.Token()
 	if err != nil {
@@ -193,14 +193,14 @@ func checkValue(dec *json.Decoder, t reflect.Type, depth int) error {
 }
 
 // foldKey folds case at least as far as encoding/json does when it matches
-// keys to fields, so two keys it could confuse fold to the same string
+// keys to fields, so two keys it could confuse fold to the same string.
 func foldKey(s string) string { return strings.ToLower(strings.ToUpper(s)) }
 
-// Truncate shortens a free-text field to about maxField bytes
-// The cut is at a rune boundary and the result says how long the original was
+// Truncate shortens a free-text field to about maxField bytes.
+// The cut is at a rune boundary and the result says how long the original was.
 func Truncate(s string) string { return truncate(s, maxField) }
 
-// truncate cuts s to at most n bytes at a rune boundary and appends its original length
+// truncate cuts s to at most n bytes at a rune boundary and appends its original length.
 func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s
@@ -212,16 +212,16 @@ func truncate(s string, n int) string {
 	return s[:cut] + fmt.Sprintf("...(%d bytes)", len(s))
 }
 
-// maxWrite keeps a written line below MaxLineBytes with room to spare
+// maxWrite keeps a written line below MaxLineBytes with room to spare.
 const maxWrite = MaxLineBytes - 1024
 
-// Marshal returns ev as one JSON line, newline included, within MaxLineBytes
+// Marshal returns ev as one JSON line, newline included, within MaxLineBytes.
 // An event too large for one line first loses actions from the end, counted
-// in ActionsOmitted, and then has its free text cut short
-// It returns an error if the shortened line still exceeds MaxLineBytes
-// The console drops a line over MaxLineBytes
-// An agent controls how many actions a call has (an apply_patch naming thousands of files)
-// The size limit must not keep its denials out of the audit trail
+// in ActionsOmitted, and then has its free text cut short.
+// It returns an error if the shortened line still exceeds MaxLineBytes.
+// The console drops a line over MaxLineBytes.
+// An agent controls how many actions a call has (an apply_patch naming thousands of files).
+// The size limit must not keep its denials out of the audit trail.
 func Marshal(ev Event) ([]byte, error) {
 	line, err := json.Marshal(ev)
 	for err == nil && len(line) > maxWrite && len(ev.Actions) > 0 {
@@ -231,8 +231,8 @@ func Marshal(ev Event) ([]byte, error) {
 		line, err = json.Marshal(ev)
 	}
 	if err == nil && len(line) > maxWrite {
-		// JSON escaping can make a field up to six times its size
-		// Shorten free-text fields before checking the final line size
+		// JSON escaping can make a field up to six times its size.
+		// Shorten free-text fields before checking the final line size.
 		const n = 256
 		for _, f := range []*string{&ev.Agent, &ev.Version, &ev.Session, &ev.ToolUseID, &ev.AgentID, &ev.AgentType,
 			&ev.Mode, &ev.Cwd, &ev.Project, &ev.Tool, &ev.Rule, &ev.Reason, &ev.PolicyName, &ev.PolicyHash} {
@@ -249,8 +249,8 @@ func Marshal(ev Event) ([]byte, error) {
 	return append(line, '\n'), nil
 }
 
-// AppendFile appends ev as one line to path. A file and directory it creates are readable only by the owner
-// The line is written with a single call to Write on a file opened for append
+// AppendFile appends ev as one line to path. A file and directory it creates are readable only by the owner.
+// The line is written with a single call to Write on a file opened for append.
 func AppendFile(path string, ev Event) error {
 	line, err := Marshal(ev)
 	if err != nil {

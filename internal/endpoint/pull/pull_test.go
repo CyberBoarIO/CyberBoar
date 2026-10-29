@@ -367,8 +367,8 @@ func TestGoldenBundles(t *testing.T) {
 	}
 }
 
-// The rollback floor is zero only when no signature is installed
-// Invalid signatures block installation; interrupted installs can be completed
+// The rollback floor is zero only when no signature is installed.
+// Invalid signatures block installation; interrupted installs can be completed.
 func TestInstalledSerial(t *testing.T) {
 	priv := ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize))
 	pol := []byte("policy\n")
@@ -408,7 +408,7 @@ func TestInstalledSerial(t *testing.T) {
 	}
 }
 
-// bareSignature removes the headers from an otherwise valid signature
+// bareSignature removes the headers from an otherwise valid signature.
 func bareSignature(t *testing.T, priv ed25519.PrivateKey, name string, policy []byte) []byte {
 	t.Helper()
 	_, raw, err := sign.Parse([]byte(signAt(t, priv, name, policy, 1)))
@@ -419,7 +419,7 @@ func bareSignature(t *testing.T, priv ed25519.PrivateKey, name string, policy []
 }
 
 // A console's error text reaches the operator's terminal, so control
-// characters in it are escaped rather than printed
+// characters in it are escaped rather than printed.
 func TestConsoleErrorTextIsEscaped(t *testing.T) {
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "\x1b]0;owned\x07\x1b[2Jcleared", http.StatusInternalServerError)

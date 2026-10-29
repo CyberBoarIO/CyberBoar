@@ -14,7 +14,7 @@ import (
 	"cyberboar.dev/cyberboar/pkg/sign"
 )
 
-// TestInstallLockProcessHelper holds a real kernel lock in a subprocess
+// TestInstallLockProcessHelper holds a real kernel lock in a subprocess.
 func TestInstallLockProcessHelper(t *testing.T) {
 	out := os.Getenv("CYBERBOAR_TEST_LOCK_OUT")
 	if out == "" {

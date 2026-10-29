@@ -13,7 +13,7 @@ import (
 // Git Bash's other absolute paths (/, /tmp, /usr/bin) go through its mount
 // table; without the table they are refused
 
-// winKind is how Git Bash reads a word used as a path
+// winKind is how Git Bash reads a word used as a path.
 type winKind int
 
 const (
@@ -24,26 +24,26 @@ const (
 	winUNC                     // //host/share, \\host\share, or anything else starting with two separators
 )
 
-// winWord is a word read as a path
+// winWord is a word read as a path.
 type winWord struct {
 	kind winKind
-	// path is the engine's form, not cleaned (drive paths, relative paths)
+	// path is the engine's form, not cleaned (drive paths, relative paths).
 	path string
 	// msys is the Git Bash form of a word starting with "/", which Git Bash
-	// cleans lexically before it applies its mounts: /c/../etc is Git's /etc, not C:\etc
+	// cleans lexically before it applies its mounts: /c/../etc is Git's /etc, not C:\etc.
 	msys string
 }
 
 // msysDevices are Git Bash's device files. They aren't files a policy
-// protects; /dev/fd and /proc are left to the built-in rules
+// protects; /dev/fd and /proc are left to the built-in rules.
 var msysDevices = set("/dev/null", "/dev/zero", "/dev/full", "/dev/random", "/dev/urandom", "/dev/tty")
 
-// MSYSDevice reports whether a cleaned Git Bash path is a device file
+// MSYSDevice reports whether a cleaned Git Bash path is a device file.
 func MSYSDevice(p string) bool { return msysDevices[p] }
 
 // readWinWord reads p as Git Bash and the Windows programs it starts do: "\"
 // and "/" both separate names, and names reads each name, the way Windows
-// programs (winNames) or Git Bash's own programs (gitBashNames) do
+// programs (winNames) or Git Bash's own programs (gitBashNames) do.
 func readWinWord(p string, names func(string) string) winWord {
 	s := strings.ReplaceAll(p, `\`, "/")
 	if strings.HasPrefix(s, "//") {
@@ -71,7 +71,7 @@ func readWinWord(p string, names func(string) string) winWord {
 	return winWord{kind: winMount, msys: msys}
 }
 
-// msysDrive splits a Git Bash path on a drive, /c/rest or /cygdrive/c/rest
+// msysDrive splits a Git Bash path on a drive, /c/rest or /cygdrive/c/rest.
 func msysDrive(p string) (drive, rest string, ok bool) {
 	first, tail, _ := strings.Cut(strings.TrimPrefix(p, "/"), "/")
 	if strings.EqualFold(first, "cygdrive") {
@@ -83,7 +83,7 @@ func msysDrive(p string) (drive, rest string, ok bool) {
 	return first, tail, true
 }
 
-// driveSpec splits "C:" or "C:/rest"
+// driveSpec splits "C:" or "C:/rest".
 func driveSpec(s string) (drive, rest string, ok bool) {
 	if len(s) < 2 || s[1] != ':' || !isASCIILetter(s[0]) || len(s) > 2 && s[2] != '/' {
 		return "", "", false
@@ -91,7 +91,7 @@ func driveSpec(s string) (drive, rest string, ok bool) {
 	return s[:1], strings.TrimPrefix(s[2:], "/"), true
 }
 
-// drivePath is the engine path of rest, whose names are already read, on a drive
+// drivePath is the engine path of rest, whose names are already read, on a drive.
 func drivePath(drive, rest string) string {
 	d := "/" + strings.ToLower(drive)
 	if rest == "" {
@@ -102,7 +102,7 @@ func drivePath(drive, rest string) string {
 
 // winNames applies Win32's rewriting to each name of a "/"-separated path:
 // trailing dots and spaces are stripped, and a name with ":" names a stream
-// of the file before the ":"
+// of the file before the ":".
 func winNames(s string) string {
 	parts := strings.Split(s, "/")
 	for i, n := range parts {
@@ -131,7 +131,7 @@ func winNames(s string) string {
 // open for a "/"-separated path. Like Cygwin, they store each character Win32
 // forbids in names, and a name's trailing dots and spaces, as U+F000 plus the
 // character, so `ln -s x 'k|y'` makes "k\uF07Cy" and `cat k.` opens
-// "k\uF02E", a different file from the k Windows programs open
+// "k\uF02E", a different file from the k Windows programs open.
 func gitBashNames(s string) string {
 	parts := strings.Split(s, "/")
 	for i, n := range parts {
@@ -153,7 +153,7 @@ func gitBashNames(s string) string {
 }
 
 // gitBashView is the name Git Bash's programs show for a name on disk, the
-// reverse of gitBashNames: what its globs match against
+// reverse of gitBashNames: what its globs match against.
 func gitBashView(name string) string {
 	if !strings.ContainsFunc(name, isGitBashRune) {
 		return name
@@ -173,7 +173,7 @@ func isGitBashRune(r rune) bool {
 
 // isIndexStream reports whether stream, the part of a name after its first
 // ":", names a directory's index rather than a data stream: its attribute
-// type (after a second ":") is present and not $DATA
+// type (after a second ":") is present and not $DATA.
 func isIndexStream(stream string) bool {
 	_, typ, ok := strings.Cut(stream, ":")
 	return ok && strings.HasPrefix(typ, "$") && !strings.EqualFold(typ, "$DATA")
@@ -181,7 +181,7 @@ func isIndexStream(stream string) bool {
 
 // msysAbs maps a Git Bash absolute path to the engine's form the way Git
 // Bash does: ".." applied lexically, then a drive or the longest matching
-// mount point. refused says why it can't be mapped
+// mount point. refused says why it can't be mapped.
 func (a *analyzer) msysAbs(p string) (mapped, refused string) {
 	c := path.Clean(p)
 	if d, rest, ok := msysDrive(c); ok {
@@ -213,7 +213,7 @@ func (a *analyzer) msysAbs(p string) (mapped, refused string) {
 
 // alt returns Git Bash's own reading of a path whose Windows reading is
 // primary, when ".." makes them differ (it climbs out of a drive or a
-// mount), or why that reading can't be checked
+// mount), or why that reading can't be checked.
 func (a *analyzer) alt(primary, msys string) ([]string, string) {
 	if !hasDotDot(msys) {
 		return nil, ""
@@ -226,15 +226,10 @@ func (a *analyzer) alt(primary, msys string) ([]string, string) {
 }
 
 func hasDotDot(p string) bool {
-	for _, n := range strings.Split(p, "/") {
-		if n == ".." {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(strings.Split(p, "/"), "..")
 }
 
-// msys is the directory in Git Bash's form, for its own reading of ".."
+// msys is the directory in Git Bash's form, for its own reading of "..".
 func (d dir) msys() string {
 	if d.posix != "" {
 		return d.posix
@@ -244,7 +239,7 @@ func (d dir) msys() string {
 
 // winPathRef is pathRef for Windows. Windows programs and Git Bash's own
 // programs read some names differently (gitBashNames), and a command may be
-// either, so both readings are checked
+// either, so both readings are checked.
 func (a *analyzer) winPathRef(p string, d dir) FileRef {
 	ref := a.winRef(p, d, winNames)
 	if ref.Refused != "" || !ref.Certain {
@@ -263,7 +258,7 @@ func (a *analyzer) winPathRef(p string, d dir) FileRef {
 	return ref
 }
 
-// winRef is one reading of a path word, names being how its names are read
+// winRef is one reading of a path word, names being how its names are read.
 func (a *analyzer) winRef(p string, d dir, names func(string) string) FileRef {
 	w := readWinWord(p, names)
 	switch w.kind {
@@ -294,8 +289,8 @@ func (a *analyzer) winRef(p string, d dir, names func(string) string) FileRef {
 	return ref
 }
 
-// winCd returns the directory `cd p` moves to from d
-// Bash tracks it logically (lexical ".."), in Git Bash's own paths and names
+// winCd returns the directory `cd p` moves to from d.
+// Bash tracks it logically (lexical ".."), in Git Bash's own paths and names.
 func (a *analyzer) winCd(p string, d dir) dir {
 	w := readWinWord(p, gitBashNames)
 	var msys string
@@ -331,7 +326,7 @@ func (a *analyzer) winCd(p string, d dir) dir {
 
 // winGlob returns a glob pattern in the engine's form. ok is false when it
 // can't be expanded (a meta character where a mount point could be, or
-// ".."), and refused says why it is denied outright
+// ".."), and refused says why it is denied outright.
 func (a *analyzer) winGlob(pattern string) (out string, ok bool, refused string) {
 	if strings.HasPrefix(pattern, "//") {
 		return "", false, "UNC paths (and words starting with two separators) are not supported"
@@ -379,7 +374,7 @@ func (a *analyzer) winGlob(pattern string) (out string, ok bool, refused string)
 }
 
 // winProgram is a program's name as Windows finds it: the last name of a
-// path with either separator, without an .exe or .com extension
+// path with either separator, without an .exe or .com extension.
 func winProgram(name string) string {
 	if i := strings.LastIndexAny(name, `/\`); i >= 0 {
 		name = name[i+1:]
@@ -392,7 +387,7 @@ func winProgram(name string) string {
 	return name
 }
 
-// isDriveWord reports a word starting with a drive, C:/ or C:\, which is not git's REF:path
+// isDriveWord reports a word starting with a drive, C:/ or C:\, which is not git's REF:path.
 func isDriveWord(s string) bool {
 	return len(s) >= 3 && s[1] == ':' && isASCIILetter(s[0]) && (s[2] == '/' || s[2] == '\\')
 }

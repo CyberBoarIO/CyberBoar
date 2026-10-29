@@ -21,7 +21,7 @@ func secretsPolicy(action policy.SecretsAction) *policy.Policy {
 
 var writeConfig = Action{Tool: ToolWrite, Path: "config.yaml", Cwd: "/work/repo", Home: "/home/dev", Workspaces: []string{"/work/repo"}}
 
-// The reason is shown to the agent and the user and logged: it must never repeat the secret
+// The reason is shown to the agent and the user and logged: it must never repeat the secret.
 func TestSecretNotInReason(t *testing.T) {
 	c := mustCompile(t, secretsPolicy(policy.SecretsDeny))
 	for _, id := range secretstest.Rules() {
@@ -38,7 +38,7 @@ func TestSecretNotInReason(t *testing.T) {
 			if v.Decision != Deny || !strings.HasPrefix(v.Rule, RuleSecretsPrefix) {
 				t.Errorf("%s in a %s: %s by %s", id, a.Tool, v.Decision, v.Rule)
 			}
-			for _, part := range strings.Split(secret, "\n") {
+			for part := range strings.SplitSeq(secret, "\n") {
 				if len(part) > 8 && strings.Contains(v.Reason, part) {
 					t.Errorf("%s: the reason repeats the secret: %s", id, v.Reason)
 				}
@@ -47,7 +47,7 @@ func TestSecretNotInReason(t *testing.T) {
 	}
 }
 
-// Content too long to scan is a finding: a secret past the limit would otherwise go through
+// Content too long to scan is a finding: a secret past the limit would otherwise go through.
 func TestSecretsTooLong(t *testing.T) {
 	a := writeConfig
 	a.Content = strings.Repeat("x", secrets.MaxText+1)
@@ -64,7 +64,7 @@ func TestSecretsTooLong(t *testing.T) {
 	}
 }
 
-// A policy built without Load has no secrets action: the zero value checks, and denies
+// A policy built without Load has no secrets action: the zero value checks, and denies.
 func TestSecretsZeroValueDenies(t *testing.T) {
 	secret, _ := secretstest.Fake("github-pat")
 	a := writeConfig
@@ -73,7 +73,7 @@ func TestSecretsZeroValueDenies(t *testing.T) {
 }
 
 // A scan the deadline cuts short is a deny, whether the deadline passes while
-// the policy is evaluated or has already ended when the scan starts
+// the policy is evaluated or has already ended when the scan starts.
 func TestSecretsDeadline(t *testing.T) {
 	secret, _ := secretstest.Fake("github-pat")
 	a := writeConfig

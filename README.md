@@ -5,7 +5,7 @@
 [Documentation](https://cyberboar.dev/docs/)
 
 CyberBoar evaluates coding-agent tool calls against a YAML policy on the developer's
-machine. It checks file access, Bash commands and MCP server/tool names, then returns
+machine. It checks file access, shell commands and MCP server/tool names, then returns
 `deny`, `ask` or no objection through the agent's hook interface. Optional local JSON
 audit logs record its decisions. No LLM participates in policy evaluation.
 

@@ -4,32 +4,33 @@ import (
 	"context"
 	"encoding/base64"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
 )
 
-// MaxDecodeDepth is how many layers of encoding ScanDecoded unwraps, as gitleaks' --max-decode-depth default
+// MaxDecodeDepth is how many layers of encoding ScanDecoded unwraps, as gitleaks' --max-decode-depth default.
 const MaxDecodeDepth = 5
 
 // encodedRe finds what may be encoded text, as gitleaks' decoder does
 // (detect/codec): percent escapes, \u escapes, hex, and base64 or base64url,
 // in that precedence. The base64 pattern also matches long identifiers;
 // decoding rejects them (they hold none of the characters base64 output
-// usually has, or don't decode to printable ASCII
+// usually has, or don't decode to printable ASCII.
 var encodedRe = regexp.MustCompile(`(%[0-9A-Fa-f]{2}(?:.*%[0-9A-Fa-f]{2})?)|((?i:(?:\\{1,2}u[a-fA-F0-9]{4})+))|([0-9A-Fa-f]{32,})|([\w/+-]{16,}={0,2})`)
 
 var escapeRe = regexp.MustCompile(`(?i)\\{1,2}u([a-fA-F0-9]{4})`)
 
-// ScanDecoded returns the secrets hidden in text by encoding, MaxDecodeDepth layers deep
-// It decodes in two ways and reports what either finds
-// Each encoded run is scanned on its own, and again for what it in turn encodes
+// ScanDecoded returns the secrets hidden in text by encoding, MaxDecodeDepth layers deep.
+// It decodes in two ways and reports what either finds.
+// Each encoded run is scanned on its own, and again for what it in turn encodes.
 // The text is also scanned with every run replaced by what it decodes to, and
 // each %XX escape replaced on its own, so that a secret only partly encoded
 // (url.QueryEscape leaves letters, digits and "-_.~" alone) is found with the
 // text around it, as gitleaks finds it. A finding's Start and End cover the
 // encoded text that holds the secret, widened to whole encoded runs, so Redact removes it
-// Secrets in the plain text are Scan's to find, so a caller runs both
+// Secrets in the plain text are Scan's to find, so a caller runs both.
 func ScanDecoded(ctx context.Context, text string, ignore []string) ([]Finding, error) {
 	if len(text) > MaxText {
 		return nil, nil // Scan reports it
@@ -52,14 +53,14 @@ func ScanDecoded(ctx context.Context, text string, ignore []string) ([]Finding, 
 	return found, nil
 }
 
-// run is an encoded run of a text: text[start:end] decodes to decoded
+// run is an encoded run of a text: text[start:end] decodes to decoded.
 type run struct {
 	start, end int
 	decoded    string
 	percent    bool // %XX escapes, decoded one by one in place
 }
 
-// findRuns returns the encoded runs of text that decode to something a credential could be
+// findRuns returns the encoded runs of text that decode to something a credential could be.
 func findRuns(ctx context.Context, text string) ([]run, error) {
 	var runs []run
 	for _, m := range encodedRe.FindAllStringSubmatchIndex(text, -1) {
@@ -87,7 +88,7 @@ func findRuns(ctx context.Context, text string) ([]run, error) {
 	return runs, nil
 }
 
-// scanRuns reports the secrets in each run decoded on its own, and in what it in turn encodes
+// scanRuns reports the secrets in each run decoded on its own, and in what it in turn encodes.
 func scanRuns(ctx context.Context, runs []run, ignore []string, depth int, report func(f Finding, start, end int)) error {
 	for _, r := range runs {
 		found, err := Scan(ctx, r.decoded, ignore)
@@ -113,13 +114,13 @@ func scanRuns(ctx context.Context, runs []run, ignore []string, depth int, repor
 }
 
 // segment is a part of a text that decoding in place replaced:
-// text[start:end] became the decoded text's [dstart:dend]
+// text[start:end] became the decoded text's [dstart:dend].
 type segment struct{ start, end, dstart, dend int }
 
 // scanInPlace decodes text in place, layer by layer, and reports each secret
 // in a layer that a replacement made for that layer touches, with its offsets
 // mapped back to text
-// runs are text's encoded runs
+// runs are text's encoded runs.
 func scanInPlace(ctx context.Context, text string, runs []run, ignore []string, report func(f Finding, start, end int)) error {
 	var layers [][]segment
 	for depth := 1; len(runs) > 0; depth++ {
@@ -135,8 +136,8 @@ func scanInPlace(ctx context.Context, text string, runs []run, ignore []string, 
 				continue
 			}
 			start, end := f.Start, f.End
-			for i := len(layers) - 1; i >= 0; i-- {
-				start, end = encodedOffset(layers[i], start, false), encodedOffset(layers[i], end, true)
+			for _, layer := range slices.Backward(layers) {
+				start, end = encodedOffset(layer, start, false), encodedOffset(layer, end, true)
 			}
 			report(f, start, end)
 		}
@@ -153,7 +154,7 @@ func scanInPlace(ctx context.Context, text string, runs []run, ignore []string, 
 
 // decodeInPlace returns text with each run replaced by what it decodes to,
 // and the replacements in order. In a percent run each escape that decodes
-// is a replacement of its own, so the rest of the run maps back exactly
+// is a replacement of its own, so the rest of the run maps back exactly.
 func decodeInPlace(text string, runs []run) (string, []segment) {
 	var b strings.Builder
 	var segs []segment
@@ -180,7 +181,7 @@ func decodeInPlace(text string, runs []run) (string, []segment) {
 	return b.String(), segs
 }
 
-// touches reports whether the span [start, end) of a decoded text overlaps a replacement
+// touches reports whether the span [start, end) of a decoded text overlaps a replacement.
 func touches(segs []segment, start, end int) bool {
 	for _, g := range segs {
 		if start < g.dend && end > g.dstart {
@@ -192,7 +193,7 @@ func touches(segs []segment, start, end int) bool {
 
 // encodedOffset maps an offset in a decoded text to the text it was decoded from
 // an offset inside a replacement moves to the replacement's start, or
-// with end to its end, so a span maps to one that covers every replacement it touches
+// with end to its end, so a span maps to one that covers every replacement it touches.
 func encodedOffset(segs []segment, off int, end bool) int {
 	delta := 0
 	for _, g := range segs {
@@ -211,7 +212,7 @@ func encodedOffset(segs []segment, off int, end bool) int {
 }
 
 // printableASCII reports whether s holds only printable ASCII, tab and newline
-// included, the bytes a decoded credential can have
+// included, the bytes a decoded credential can have.
 func printableASCII(s string) bool {
 	for i := range len(s) {
 		if c := s[i]; c <= '\x08' || c >= '\x7f' {
@@ -222,7 +223,7 @@ func printableASCII(s string) bool {
 }
 
 // decodeBase64 decodes s as standard or URL-safe base64, and returns "" unless
-// the result is printable ASCII
+// the result is printable ASCII.
 func decodeBase64(s string) string {
 	if !strings.ContainsAny(s, "0123456789+/-_") {
 		return ""
@@ -235,7 +236,7 @@ func decodeBase64(s string) string {
 	return ""
 }
 
-// decodeHex decodes s as pairs of hex digits, and returns "" unless the result is printable ASCII
+// decodeHex decodes s as pairs of hex digits, and returns "" unless the result is printable ASCII.
 func decodeHex(s string) string {
 	if len(s)%2 != 0 || !strings.ContainsAny(s, "0123456789") {
 		return ""
@@ -257,7 +258,7 @@ func decodeHex(s string) string {
 // decodePercent decodes the %XX escapes in s that percentByte accepts and
 // keeps the rest as written. An escape of a control byte stays an escape
 // rather than spoiling the whole run, which would let one %00 on a line hide
-// every escape after it
+// every escape after it.
 func decodePercent(s string) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {
@@ -272,7 +273,7 @@ func decodePercent(s string) string {
 }
 
 // percentByte reports whether s[i:] starts with a %XX escape of a byte a
-// credential can hold (printable ASCII, tab or newline), and returns the byte
+// credential can hold (printable ASCII, tab or newline), and returns the byte.
 func percentByte(s string, i int) (byte, bool) {
 	if i+3 > len(s) || s[i] != '%' {
 		return 0, false
@@ -284,7 +285,7 @@ func percentByte(s string, i int) (byte, bool) {
 	return byte(v), true
 }
 
-// decodeEscapes decodes a run of \uXXXX escapes
+// decodeEscapes decodes a run of \uXXXX escapes.
 func decodeEscapes(s string) string {
 	var b strings.Builder
 	for _, m := range escapeRe.FindAllStringSubmatch(s, -1) {

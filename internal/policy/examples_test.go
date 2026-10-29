@@ -8,8 +8,8 @@ import (
 	"cyberboar.dev/cyberboar/internal/policy"
 )
 
-// Example policies are documentation users copy from; each must load
-// This also catches a stale apiVersion after a rename
+// Example policies are documentation users copy from; each must load.
+// This also catches a stale apiVersion after a rename.
 func TestExamplePoliciesLoad(t *testing.T) {
 	files, err := filepath.Glob(filepath.Join("..", "..", "examples", "*.yaml"))
 	if err != nil || len(files) == 0 {

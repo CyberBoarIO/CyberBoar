@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"maps"
 	"slices"
 	"strings"
 
@@ -16,17 +17,15 @@ import (
 // An image's own entrypoint, the remote user's shell and ~/.ssh/config are not seen
 
 func registerRemote() {
-	for name, fn := range map[string]wrapperFunc{
+	maps.Copy(wrappers, map[string]wrapperFunc{
 		"docker": wrapDocker, "podman": wrapDocker,
 		"docker-compose": wrapCompose, "podman-compose": wrapCompose,
 		"kubectl": wrapKubectl, "oc": wrapKubectl,
-	} {
-		wrappers[name] = fn
-	}
+	})
 }
 
 // login reports whether name is ssh or slogin, compared case-insensitively
-// the way lookupWrapper matches names. scp and sftp are not logins
+// the way lookupWrapper matches names. scp and sftp are not logins.
 func login(name string) bool {
 	n := fold.String(name)
 	return n == "ssh" || n == "slogin"
@@ -40,7 +39,7 @@ func (a *analyzer) homeDir() *dir {
 	return &dir{path: a.home, known: true}
 }
 
-// sshPath is one reading of an ssh command line
+// sshPath is one reading of an ssh command line.
 type sshPath struct {
 	command   int  // index of the first word of the remote command; -1: none
 	noCommand bool // -N, -W, -G, -V, -O: no remote command or login shell
@@ -50,13 +49,13 @@ type sshPath struct {
 }
 
 // maxSSHBranches bounds the readings tried when run-time words sit where an
-// option or the destination could be
+// option or the destination could be.
 const maxSSHBranches = 16
 
 // sshPaths reads an ssh command line the way OpenSSH does: options, the
 // destination, more options, then the remote command. A run-time word before
 // the command could be an option or the destination, so both readings are
-// returned (ambiguous is then set)
+// returned (ambiguous is then set).
 func sshPaths(args []Elem) (paths []sshPath, ambiguous bool) {
 	const withValue = "BbcDEeFIiJLlmOoPpQRSWw"
 	var walk func(i int, seenDest bool, p sshPath)
@@ -128,7 +127,7 @@ func sshPaths(args []Elem) (paths []sshPath, ambiguous bool) {
 
 // sshRemote adds what ssh runs on the remote host: the command (its words
 // joined with spaces, as ssh sends them to the remote shell) or, with no
-// command, a login shell reading stdin
+// command, a login shell reading stdin.
 func sshRemote(a *analyzer, name string, args []Elem, u *unwrapped) {
 	paths, ambiguous := sshPaths(args)
 	if ambiguous {
@@ -164,7 +163,7 @@ func sshRemote(a *analyzer, name string, args []Elem, u *unwrapped) {
 }
 
 // wrapSSH finds -o ProxyCommand/LocalCommand/KnownHostsCommand/RemoteCommand,
-// scp/sftp -S, and what ssh runs on the remote host
+// scp/sftp -S, and what ssh runs on the remote host.
 func wrapSSH(a *analyzer, name string, args []Elem) unwrapped {
 	const withValue = "BbcDEeFIiJLlmOoPpQRSWw"
 	var u unwrapped
@@ -222,7 +221,7 @@ func wrapSSH(a *analyzer, name string, args []Elem) unwrapped {
 	return u
 }
 
-// splitSSHOption splits "Key=value" or "Key value", lower-casing the key
+// splitSSHOption splits "Key=value" or "Key value", lower-casing the key.
 func splitSSHOption(s string) (key, val string) {
 	s = strings.TrimSpace(s)
 	i := strings.IndexAny(s, "= \t")
@@ -233,19 +232,19 @@ func splitSSHOption(s string) (key, val string) {
 	return strings.ToLower(key), val
 }
 
-// longOpts is a program's option table: flags, and options taking a value
+// longOpts is a program's option table: flags, and options taking a value.
 type longOpts struct {
 	short, shortValue string
 	long, longValue   map[string]bool
 }
 
-// maxOperandStarts bounds the readings operandStarts returns
+// maxOperandStarts bounds the readings operandStarts returns.
 const maxOperandStarts = 8
 
 // operandStarts reads options from args[i:] and returns where the first
 // operand may start. "--" ends the options. A run-time word could be an
 // option or the operand, so both readings are returned; an option not in
-// the table is taken as a flag. Either sets ambiguous
+// the table is taken as a flag. Either sets ambiguous.
 func operandStarts(args []Elem, i int, o longOpts) (starts []int, ambiguous bool) {
 	for ; i < len(args); i++ {
 		e := args[i]
@@ -292,7 +291,7 @@ func operandStarts(args []Elem, i int, o longOpts) (starts []int, ambiguous bool
 	return append(starts, len(args)), ambiguous
 }
 
-// hasShortFlag reports whether args[:end] set a short flag c (not as a value)
+// hasShortFlag reports whether args[:end] set a short flag c (not as a value).
 func hasShortFlag(args []Elem, end int, c byte, o longOpts) bool {
 	for _, e := range args[:min(end, len(args))] {
 		t := e.Text
@@ -311,7 +310,7 @@ func hasShortFlag(args []Elem, end int, c byte, o longOpts) bool {
 	return false
 }
 
-// runsEach runs each argv (next, then extra), skipping empty and repeated ones
+// runsEach runs each argv (next, then extra), skipping empty and repeated ones.
 func runsEach(argvs [][]Elem, unknown bool) unwrapped {
 	u := unwrapped{unknown: unknown}
 	seen := map[string]bool{}
@@ -392,7 +391,7 @@ var (
 	}
 )
 
-// wrapDocker finds `docker exec`, `docker container exec` and `docker compose exec` (podman alike)
+// wrapDocker finds `docker exec`, `docker container exec` and `docker compose exec` (podman alike).
 func wrapDocker(_ *analyzer, name string, args []Elem) unwrapped {
 	starts, amb := operandStarts(args, 0, dockerGlobal)
 	var argvs [][]Elem
@@ -447,7 +446,7 @@ func wrapCompose(_ *analyzer, name string, args []Elem) unwrapped {
 // containerRun reads `run [OPTIONS] IMAGE [COMMAND...]` (and create): the
 // command (after --entrypoint, if given; the image's own entrypoint isn't
 // seen) and the host paths it mounts, which the container reads and writes
-// like any directory a command is given
+// like any directory a command is given.
 func containerRun(args []Elem) unwrapped {
 	var u unwrapped
 	var entry []Elem
@@ -498,8 +497,8 @@ func containerRun(args []Elem) unwrapped {
 	return r
 }
 
-// volumeSource returns the host path of -v SRC:DST[:OPTS]
-// A source without a slash or a leading dot or tilde is a named volume
+// volumeSource returns the host path of -v SRC:DST[:OPTS].
+// A source without a slash or a leading dot or tilde is a named volume.
 func volumeSource(v Elem) (Elem, bool) {
 	if v.Kind != Lit {
 		return v, true // only known at run time
@@ -512,14 +511,14 @@ func volumeSource(v Elem) (Elem, bool) {
 }
 
 // mountSource returns the host path of --mount type=bind,source=SRC,… (the
-// keys in any order). A source that looks like a path is taken whatever the type says
+// keys in any order). A source that looks like a path is taken whatever the type says.
 func mountSource(v Elem) (Elem, bool) {
 	if v.Kind != Lit {
 		return v, true
 	}
 	bind := false
 	var src string
-	for _, kv := range strings.Split(v.Text, ",") {
+	for kv := range strings.SplitSeq(v.Text, ",") {
 		k, val, _ := strings.Cut(kv, "=")
 		switch strings.ToLower(strings.TrimSpace(k)) {
 		case "type":
@@ -559,8 +558,8 @@ func containerExec(name string, args []Elem, o longOpts) unwrapped {
 
 // wrapKubectl finds `kubectl exec POD -- COMMAND` and the commands of `run`
 // and `debug` (oc alike). Options may come anywhere; the command follows "--"
-// or, for exec in the old form, the pod
-func wrapKubectl(_ *analyzer, name string, args []Elem) unwrapped {
+// or, for exec in the old form, the pod.
+func wrapKubectl(_ *analyzer, _ string, args []Elem) unwrapped {
 	starts, amb := operandStarts(args, 0, kubectlOpts)
 	var argvs [][]Elem
 	for _, i := range starts {

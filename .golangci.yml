@@ -2,14 +2,20 @@ version: "2"
 
 linters:
   default: standard
-  enable: [gosec, bodyclose, bidichk, nolintlint, depguard]
+  enable: [gosec, bodyclose, bidichk, nolintlint, depguard, godot, modernize]
   settings:
+    modernize:
+      # a strings.Builder only pays off in long loops, and += reads better in short ones
+      disable: [stringsbuilder]
+    godot:
+      # go doc joins a comment's lines, so a sentence needs its full stop
+      scope: declarations
     staticcheck:
       # ST1023 is a redundant type in a declaration
       # QF are quick-fix suggestions
       checks: ["all", "-ST1023", "-QF*"]
     gosec:
-      # G104 duplicates errcheck, which is configured below. 
+      # G104 duplicates errcheck, which is configured below.
       # G304 (opening a path held in a variable) is common in CLI operations on files
       excludes: [G104, G304]
     errcheck:

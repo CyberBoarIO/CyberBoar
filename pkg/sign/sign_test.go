@@ -24,7 +24,7 @@ func keys(t *testing.T) (string, string) {
 	return priv, pub
 }
 
-// The header uses a fixed epoch so FuzzParse seeds stay reproducible
+// The header uses a fixed epoch so FuzzParse seeds stay reproducible.
 var hdr = Header{Serial: 1, Expires: time.Unix(0, 0).UTC().Add(90 * 24 * time.Hour)}
 
 func mustSign(t *testing.T, priv ed25519.PrivateKey, name string, policy []byte, h Header) string {
@@ -95,7 +95,7 @@ func TestSignVerify(t *testing.T) {
 	}
 }
 
-// A valid signature needs its format, serial and expiry headers
+// A valid signature needs its format, serial and expiry headers.
 func TestBareSignatureRefused(t *testing.T) {
 	privPath, pubPath := keys(t)
 	priv, _ := LoadPrivate(privPath)
@@ -172,7 +172,7 @@ func TestSignExpiryUTCYearBoundary(t *testing.T) {
 	}
 }
 
-// A policy may be signed without expiry
+// A policy may be signed without expiry.
 func TestNoExpiry(t *testing.T) {
 	privPath, pubPath := keys(t)
 	priv, _ := LoadPrivate(privPath)
@@ -199,7 +199,7 @@ func TestExpired(t *testing.T) {
 	}
 }
 
-// Parse accepts exactly what Sign writes: anything it accepts is written back byte for byte
+// Parse accepts exactly what Sign writes: anything it accepts is written back byte for byte.
 func FuzzParse(f *testing.F) {
 	priv := ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize))
 	sig, _ := Sign(priv, "baseline", nil, hdr)
@@ -221,8 +221,8 @@ func FuzzParse(f *testing.F) {
 }
 
 // Keygen never replaces a key, the public one included: a new private key
-// beside an old public key would leave a pair that doesn't match
-// A refused Keygen leaves no file of its own behind
+// beside an old public key would leave a pair that doesn't match.
+// A refused Keygen leaves no file of its own behind.
 func TestKeygenNeverOverwrites(t *testing.T) {
 	priv, pub := keys(t)
 	before := map[string]string{}
@@ -268,7 +268,7 @@ func TestLoadRejectsWrongKeys(t *testing.T) {
 	}
 }
 
-// A public key of the wrong length is a bad signature, not a panic
+// A public key of the wrong length is a bad signature, not a panic.
 func TestVerifyWrongKeyLength(t *testing.T) {
 	privPath, _ := keys(t)
 	priv, err := LoadPrivate(privPath)

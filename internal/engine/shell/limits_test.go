@@ -10,7 +10,7 @@ import (
 )
 
 // Unknown code in a bare assignment creates a command too. Count it against
-// the same budget as ordinary commands, including inside inline shell code
+// the same budget as ordinary commands, including inside inline shell code.
 func TestCommandLimit(t *testing.T) {
 	for _, tc := range []struct {
 		name string

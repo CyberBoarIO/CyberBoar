@@ -14,8 +14,8 @@ import (
 
 // runCheck loads each policy and reports whether it compiles. Unknown secret
 // rule IDs in secrets.ignore, and a minimumVersion this binary doesn't meet,
-// are reported without failing the check
-func runCheck(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stderr io.Writer) int {
+// are reported without failing the check.
+func runCheck(_ host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	fs.Usage = func() { fmt.Fprintf(stderr, "usage: %s check POLICY...\n", brand.Name) }
 	if code, ok := parseFlags(fs, args); !ok {

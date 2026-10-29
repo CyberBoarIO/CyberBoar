@@ -10,7 +10,7 @@ import (
 	"cyberboar.dev/cyberboar/internal/engine/osfs"
 )
 
-// psCorpus returns the parser's differential inputs (pwsh/testdata/differential)
+// psCorpus returns the parser's differential inputs (pwsh/testdata/differential).
 func psCorpus(tb testing.TB) []string {
 	files, err := filepath.Glob(filepath.Join("pwsh", "testdata", "differential", "*.txt"))
 	if err != nil || len(files) == 0 {
@@ -22,7 +22,7 @@ func psCorpus(tb testing.TB) []string {
 		if err != nil {
 			tb.Fatal(err)
 		}
-		for _, in := range strings.Split(string(b), "\n---\n") {
+		for in := range strings.SplitSeq(string(b), "\n---\n") {
 			if !strings.HasPrefix(in, "#") {
 				out = append(out, strings.TrimSuffix(in, "\n---"))
 			}
@@ -32,7 +32,7 @@ func psCorpus(tb testing.TB) []string {
 }
 
 // AnalyzePowerShell fails closed on anything: it never panics, and an error
-// is one the engine denies. On Windows and elsewhere
+// is one the engine denies. On Windows and elsewhere.
 func checkPowerShell(t *testing.T, in string) {
 	for _, o := range []Options{{Cwd: "/c/work", FS: osfs.FS{Windows: true}}, {Cwd: "/work"}, {CwdUnknown: true, Persistent: true}} {
 		an, err := AnalyzePowerShell(in, "/c/Users/dev", o)

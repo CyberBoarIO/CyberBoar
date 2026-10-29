@@ -1,12 +1,12 @@
 // Package opencode maps the input of CyberBoar's opencode plugin shim to
-// engine actions and engine verdicts to the shim's answer
+// engine actions and engine verdicts to the shim's answer.
 //
 // opencode has no command hooks. It loads JavaScript plugins in its own
 // process, and a plugin whose tool.execute.before hook throws blocks the tool
 // call. The shim (cyberboar.js, written by apply) runs the hook command with
 // the call as JSON on stdin and throws unless the hook answers exactly
 // {"decision":"none"} with exit status 0, so a missing binary, a crash, a
-// timeout or any other answer blocks the call too
+// timeout or any other answer blocks the call too.
 package opencode
 
 import (
@@ -25,34 +25,34 @@ import (
 	"cyberboar.dev/cyberboar/internal/engine"
 )
 
-// Adapter speaks the plugin shim's protocol
+// Adapter speaks the plugin shim's protocol.
 type Adapter struct{}
 
 // Name returns "opencode", the agent name used on the command line and in
-// audit events
+// audit events.
 func (Adapter) Name() string { return "opencode" }
 
-// Input is what the shim sends for one tool call
+// Input is what the shim sends for one tool call.
 // It holds the tool.execute.before input and arguments, the plugin's directory and
-// worktree, and what the config plugin hook reported
+// worktree, and what the config plugin hook reported.
 type Input struct {
 	Tool      string          `json:"tool"`
 	SessionID string          `json:"sessionID"`
 	CallID    string          `json:"callID"`
 	Args      json.RawMessage `json:"args"`
 	// Directory is the session directory, where tools resolve relative paths
-	// and start commands
+	// and start commands.
 	Directory string `json:"directory"`
-	// Worktree is the git worktree root, or "/" outside a git repository
+	// Worktree is the git worktree root, or "/" outside a git repository.
 	Worktree string `json:"worktree"`
 	// Shell is the config's shell setting, or "" if it is unset. If nil, the
-	// config hook never ran, and the shell is unknown
+	// config hook never ran, and the shell is unknown.
 	Shell *string `json:"shell"`
-	// MCPServers are the configured MCP server names. If nil, they are unknown
+	// MCPServers are the configured MCP server names. If nil, they are unknown.
 	MCPServers *[]string `json:"mcpServers"`
 }
 
-// ParseInput decodes exactly one JSON object with only the shim's fields
+// ParseInput decodes exactly one JSON object with only the shim's fields.
 func ParseInput(data []byte) (*Input, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
@@ -79,28 +79,28 @@ func ParseInput(data []byte) (*Input, error) {
 }
 
 // Env is what the adapter takes from the hook's environment, which the shim
-// passes on from opencode's
+// passes on from opencode's.
 type Env struct {
 	Home          string
 	XDGConfigHome string
 	XDGCacheHome  string
 	// Config, ConfigDir and TUIConfig are OPENCODE_CONFIG,
 	// OPENCODE_CONFIG_DIR and OPENCODE_TUI_CONFIG, which are more places
-	// opencode loads configuration and plugins from
+	// opencode loads configuration and plugins from.
 	Config, ConfigDir, TUIConfig string
-	// UserShell is $SHELL, which opencode runs commands in when the config names no shell
+	// UserShell is $SHELL, which opencode runs commands in when the config names no shell.
 	UserShell string
 	CDPath    bool
 }
 
-// EnvFrom reads Env from the hook's environment
+// EnvFrom reads Env from the hook's environment.
 func EnvFrom(getenv func(string) string) Env {
 	return Env{Home: getenv("HOME"), XDGConfigHome: getenv("XDG_CONFIG_HOME"), XDGCacheHome: getenv("XDG_CACHE_HOME"),
 		Config: getenv("OPENCODE_CONFIG"), ConfigDir: getenv("OPENCODE_CONFIG_DIR"), TUIConfig: getenv("OPENCODE_TUI_CONFIG"),
 		UserShell: getenv("SHELL"), CDPath: getenv("CDPATH") != ""}
 }
 
-// Parse decodes the shim's input
+// Parse decodes the shim's input.
 func (Adapter) Parse(data []byte, getenv func(string) string) (*adapters.Call, error) {
 	in, err := ParseInput(data)
 	if err != nil {
@@ -116,7 +116,7 @@ func (Adapter) Parse(data []byte, getenv func(string) string) (*adapters.Call, e
 
 // Workspace returns the project root. That is the git worktree, or the
 // session directory outside a git repository, where opencode reports the
-// worktree as "/"
+// worktree as "/".
 func Workspace(in *Input) string {
 	if in.Worktree != "/" {
 		return in.Worktree
@@ -126,7 +126,7 @@ func Workspace(in *Input) string {
 
 // ManagedDirs are where opencode reads managed (machine-wide) configuration
 // on Linux and macOS. On macOS that includes the ai.opencode.managed profiles
-// MDM installs in /Library/Managed Preferences and its per-user directories
+// MDM installs in /Library/Managed Preferences and its per-user directories.
 var ManagedDirs = []string{"/etc/opencode", "/Library/Application Support/opencode", "/Library/Managed Preferences"}
 
 // ConfigFiles returns the opencode files and directories that can load,
@@ -137,7 +137,7 @@ var ManagedDirs = []string{"/etc/opencode", "/Library/Application Support/openco
 // OPENCODE_CONFIG_DIR), every configuration file that can list plugins
 // (opencode.json, opencode.jsonc, tui.json and tui.jsonc on the same walk,
 // OPENCODE_CONFIG, OPENCODE_TUI_CONFIG, the managed directories), and the
-// cache that holds plugin packages
+// cache that holds plugin packages.
 func ConfigFiles(in *Input, env Env) []string {
 	var out []string
 	abs := func(p string) string {
@@ -178,7 +178,7 @@ func ConfigFiles(in *Input, env Env) []string {
 // Respond turns a verdict into the shim's answer. Only exit 0 with
 // {"decision":"none"} lets the call through, leaving opencode's own
 // permissions in charge. Deny exits 2 with the reason in the JSON and on
-// stderr. opencode plugins can't ask the user, so ask is answered as deny
+// stderr. opencode plugins can't ask the user, so ask is answered as deny.
 func (Adapter) Respond(v engine.Verdict, prefix string) adapters.Output {
 	var reason string
 	switch v.Decision {
@@ -240,7 +240,7 @@ var classification = sync.OnceValues(func() (map[string]toolSpec, error) {
 })
 
 // Actions maps the shim's input to the engine actions to evaluate. No actions
-// and no error means the tool touches nothing CyberBoar governs
+// and no error means the tool touches nothing CyberBoar governs.
 func Actions(in *Input, env Env) ([]engine.Action, error) {
 	// Checked here rather than in ParseInput, so that on an unsupported
 	// platform (Windows paths) the hook explains the platform instead
@@ -415,7 +415,7 @@ func specActions(in *Input, env Env, spec toolSpec, args map[string]any, base en
 // shell, or else $SHELL, or else bash. opencode refuses fish and nu, so for
 // them it is bash too. A shell that doesn't exist also falls back to bash in
 // opencode. The hook can't tell, so it takes the named one, which is the
-// stricter reading
+// stricter reading.
 func RunShell(config, user string) string {
 	sh := config
 	if sh == "" {
@@ -434,7 +434,7 @@ func shellName(sh string) string {
 // bashLike reports whether the engine can analyze the shell's commands as
 // bash. opencode runs bash and zsh as login shells that read ~/.bashrc or
 // ~/.zshrc first, aliases included. The apply command warns about the
-// settings there that change what a command line means
+// settings there that change what a command line means.
 func bashLike(sh string) bool {
 	switch shellName(sh) {
 	case "bash", "sh", "dash", "zsh":
@@ -444,7 +444,7 @@ func bashLike(sh string) bool {
 }
 
 // resolve makes p absolute against dir, for the directory test only. The
-// engine does its own resolution
+// engine does its own resolution.
 func resolve(dir, p string) string {
 	if strings.HasPrefix(p, "/") {
 		return p
@@ -453,7 +453,7 @@ func resolve(dir, p string) string {
 }
 
 // sanitize sanitizes an MCP server name as opencode does, replacing every
-// UTF-16 code unit outside [A-Za-z0-9_-] with "_"
+// UTF-16 code unit outside [A-Za-z0-9_-] with "_".
 func sanitize(s string) string {
 	var b strings.Builder
 	for _, r := range s {
@@ -474,7 +474,7 @@ func sanitize(s string) string {
 // underscores and may be prefixes of each other, so every match is evaluated
 // and the strictest verdict wins. An allowed server "github" then can't cover
 // a server "github_evil". opencode sanitizes the tool name too, and the
-// original can't be recovered, so the call says how the names were written
+// original can't be recovered, so the call says how the names were written.
 func mcpActions(name string, servers []string, base engine.Action) []engine.Action {
 	var out []engine.Action
 	for _, s := range servers {

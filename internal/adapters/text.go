@@ -11,12 +11,12 @@ import (
 	"cyberboar.dev/cyberboar/internal/engine"
 )
 
-// EditSpec says where a tool's input holds its text edits (package edits)
+// EditSpec says where a tool's input holds its text edits (package edits).
 // If List is set, it is the field holding an array of edit objects, as in
-// Claude Code's MultiEdit
-// Otherwise the input is the one edit
-// Old, New and All name the fields of an edit, and All, a boolean, may be left out
-// Match is "opencode" for opencode's matching (edits.Opencode), or "" for edits.Loose
+// Claude Code's MultiEdit.
+// Otherwise the input is the one edit.
+// Old, New and All name the fields of an edit, and All, a boolean, may be left out.
+// Match is "opencode" for opencode's matching (edits.Opencode), or "" for edits.Loose.
 type EditSpec struct {
 	List  string `yaml:"list"`
 	Old   string `yaml:"old"`
@@ -25,7 +25,7 @@ type EditSpec struct {
 	Match string `yaml:"match"`
 }
 
-// Valid returns an error if the spec doesn't name the fields an edit needs
+// Valid returns an error if the spec doesn't name the fields an edit needs.
 func (s *EditSpec) Valid() error {
 	if s.Old == "" || s.New == "" {
 		return errors.New("edit without old and new fields")
@@ -37,7 +37,7 @@ func (s *EditSpec) Valid() error {
 }
 
 // Read returns the edits in a tool's input. Anything not of the expected
-// types is an error, because the engine must not guess what the tool will do
+// types is an error, because the engine must not guess what the tool will do.
 func (s *EditSpec) Read(input map[string]any) ([]edits.Replace, error) {
 	objs := []any{input}
 	if s.List != "" {
@@ -73,9 +73,9 @@ func (s *EditSpec) Read(input map[string]any) ([]edits.Replace, error) {
 	return out, nil
 }
 
-// WriteText returns what a write tool puts in its file, for the secrets check
-// That is the text at its content fields and its edits' new text
-// If edit is set, WriteText also returns the Rewrite that applies the edits (edits.StringsMatching)
+// WriteText returns what a write tool puts in its file, for the secrets check.
+// That is the text at its content fields and its edits' new text.
+// If edit is set, WriteText also returns the Rewrite that applies the edits (edits.StringsMatching).
 func WriteText(input map[string]any, content []string, edit *EditSpec) (string, engine.Rewrite, error) {
 	text := Text(input, content)
 	if edit == nil {
@@ -97,8 +97,8 @@ func WriteText(input map[string]any, content []string, edit *EditSpec) (string, 
 	return text, edits.StringsMatching(es, m), nil
 }
 
-// EditText joins the new texts of edits with newlines
-// That is what the edits add, for the secrets check
+// EditText joins the new texts of edits with newlines.
+// That is what the edits add, for the secrets check.
 func EditText(es []edits.Replace) string {
 	parts := make([]string, len(es))
 	for i, e := range es {
@@ -107,8 +107,8 @@ func EditText(es []edits.Replace) string {
 	return strings.Join(parts, "\n")
 }
 
-// Text joins the strings at the input's field paths, as Extract reads them, with newlines
-// It gives the secrets check the text a tool writes
+// Text joins the strings at the input's field paths, as Extract reads them, with newlines.
+// It gives the secrets check the text a tool writes.
 func Text(input any, fields []string) string {
 	var parts []string
 	for _, f := range fields {
@@ -118,9 +118,9 @@ func Text(input any, fields []string) string {
 }
 
 // JSONText returns every object key and string value in JSON, such as an MCP
-// call's arguments, with object keys in order and joined with newlines
-// It gives the secrets check what the call sends out
-// Text that isn't JSON is returned as it is
+// call's arguments, with object keys in order and joined with newlines.
+// It gives the secrets check what the call sends out.
+// Text that isn't JSON is returned as it is.
 func JSONText(raw []byte) string {
 	var v any
 	if err := json.Unmarshal(raw, &v); err != nil {
@@ -130,7 +130,7 @@ func JSONText(raw []byte) string {
 }
 
 // ValuesText returns every object key and string value in a decoded JSON value,
-// at any depth, with object keys in order and joined with newlines
+// at any depth, with object keys in order and joined with newlines.
 func ValuesText(v any) string {
 	return strings.Join(stringValues(v), "\n")
 }

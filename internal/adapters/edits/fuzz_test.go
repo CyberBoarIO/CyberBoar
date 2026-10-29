@@ -6,8 +6,8 @@ import (
 	"cyberboar.dev/cyberboar/internal/secrets"
 )
 
-// FuzzPatch parses arbitrary documents and applies valid updates without panicking
-// A successful rewrite must return at least one result
+// FuzzPatch parses arbitrary documents and applies valid updates without panicking.
+// A successful rewrite must return at least one result.
 func FuzzPatch(f *testing.F) {
 	f.Add(patch("*** Update File: f\n@@ ctx\n a\n-b\n+c\n*** End of File\n"), "ctx\na\nb\n")
 	f.Add(patch("*** Update File: f\n*** Move to: g\n@@\n+x\n@@\n-–\n"), "—\n")
@@ -26,7 +26,7 @@ func FuzzPatch(f *testing.F) {
 	})
 }
 
-// FuzzStrings applies any edit to any file with either matching: no panic, and a result or an error
+// FuzzStrings applies any edit to any file with either matching: no panic, and a result or an error.
 func FuzzStrings(f *testing.F) {
 	f.Add("x =   1\n", "x = 1", "y", false)
 	f.Add("“a”\t–\n", `"a" -`, "", true)

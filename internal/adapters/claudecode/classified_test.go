@@ -12,7 +12,7 @@ import (
 	"cyberboar.dev/cyberboar/internal/adapters/claudecode"
 )
 
-// unclassified reports whether Actions blocks tool as unclassified
+// unclassified reports whether Actions blocks tool as unclassified.
 func unclassified(tool string) bool {
 	_, err := claudecode.Actions(&claudecode.Input{ToolName: tool, Cwd: "/work", ToolInput: json.RawMessage(`{}`)}, claudecode.Env{})
 	var e *adapters.Error
@@ -20,7 +20,7 @@ func unclassified(tool string) bool {
 }
 
 // Every tool in a captured Claude Code tool list must be classified, so an
-// unclassified tool shows up here before it reaches a user
+// unclassified tool shows up here before it reaches a user.
 func TestCapturedToolsClassified(t *testing.T) {
 	files, _ := filepath.Glob("testdata/tools-*.json")
 	if len(files) == 0 {
@@ -48,7 +48,7 @@ func TestCapturedToolsClassified(t *testing.T) {
 	}
 }
 
-// Every input captured from a real Claude Code run maps cleanly: known tool, well-formed input
+// Every input captured from a real Claude Code run maps cleanly: known tool, well-formed input.
 func TestCapturedInputs(t *testing.T) {
 	files, _ := filepath.Glob("testdata/captured-*.jsonl")
 	if len(files) == 0 {
@@ -73,7 +73,7 @@ func TestCapturedInputs(t *testing.T) {
 	}
 }
 
-// Tools later Claude Code releases offer that touch no local file and run no command
+// Tools later Claude Code releases offer that touch no local file and run no command.
 func TestNewerToolsClassified(t *testing.T) {
 	for _, tool := range []string{"TaskCreate", "TaskGet", "TaskList", "TaskUpdate", "SendFeedback", "EndConversation"} {
 		if unclassified(tool) {

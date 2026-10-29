@@ -13,13 +13,13 @@ import (
 	"cyberboar.dev/cyberboar/internal/secrets"
 )
 
-// RuleSecretsPrefix starts the rule ID of a verdict on a secret
-// The rest of the ID is the rule that found it: an ID from secrets.Rules, or secrets.TooLong
+// RuleSecretsPrefix starts the rule ID of a verdict on a secret.
+// The rest of the ID is the rule that found it: an ID from secrets.Rules, or secrets.TooLong.
 const RuleSecretsPrefix = "secrets."
 
-// evalSecrets looks for credentials in what a shell action runs, a write adds or an MCP call sends
-// It returns nil when there are none, or the policy turned the check off
-// A scan the deadline cut short is a deny, since a secret may sit in the part not read
+// evalSecrets looks for credentials in what a shell action runs, a write adds or an MCP call sends.
+// It returns nil when there are none, or the policy turned the check off.
+// A scan the deadline cut short is a deny, since a secret may sit in the part not read.
 func (c *Compiled) evalSecrets(ctx context.Context, a Action) *Verdict {
 	cfg := c.policy.Spec.Secrets
 	if cfg.Action == policy.SecretsOff {
@@ -70,16 +70,16 @@ func (c *Compiled) evalSecrets(ctx context.Context, a Action) *Verdict {
 }
 
 // Unchecked is the secrets finding for a write whose result can't be
-// worked out, because the file can't be read or the edit doesn't apply to it
+// worked out, because the file can't be read or the edit doesn't apply to it.
 const Unchecked = "unchecked"
 
 // MaxFile is the largest file, in bytes, that the secrets check reads before an edit to it
-// An edit to a larger file is a finding of secrets.TooLong
+// An edit to a larger file is a finding of secrets.TooLong.
 const MaxFile = 8 << 20
 
 // commandSecret returns the first secret in a command line in the language
 // lang (Action.Shell), read both as written and as the shell reads it,
-// which turns gh""p_x in bash and gh`p_x in PowerShell into ghp_x
+// which turns gh""p_x in bash and gh`p_x in PowerShell into ghp_x.
 func commandSecret(ctx context.Context, command, lang string, ignore []string) (*secrets.Finding, error) {
 	found, err := findSecrets(ctx, command, ignore)
 	if err != nil || len(found) > 0 {
@@ -98,9 +98,9 @@ func commandSecret(ctx context.Context, command, lang string, ignore []string) (
 }
 
 // shellTexts returns what the shell (bash, or PowerShell for lang
-// ShellPowerShell) may make of a command line's words
-// The first text has each word on a line of its own
-// The second runs the commands' arguments together, as printf %s%s gh p_x or echo -n in turn would print them
+// ShellPowerShell) may make of a command line's words.
+// The first text has each word on a line of its own.
+// The second runs the commands' arguments together, as printf %s%s gh p_x or echo -n in turn would print them.
 func shellTexts(command, lang string) ([]string, error) {
 	literals := shell.Literals
 	if lang == ShellPowerShell {
@@ -121,8 +121,8 @@ func shellTexts(command, lang string) ([]string, error) {
 // may edit next to a credential it didn't write, or remove one. For an
 // edit, it checks the file as it would be after the edit, so that a secret
 // put together from parts (edits next to each other, or an edit next to
-// text written earlier) is found too
-// A move checks the complete result, without the source's existing-secret allowance
+// text written earlier) is found too.
+// A move checks the complete result, without the source's existing-secret allowance.
 func writeSecret(ctx context.Context, a Action, ignore []string) (*secrets.Finding, error) {
 	if a.Content == "" && a.Rewrite == nil {
 		return nil, nil
@@ -190,7 +190,7 @@ func writeSecret(ctx context.Context, a Action, ignore []string) (*secrets.Findi
 	return first(found), nil
 }
 
-// first returns a pointer to the first finding, or nil when there are none
+// first returns a pointer to the first finding, or nil when there are none.
 func first(found []secrets.Finding) *secrets.Finding {
 	if len(found) == 0 {
 		return nil
@@ -198,7 +198,7 @@ func first(found []secrets.Finding) *secrets.Finding {
 	return &found[0]
 }
 
-// findSecrets returns the secrets in text, plain or encoded, in the order of their offsets
+// findSecrets returns the secrets in text, plain or encoded, in the order of their offsets.
 func findSecrets(ctx context.Context, text string, ignore []string) ([]secrets.Finding, error) {
 	found, err := secrets.Scan(ctx, text, ignore)
 	if err != nil {
@@ -213,7 +213,7 @@ func findSecrets(ctx context.Context, text string, ignore []string) ([]secrets.F
 	return found, nil
 }
 
-// displayPath is the action's path as the agent wrote it
+// displayPath is the action's path as the agent wrote it.
 func (a Action) displayPath() string {
 	if a.display != "" {
 		return a.display
@@ -222,8 +222,8 @@ func (a Action) displayPath() string {
 }
 
 // Redact replaces the secrets in s, plain or encoded, with their rule's
-// name, for logs, whatever a policy says and ignoring no rule
-// Text whose scan can't finish is replaced whole
+// name, for logs, whatever a policy says and ignoring no rule.
+// Text whose scan can't finish is replaced whole.
 func Redact(ctx context.Context, s string) string {
 	if s == "" {
 		return s
@@ -237,7 +237,7 @@ func Redact(ctx context.Context, s string) string {
 
 // RedactCommand is Redact for a command line in the language lang
 // (Action.Shell): a secret only the shell would see (split by quotes or
-// escapes) replaces the whole line
+// escapes) replaces the whole line.
 func RedactCommand(ctx context.Context, command, lang string) string {
 	red := Redact(ctx, command)
 	if red == "" || red == "[REDACTED:unchecked]" {

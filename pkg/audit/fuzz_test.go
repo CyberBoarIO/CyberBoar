@@ -9,7 +9,7 @@ import (
 	"cyberboar.dev/cyberboar/pkg/audit"
 )
 
-// FuzzParseLine: parsing never panics, and a line ParseLine accepts also passes CheckKeys inside a batch
+// FuzzParseLine: parsing never panics, and a line ParseLine accepts also passes CheckKeys inside a batch.
 func FuzzParseLine(f *testing.F) {
 	// A fixed epoch keeps the seed corpus reproducible
 	timestamp := time.Unix(0, 0).UTC().Format(time.RFC3339)

@@ -25,7 +25,7 @@ func TestSchemaCompiles(t *testing.T) {
 	}
 }
 
-// The schema is a static file, so it can drift from pkg/brand on rename
+// The schema is a static file, so it can drift from pkg/brand on rename.
 func TestSchemaMatchesBrand(t *testing.T) {
 	var s struct {
 		ID         string `json:"$id"`
@@ -68,7 +68,7 @@ func TestLoadFillsDefaults(t *testing.T) {
 	}
 }
 
-// A tripwire block turns the tripwire on, with the defaults for what it leaves out
+// A tripwire block turns the tripwire on, with the defaults for what it leaves out.
 func TestTripwireBlockTurnsItOn(t *testing.T) {
 	p, err := Load([]byte("apiVersion: " + brand.APIVersion + "\nkind: Policy\nmetadata: {name: x}\n" +
 		"spec: {session: {tripwire: {}}}\n"))
@@ -99,7 +99,7 @@ func TestSessionSettings(t *testing.T) {
 	}
 }
 
-// An unsupported API version error names the supported version
+// An unsupported API version error names the supported version.
 func TestUnsupportedAPIVersionNamesSupportedVersion(t *testing.T) {
 	_, err := Load([]byte("apiVersion: " + brand.APIGroup + "/v2\nkind: Policy\nmetadata: {name: x}\nspec: {}\n"))
 	var perr *Error
@@ -109,7 +109,7 @@ func TestUnsupportedAPIVersionNamesSupportedVersion(t *testing.T) {
 }
 
 // Deep nesting is refused before the parser sees it, since parsing it takes
-// time and memory quadratic in the depth
+// time and memory quadratic in the depth.
 func TestTooDeep(t *testing.T) {
 	const n = 100000
 	head := "apiVersion: " + brand.APIVersion + "\nkind: Policy\nmetadata: {name: x}\n"
@@ -129,7 +129,7 @@ func TestTooDeep(t *testing.T) {
 	}
 }
 
-// Nesting under the limit reaches the schema, and comments don't count as levels
+// Nesting under the limit reaches the schema, and comments don't count as levels.
 func TestNotTooDeep(t *testing.T) {
 	var comments strings.Builder
 	for i := range 2 * MaxDepth {
@@ -144,7 +144,7 @@ func TestNotTooDeep(t *testing.T) {
 	}
 }
 
-// Of several schema errors, the first in index order is reported
+// Of several schema errors, the first in index order is reported.
 func TestSchemaErrorOrder(t *testing.T) {
 	deny := make([]string, 11)
 	for i := range deny {
@@ -159,7 +159,7 @@ func TestSchemaErrorOrder(t *testing.T) {
 	}
 }
 
-// A pattern error quotes the pattern as written, not its translated form
+// A pattern error quotes the pattern as written, not its translated form.
 func TestPatternErrorQuotesWrittenPattern(t *testing.T) {
 	_, err := Load([]byte("apiVersion: " + brand.APIVersion + "\nkind: Policy\nmetadata: {name: x}\n" +
 		"spec: {files: {deny: ['C:\\']}}\n"))
@@ -168,7 +168,7 @@ func TestPatternErrorQuotesWrittenPattern(t *testing.T) {
 	}
 }
 
-// Drive patterns still reach the engine in its /c/x form
+// Drive patterns still reach the engine in its /c/x form.
 func TestDrivePatternsTranslated(t *testing.T) {
 	p, err := Load([]byte("apiVersion: " + brand.APIVersion + "\nkind: Policy\nmetadata: {name: x}\n" +
 		"spec: {files: {deny: ['C:\\Users\\*\\.ssh\\**', 'D:/data/**']}}\n"))

@@ -18,7 +18,7 @@ import (
 )
 
 // Codex runs the tool when a hook answers "ask", so nothing but deny or
-// silence may ever come out
+// silence may ever come out.
 func TestRespondNeverAsksOrAllows(t *testing.T) {
 	for _, d := range []engine.Decision{engine.Ask, engine.Deny} {
 		out := Adapter{}.Respond(engine.Verdict{Decision: d, Rule: "r", Reason: "because"}, "cb: ")
@@ -48,7 +48,7 @@ func TestRespondNeverAsksOrAllows(t *testing.T) {
 
 // Codex may still be writing the call when the hook runs, so the adapter
 // waits for it, 1.5 s at most. The bubble's clock is fake: a call written
-// 1.4 s in is found, one written 1.6 s in is refused, and no test sleeps
+// 1.4 s in is found, one written 1.6 s in is refused, and no test sleeps.
 func TestTranscriptCallArrivesLate(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -86,7 +86,7 @@ func TestTranscriptCallArrivesLate(t *testing.T) {
 	}
 }
 
-// Only the end of a large transcript is read; a call there is still found
+// Only the end of a large transcript is read; a call there is still found.
 func TestTranscriptTail(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "rollout.jsonl")
 	big := strings.Repeat(`{"type":"event_msg","payload":{"text":"`+strings.Repeat("x", 1000)+`"}}`+"\n", transcriptTail/1000+10)
@@ -99,7 +99,7 @@ func TestTranscriptTail(t *testing.T) {
 // Codex reads the arguments with exact key names and ignores other keys;
 // encoding/json also takes a key that differs in case, and the last of two.
 // Any such key is refused, so the hook can't read another workdir or shell
-// than Codex uses
+// than Codex uses.
 func TestTranscriptArgumentKeys(t *testing.T) {
 	for name, args := range map[string]string{
 		"mis-cased":         `{"cmd":"ls","workdir":"/root","Workdir":null}`,
@@ -136,7 +136,7 @@ func TestReadLineSkipsOverlongLines(t *testing.T) {
 	}
 }
 
-// Codex reports MCP names in its own form, so every split says so
+// Codex reports MCP names in its own form, so every split says so.
 func TestMCPCallsHaveCodexNames(t *testing.T) {
 	in := &Input{HookEventName: "PreToolUse", Cwd: "/work", ToolName: "mcp__fs_srv__write_file", ToolInput: json.RawMessage(`{}`)}
 	actions, err := Actions(in, Env{Home: "/home/dev", Shell: "/bin/bash"})
@@ -153,7 +153,7 @@ func TestMCPCallsHaveCodexNames(t *testing.T) {
 // On native Windows Codex runs commands in PowerShell: they are analysed as
 // PowerShell with Windows paths, a shell other than PowerShell is refused,
 // and the user's PowerShell folders, Codex's settings and the managed
-// directory are guarded
+// directory are guarded.
 func TestWindows(t *testing.T) {
 	c, err := engine.Compile(loadPolicy(t, "baseline.yaml"))
 	if err != nil {

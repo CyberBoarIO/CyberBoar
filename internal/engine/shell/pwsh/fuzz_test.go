@@ -12,7 +12,7 @@ import (
 // panics, an error is always an *Error the engine treats as unparseable or
 // over a limit, and a tree it returns is well formed (every extent inside
 // the input) and the same on every call. TestPowerShellDifferential takes what
-// the fuzzer finds further, against PowerShell's own parser
+// the fuzzer finds further, against PowerShell's own parser.
 func FuzzParsePowerShell(f *testing.F) {
 	for _, in := range pwshInputs(f) {
 		f.Add(in)

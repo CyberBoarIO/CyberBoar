@@ -1,13 +1,13 @@
 // Package copilot maps GitHub Copilot's preToolUse hook input to engine
 // actions and engine verdicts to hook output, for Copilot CLI, the Copilot
 // session target of VS Code (which runs Copilot CLI's runtime) and VS Code's
-// Local agent, which all read the same hook files
+// Local agent, which all read the same hook files.
 //
 // The hook is installed under the camelCase event name preToolUse, whose
 // input from Copilot names its own tools, such as bash, powershell and view.
 // Copilot's VS Code-compatible PreToolUse form reports bash and powershell
 // both as Bash, so the adapter refuses it. VS Code's Local agent sends that
-// form with a tool_use_id and its own tools (vscode.go)
+// form with a tool_use_id and its own tools (vscode.go).
 package copilot
 
 import (
@@ -27,24 +27,24 @@ import (
 )
 
 // RuleSQLFileAccess denies a query to one of Copilot's SQL tools that could
-// read or write a file
-// Copilot runs the query itself, so the files it would touch never reach the engine
+// read or write a file.
+// Copilot runs the query itself, so the files it would touch never reach the engine.
 const RuleSQLFileAccess = "adapter.sqlFileAccess"
 
-// Adapter speaks Copilot CLI's hook protocol
+// Adapter speaks Copilot CLI's hook protocol.
 type Adapter struct{}
 
-// Name returns "copilot-cli", the agent name used on the command line and in audit events
+// Name returns "copilot-cli", the agent name used on the command line and in audit events.
 func (Adapter) Name() string { return "copilot-cli" }
 
-// Input is the preToolUse hook input
+// Input is the preToolUse hook input.
 type Input struct {
 	SessionID string          `json:"sessionId"`
 	Cwd       string          `json:"cwd"`
 	ToolName  string          `json:"toolName"`
 	ToolArgs  json.RawMessage `json:"toolArgs"`
 	// The VS Code-compatible form's fields. VS Code's Local agent sends this
-	// form with a tool_use_id and Copilot sends it without one
+	// form with a tool_use_id and Copilot sends it without one.
 	ToolNameVSCode *string         `json:"tool_name"`
 	ToolInput      json.RawMessage `json:"tool_input"`
 	ToolUseID      string          `json:"tool_use_id"`
@@ -52,10 +52,10 @@ type Input struct {
 	HookEventName  string          `json:"hook_event_name"`
 }
 
-// Local reports whether the input is from VS Code's Local agent
+// Local reports whether the input is from VS Code's Local agent.
 func (in *Input) Local() bool { return in.ToolNameVSCode != nil }
 
-// ParseInput decodes exactly one JSON object
+// ParseInput decodes exactly one JSON object.
 func ParseInput(data []byte) (*Input, error) {
 	var in Input
 	if err := adapters.DecodeHookInput(data, &in); err != nil {
@@ -79,20 +79,20 @@ func ParseInput(data []byte) (*Input, error) {
 	return &in, nil
 }
 
-// Env is what the adapter takes from the hook's environment
+// Env is what the adapter takes from the hook's environment.
 type Env struct {
 	// ProjectDir is COPILOT_PROJECT_DIR, which Copilot sets for hooks to the
-	// git root, or else to the session directory
-	// The model can't change it
+	// git root, or else to the session directory.
+	// The model can't change it.
 	ProjectDir string
 	Home       string
-	// CopilotHome is COPILOT_HOME, where Copilot keeps the user's settings when it is set
-	// The default is ~/.copilot
+	// CopilotHome is COPILOT_HOME, where Copilot keeps the user's settings when it is set.
+	// The default is ~/.copilot.
 	CopilotHome string
 	CDPath      bool
 }
 
-// Parse reads the workspace root from COPILOT_PROJECT_DIR
+// Parse reads the workspace root from COPILOT_PROJECT_DIR.
 func (Adapter) Parse(data []byte, getenv func(string) string) (*adapters.Call, error) {
 	in, err := ParseInput(data)
 	if err != nil {
@@ -116,7 +116,7 @@ func (Adapter) Parse(data []byte, getenv func(string) string) (*adapters.Call, e
 // SettingsFiles returns the Copilot files and directories that can install,
 // change or switch off the hook (disableAllHooks), which agents may not
 // change (builtin.guarded). They are the user's config and hooks, the
-// repository's hooks and settings, and the machine-wide policy directory
+// repository's hooks and settings, and the machine-wide policy directory.
 func SettingsFiles(env Env) []string {
 	var out []string
 	for _, dir := range []string{adapters.Under(false, env.Home, ".copilot"), env.CopilotHome} {
@@ -131,7 +131,7 @@ func SettingsFiles(env Env) []string {
 }
 
 // copilotProjectFiles returns a folder's Copilot hook files and settings,
-// and its custom agents, whose hooks VS Code runs when the agent runs
+// and its custom agents, whose hooks VS Code runs when the agent runs.
 func copilotProjectFiles(dir string) []string {
 	if dir == "" {
 		return nil
@@ -143,10 +143,10 @@ func copilotProjectFiles(dir string) []string {
 // Respond turns a verdict into hook output. Deny exits 2, which blocks even
 // if Copilot can't parse the JSON, and puts the reason on stderr too. Copilot
 // still shows the JSON reason. Allow produces no output, because CyberBoar
-// never answers "allow" and leaves Copilot's own permission flow in charge
+// never answers "allow" and leaves Copilot's own permission flow in charge.
 // The answer is in both shapes: Copilot reads the top-level fields and
 // ignores hookSpecificOutput, which VS Code's Local agent reads (seen in
-// Copilot CLI 1.0.98 and VS Code 1.142)
+// Copilot CLI 1.0.98 and VS Code 1.142).
 func (Adapter) Respond(v engine.Verdict, prefix string) adapters.Output {
 	reason := prefix + v.Reason
 	var decision string
@@ -222,8 +222,8 @@ var classification = sync.OnceValues(func() (map[string]toolSpec, error) {
 	})
 })
 
-// Actions maps a hook input to the engine actions to evaluate
-// No actions and no error means the tool touches nothing CyberBoar governs
+// Actions maps a hook input to the engine actions to evaluate.
+// No actions and no error means the tool touches nothing CyberBoar governs.
 func Actions(in *Input, env Env) ([]engine.Action, error) {
 	base := engine.Action{Cwd: in.Cwd, Home: env.Home}
 	if env.ProjectDir != "" {
@@ -333,7 +333,7 @@ func Actions(in *Input, env Env) ([]engine.Action, error) {
 
 // resolve makes p absolute against cwd, for the directory test only. The
 // engine does its own resolution. An unusable cwd gives "", which is not a
-// directory, so the path is checked as a read, the stricter reading
+// directory, so the path is checked as a read, the stricter reading.
 func resolve(cwd, p string) string {
 	if strings.HasPrefix(p, "/") {
 		return p
@@ -346,11 +346,11 @@ func resolve(cwd, p string) string {
 
 // mcpActions splits <server>-<tool>. Server and tool names may both contain
 // dashes and the hook input doesn't say where the server ends, so every split
-// is evaluated and the strictest verdict wins
-// An allowed server "github" then can't cover a server "github-evil"
+// is evaluated and the strictest verdict wins.
+// An allowed server "github" then can't cover a server "github-evil".
 // Copilot writes both names with "-" for other punctuation, punycode for
 // non-ASCII parts, and cuts the whole at 64 characters (seen in 1.0.97), so
-// the calls say the names are Copilot's
+// the calls say the names are Copilot's.
 func mcpActions(name string, base engine.Action) ([]engine.Action, error) {
 	var out []engine.Action
 	for i := 1; i < len(name)-1; i++ {
@@ -370,18 +370,18 @@ func mcpActions(name string, base engine.Action) ([]engine.Action, error) {
 // session database, can attach databases, write one with VACUUM INTO and load
 // extensions. DuckDB, the session store, also reads and writes files through
 // table functions, COPY, EXPORT and file names used as tables. query and
-// query_table can construct SQL or file names at runtime, so they are refused
+// query_table can construct SQL or file names at runtime, so they are refused.
 // The lists over-approximate, and a false match only denies a query the model
-// can phrase another way
+// can phrase another way.
 var (
 	sqliteFile = regexp.MustCompile(`(?i)\b(attach|vacuum|load_extension|readfile|writefile|fsdir|zipfile|sqlar\w*|(temp|data)_store_directory)\b|\bedit\s*\(`)
 	duckdbFile = regexp.MustCompile(`(?i)\b(copy|export|import|install|load|force|read_\w+|\w+_scan|sniff_csv|parquet_\w+|delta_\w+|iceberg_\w+|query(_table)?|glob|secret|httpfs)\b`)
 	// quotedPath matches a quoted name or string that looks like a path or
-	// file name, because DuckDB reads FROM 'x.csv' and FROM "x.csv" as files
+	// file name, because DuckDB reads FROM 'x.csv' and FROM "x.csv" as files.
 	quotedPath = regexp.MustCompile(`'[^']*[/\\~][^']*'|"[^"]*[/\\~][^"]*"|'[^']*\.[A-Za-z]\w*'|"[^"]*\.[A-Za-z]\w*"`)
 )
 
-// sqlFileAccess names the construct that makes a query unsafe, or ""
+// sqlFileAccess names the construct that makes a query unsafe, or "".
 func sqlFileAccess(dialect, q string) string {
 	if m := sqliteFile.FindString(q); m != "" {
 		return strings.ToUpper(strings.TrimSpace(strings.TrimSuffix(m, "(")))
@@ -402,7 +402,7 @@ func sqlFileAccess(dialect, q string) string {
 // the file (adapters.WriteText). str_replace_editor, Anthropic's text editor
 // tool, uses the fields its command names. create writes file_text,
 // str_replace replaces old_str with new_str, and insert puts new_str after
-// line insert_line. A command that writes nothing may not carry text
+// line insert_line. A command that writes nothing may not carry text.
 func writeText(input map[string]any, spec toolSpec) (string, engine.Rewrite, error) {
 	if !spec.Editor {
 		return adapters.WriteText(input, spec.Content, spec.Edit)

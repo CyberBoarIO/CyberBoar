@@ -1,4 +1,4 @@
-// Package boundedfile reads regular files without allocating beyond a byte limit
+// Package boundedfile reads regular files without allocating beyond a byte limit.
 package boundedfile
 
 import (
@@ -8,10 +8,10 @@ import (
 	"os"
 )
 
-// Read follows symlinks to a regular file and reads at most limit bytes
+// Read follows symlinks to a regular file and reads at most limit bytes.
 // Both the path and the opened file are checked: a FIFO or device is refused,
-// and growth or replacement cannot defeat the allocation bound
-// Filesystem operations may still block, so callers with a deadline must bound the call
+// and growth or replacement cannot defeat the allocation bound.
+// Filesystem operations may still block, so callers with a deadline must bound the call.
 func Read(path string, limit int64) ([]byte, error) {
 	info, err := os.Stat(path)
 	if err != nil {

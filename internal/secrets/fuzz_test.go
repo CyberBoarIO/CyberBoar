@@ -10,7 +10,7 @@ import (
 	"cyberboar.dev/cyberboar/internal/secrets/secretstest"
 )
 
-// FuzzScan checks that findings, plain and decoded, lie in the text, and that Redact removes each of them
+// FuzzScan checks that findings, plain and decoded, lie in the text, and that Redact removes each of them.
 func FuzzScan(f *testing.F) {
 	for _, id := range secretstest.Rules() {
 		s, _ := secretstest.Fake(id)

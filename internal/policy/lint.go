@@ -2,14 +2,14 @@ package policy
 
 import "fmt"
 
-// Warning is an advisory finding. Warnings never affect policy validity or enforcement
+// Warning is an advisory finding. Warnings never affect policy validity or enforcement.
 type Warning struct {
 	Path    string
 	Message string
 }
 
-// Lint detects only exact duplicates and exact cross-list conflicts
-// It does not attempt to infer overlaps between nonidentical patterns or globs
+// Lint detects only exact duplicates and exact cross-list conflicts.
+// It does not attempt to infer overlaps between nonidentical patterns or globs.
 func Lint(p *Policy) []Warning {
 	if p == nil {
 		return nil

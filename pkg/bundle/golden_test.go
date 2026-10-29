@@ -19,10 +19,10 @@ import (
 var update = flag.Bool("update", false, "rewrite the golden files in testdata/protocol")
 
 // goldenClock is the time the golden files are made for (docs/protocol); the
-// golden serial is its Unix time, as `sign --serial $(date +%s)` would write
+// golden serial is its Unix time, as `sign --serial $(date +%s)` would write.
 var goldenClock = time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
 
-// goldenBundles defines the generated fixtures and their signature headers
+// goldenBundles defines the generated fixtures and their signature headers.
 var goldenBundles = map[string]sign.Header{
 	"bundle-baseline.json":           {Serial: 1790856000, Expires: goldenClock.AddDate(0, 0, 90)},
 	"bundle-reject-expired.json":     {Serial: 1790856001, Expires: goldenClock},
@@ -34,7 +34,7 @@ var goldenBundles = map[string]sign.Header{
 // The golden bundles in testdata/protocol are what this package builds from
 // examples/baseline.yaml signed with the test key. Other
 // implementations of the protocol test against them (docs/protocol), so a
-// change here is a change to the protocol
+// change here is a change to the protocol.
 func TestGoldenBundle(t *testing.T) {
 	priv, err := sign.LoadPrivate("../../testdata/protocol/insecure-test.key")
 	if err != nil {
@@ -109,7 +109,7 @@ func TestGoldenBundle(t *testing.T) {
 	}
 }
 
-// A console configured with a key serves only policies signed with it
+// A console configured with a key serves only policies signed with it.
 func TestLoadDirRequiresSignatures(t *testing.T) {
 	priv, _ := sign.LoadPrivate("../../testdata/protocol/insecure-test.key")
 	pub, _ := sign.LoadPublic("../../testdata/protocol/insecure-test.pub")
@@ -150,7 +150,7 @@ func signed(t *testing.T, priv ed25519.PrivateKey, name string, data []byte) str
 	return sig
 }
 
-// invalidSignatureBundle reads a fixture whose signature is missing its headers
+// invalidSignatureBundle reads a fixture whose signature is missing its headers.
 func invalidSignatureBundle(t *testing.T) (policy []byte, sig string) {
 	t.Helper()
 	body, err := os.ReadFile("../../testdata/protocol/bundle-reject-signature.json")

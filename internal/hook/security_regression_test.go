@@ -70,7 +70,7 @@ func (a decisionAdapter) Parse([]byte, func(string) string) (*adapters.Call, err
 }
 
 // TestPolicyExpiresDuringEvaluation advances the injected clock while an
-// otherwise permitted edit is evaluated, after the signature was checked
+// otherwise permitted edit is evaluated, after the signature was checked.
 func TestPolicyExpiresDuringEvaluation(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {

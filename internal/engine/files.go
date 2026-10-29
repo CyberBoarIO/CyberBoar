@@ -60,7 +60,7 @@ func compileFileRules(r policy.Rules) fileRules {
 }
 
 // fileEnv holds the anchors of one action. It keeps both the given and the
-// resolved form of the home directory and of every workspace root
+// resolved form of the home directory and of every workspace root.
 type fileEnv struct {
 	fs           osfs.FS
 	homes, roots []string
@@ -71,7 +71,7 @@ type fileEnv struct {
 // prepareFileEnv resolves the home directory, workspace roots, protected and
 // guarded paths of a. An error makes the whole action invalid rather than
 // checked against some of the anchors: a workspace root that is a drive's
-// root, or that contains the home directory, would widen what the workspace rules cover
+// root, or that contains the home directory, would widen what the workspace rules cover.
 func prepareFileEnv(a Action) (fileEnv, error) {
 	env := fileEnv{fs: a.fs()}
 	// show gives a path back in the form the user knows: C:\x on Windows, not /c/x
@@ -123,7 +123,7 @@ func prepareFileEnv(a Action) (fileEnv, error) {
 	return env, nil
 }
 
-// change is how an action may change the path it names (builtin.guarded)
+// change is how an action may change the path it names (builtin.guarded).
 type change int
 
 const (
@@ -132,11 +132,11 @@ const (
 	changeModify               // may also delete, move or replace it and what a directory holds
 )
 
-// guardRule denies a change to a guarded path (builtin.guarded)
+// guardRule denies a change to a guarded path (builtin.guarded).
 // That is writing the path or anything inside a guarded directory, and with
 // changeModify also deleting, moving or replacing a directory that holds one
-// The shell can't tell reading from writing, so every shell access counts as a write
-// Reading stays possible with the agent's file tools
+// The shell can't tell reading from writing, so every shell access counts as a write.
+// Reading stays possible with the agent's file tools.
 func (e fileEnv) guardRule(display string, candidates []string, how change) (Verdict, bool) {
 	if how == changeNone {
 		return Verdict{}, false
@@ -160,8 +160,8 @@ func (e fileEnv) guardRule(display string, candidates []string, how change) (Ver
 }
 
 // selfRule denies a path inside one of CyberBoar's own directories, or, when
-// the action touches contents, a directory that holds one (builtin.self)
-// Paths are compared folded, like deny rules
+// the action touches contents, a directory that holds one (builtin.self).
+// Paths are compared folded, like deny rules.
 func (e fileEnv) selfRule(display string, candidates []string, contents bool) (Verdict, bool) {
 	for _, p := range e.protected {
 		for _, c := range candidates {
@@ -173,7 +173,7 @@ func (e fileEnv) selfRule(display string, candidates []string, contents bool) (V
 	return Verdict{}, false
 }
 
-// expand returns the rule's pattern(s) as absolute globs without the leading "/"
+// expand returns the rule's pattern(s) as absolute globs without the leading "/".
 func (r fileRule) expand(env fileEnv) []string {
 	join := func(bases []string) []string {
 		out := make([]string, 0, len(bases))
@@ -201,7 +201,7 @@ func (r fileRule) expand(env fileEnv) []string {
 	}
 }
 
-// boundRule is a rule expanded for one action's home and workspace roots
+// boundRule is a rule expanded for one action's home and workspace roots.
 type boundRule struct {
 	id    string
 	pats  []string // case-sensitive
@@ -212,7 +212,7 @@ type boundRule struct {
 // pattern as written against the path as written. With folded (deny and ask
 // rules), the folded pattern against the folded path also counts, which
 // ignores case, Unicode normalization and ignorable characters, as macOS and
-// other case-insensitive filesystems do
+// other case-insensitive filesystems do.
 func (r boundRule) match(candidates []string, folded bool) bool {
 	for _, c := range candidates {
 		name := strings.TrimPrefix(c, "/")
@@ -235,8 +235,8 @@ func (r boundRule) match(candidates []string, folded bool) bool {
 	return false
 }
 
-// matchAnyPattern reports whether one of pats matches name
-// It stops at the first error
+// matchAnyPattern reports whether one of pats matches name.
+// It stops at the first error.
 func matchAnyPattern(pats []string, name string) (bool, error) {
 	for _, pat := range pats {
 		if ok, err := doublestar.Match(pat, name); ok || err != nil {
@@ -246,7 +246,7 @@ func matchAnyPattern(pats []string, name string) (bool, error) {
 	return false, nil
 }
 
-// boundRules are a policy's file rules bound to one action
+// boundRules are a policy's file rules bound to one action.
 type boundRules struct {
 	env              fileEnv
 	deny, ask, allow []boundRule
@@ -254,7 +254,7 @@ type boundRules struct {
 	allowListed      bool
 }
 
-// bind expands the policy's file rules for the anchors in env
+// bind expands the policy's file rules for the anchors in env.
 func (c *Compiled) bind(env fileEnv) *boundRules {
 	bindRules := func(rs []fileRule) []boundRule {
 		out := make([]boundRule, len(rs))
@@ -294,7 +294,7 @@ const (
 
 // pathResult is the decision for one path. Its outcome says which kind of
 // decision it is, verdict is the verdict to report for it, and rule names
-// the allow rule or posture that let it through
+// the allow rule or posture that let it through.
 type pathResult struct {
 	outcome outcome
 	verdict Verdict
@@ -302,12 +302,12 @@ type pathResult struct {
 }
 
 // maxScanEntries bounds the walk of a directory argument (files.containing).
-// A larger directory counts as containing a protected file
+// A larger directory counts as containing a protected file.
 const maxScanEntries = osfs.MaxDirEntries
 
 // checkPath decides one path. With contents, the action may read or change
 // what a directory contains. With accessed, the path is opened, so under
-// allow-listed posture it needs an allow rule
+// allow-listed posture it needs an allow rule.
 func (b *boundRules) checkPath(display, abs string, contents, accessed bool, how change) pathResult {
 	denied := func(v Verdict) pathResult { return pathResult{outcome: outDenied, verdict: v} }
 	lexical := cleanPath(abs, b.env.fs.Windows)
@@ -386,7 +386,8 @@ func (b *boundRules) checkPath(display, abs string, contents, accessed bool, how
 		return pathResult{outcome: outAsk, verdict: Verdict{Decision: Ask, Rule: id, Reason: fmt.Sprintf("access to %s needs confirmation (policy rule %s)", display, id)}}
 	}
 	if askInside != "" {
-		return pathResult{outcome: outAsk, verdict: Verdict{Decision: Ask, Rule: askInside, Reason: fmt.Sprintf("the directory %s contains files policy rule %s protects, so this needs confirmation", display, askInside)}}
+		reason := fmt.Sprintf("the directory %s contains files policy rule %s protects, so this needs confirmation", display, askInside)
+		return pathResult{outcome: outAsk, verdict: Verdict{Decision: Ask, Rule: askInside, Reason: reason}}
 	}
 	if !b.allowListed || !accessed {
 		return pathResult{outcome: outAllowed, rule: RulePostureDenyListed}
@@ -399,16 +400,20 @@ func (b *boundRules) checkPath(display, abs string, contents, accessed bool, how
 	return pathResult{outcome: outAllowed, rule: allowedBy}
 }
 
-// containingResult converts a blocking directory finding to the policy's decision
-// Built-in denials and incomplete checks cannot become confirmations
+// containingResult converts a blocking directory finding to the policy's decision.
+// Built-in denials and incomplete checks cannot become confirmations.
 func (b *boundRules) containingResult(display string, found finding) (pathResult, bool) {
 	inside := b.env.fs.Show(found.entry)
 	switch found.kind {
 	case foundUncheckable:
-		return pathResult{outcome: outDenied, verdict: deny(RuleContainingLimit, fmt.Sprintf("the directory %s can't be fully checked (%s), so access is blocked; name specific files or subdirectories instead", display, inside))}, true
+		reason := fmt.Sprintf("the directory %s can't be fully checked (%s), so access is blocked; "+
+			"name specific files or subdirectories instead", display, inside)
+		return pathResult{outcome: outDenied, verdict: deny(RuleContainingLimit, reason)}, true
 	case foundBuiltin:
 		if found.rule == RuleSelf {
-			return pathResult{outcome: outDenied, verdict: deny(RuleSelf, fmt.Sprintf("the directory %s holds %s, which leads to %s's own state that agents may not touch, so access is blocked; %s", display, inside, brand.Name, noRetry))}, true
+			reason := fmt.Sprintf("the directory %s holds %s, which leads to %s's own state that agents may not touch, "+
+				"so access is blocked; %s", display, inside, brand.Name, noRetry)
+			return pathResult{outcome: outDenied, verdict: deny(RuleSelf, reason)}, true
 		}
 		what := "process information under /proc"
 		if found.rule == RuleDevFD {
@@ -434,7 +439,7 @@ func (b *boundRules) containingResult(display string, found finding) (pathResult
 
 // allowedBy reports whether every candidate matches an allow rule, so that a
 // symlink inside an allowed area can't lead outside it
-// The rule returned is the one the last candidate matched, which is the resolved path's
+// The rule returned is the one the last candidate matched, which is the resolved path's.
 func (b *boundRules) allowedBy(candidates []string) (string, bool) {
 	var id string
 	for _, c := range candidates {
@@ -447,14 +452,14 @@ func (b *boundRules) allowedBy(candidates []string) (string, bool) {
 }
 
 // A finding is what a walk of a directory found. It holds the rule that
-// matched and the entry it matched, or RuleContainingLimit and why the walk stopped
+// matched and the entry it matched, or RuleContainingLimit and why the walk stopped.
 type finding struct {
 	kind  findingKind
 	rule  string
 	entry string
 }
 
-// findingKind orders findings from the least strict to the strictest
+// findingKind orders findings from the least strict to the strictest.
 type findingKind int
 
 const (
@@ -469,7 +474,7 @@ const (
 // scanDir walks dir breadth-first, in name order, for entries a deny or ask
 // rule matches and, with allowList, for entries that are not on the allow
 // list or link to a path that is not. It returns the strictest finding, the
-// first of its kind
+// first of its kind.
 //
 // Links are resolved, and a link to a directory is followed, as grep -R and
 // cp -rL follow it. An entry is checked by the name the walk reached it by,
@@ -479,27 +484,27 @@ const (
 // it generates, so it counts as an unreadable directory. Every entry,
 // including one reached through another alias, counts toward the one limit.
 // A selfOnly walk can reuse a resolved directory, since the built-in rules
-// depend on the target rather than the alias's spelling
+// depend on the target rather than the alias's spelling.
 //
 // The built-in rules are checked on every entry, link targets included,
 // whatever files.containing says: programs that follow links (grep -R,
 // cp -rL) read through a link to /proc/self/environ. For the same reason
 // whatever the walk can't check is a RuleContainingLimit deny finding in
 // every walk: more entries than the limit, a directory it can't read, or a
-// link it can't resolve. Any of them could hide such a link
+// link it can't resolve. Any of them could hide such a link.
 //
 // A built-in finding or an incomplete check ends the walk. A deny finding
 // ends it too, except under files.containing "ask", where a deny finding
-// only asks and a built-in rule further on must still deny
+// only asks and a built-in rule further on must still deny.
 //
 // With files.containing "ignore", or with no rule to look for, the walk is
-// selfOnly: it looks only for what the built-in rules deny
+// selfOnly: it looks only for what the built-in rules deny.
 func (b *boundRules) scanDir(dir string, allowList bool, budget int) finding {
 	selfOnly := b.containing == policy.ContainingIgnore || len(b.deny)+len(b.ask) == 0 && !allowList
 	denyDecides := b.containing != policy.ContainingAsk
 	// An entry is checked when its directory is read, before anything under
 	// it. At each step, every entry seen so far has passed the built-in
-	// rules, and found is the strictest policy finding among them
+	// rules, and found is the strictest policy finding among them.
 	var found finding
 	// keep records f if it is stricter than what was found so far, and
 	// reports whether the walk can stop
@@ -513,7 +518,7 @@ func (b *boundRules) scanDir(dir string, allowList bool, budget int) finding {
 		return finding{kind: foundUncheckable, rule: RuleContainingLimit, entry: what}
 	}
 	// A walkDir keeps the name the walk reached it by and its ancestors, so
-	// distinct aliases are checked while links back up the tree terminate
+	// distinct aliases are checked while links back up the tree terminate.
 	type walkDir struct {
 		name, resolved string
 		parent         *walkDir
@@ -608,7 +613,7 @@ func (b *boundRules) scanDir(dir string, allowList bool, budget int) finding {
 
 // checkEntry applies the policy's rules to one entry of a walk, in the order
 // checkPath applies them to a path: a deny rule, then an ask rule, which also
-// exempts the entry from the allow list, then with allowList the allow rules
+// exempts the entry from the allow list, then with allowList the allow rules.
 func (b *boundRules) checkEntry(p string, candidates []string, allowList bool) finding {
 	if id, ok := b.firstMatch(b.deny, candidates, true); ok {
 		return finding{kind: foundDeny, rule: id, entry: p}
@@ -624,13 +629,13 @@ func (b *boundRules) checkEntry(p string, candidates []string, allowList bool) f
 	return finding{}
 }
 
-// unresolvable is the deny verdict for a path that resolvePath failed on
+// unresolvable is the deny verdict for a path that resolvePath failed on.
 func unresolvable(display string, err error) Verdict {
 	return deny(RuleUnresolvablePath, fmt.Sprintf("the path %s could not be resolved (%v), so access is blocked; %s", display, err, noRetry))
 }
 
-// builtinRule checks the always-on rules that no policy can switch off
-// The path is folded, since on a case-insensitive root volume (macOS) /DEV/fd is /dev/fd
+// builtinRule checks the always-on rules that no policy can switch off.
+// The path is folded, since on a case-insensitive root volume (macOS) /DEV/fd is /dev/fd.
 func builtinRule(p string) (Verdict, bool) {
 	p = fold.String(p)
 	if p == "/dev/fd" || strings.HasPrefix(p, "/dev/fd/") ||
@@ -653,7 +658,7 @@ func builtinRule(p string) (Verdict, bool) {
 // /proc/$PPID/environ or /dev/fd/$n. Literal text after a run-time part
 // counts when it names such a path on its own, as in ${D}/proc/self/environ,
 // where D may be empty. A shape that pins nothing, such as that of "$f", is
-// left to the policy's rules
+// left to the policy's rules.
 func builtinShape(shape string) (Verdict, bool) {
 	if shape == "" {
 		return Verdict{}, false
@@ -697,11 +702,11 @@ func builtinShape(shape string) (Verdict, bool) {
 	return Verdict{}, false
 }
 
-// shapeDisplay shows a shape in a reason, with "…" for each run-time part
+// shapeDisplay shows a shape in a reason, with "…" for each run-time part.
 func shapeDisplay(shape string) string { return strings.Join(splitShape(shape), "…") }
 
 // splitShape returns the literal pieces of a shape, unescaped, between its
-// unescaped "*"s. The first piece is what the path starts with
+// unescaped "*"s. The first piece is what the path starts with.
 func splitShape(shape string) []string {
 	var pieces []string
 	var b strings.Builder
@@ -725,21 +730,22 @@ func splitShape(shape string) []string {
 
 // builtinHolder is builtinRule for an action that reads what a directory
 // holds. It also denies /, /proc and /dev, whose contents are what the
-// built-in rules protect. display names p in the reason
+// built-in rules protect. display names p in the reason.
 func builtinHolder(display, p string) (Verdict, bool) {
 	if v, hit := builtinRule(p); hit {
 		return v, true
 	}
 	switch fold.String(p) {
 	case "/", "/proc":
-		return deny(RuleProcfs, fmt.Sprintf("reading what %s holds reaches process information under /proc, which can expose secrets and reach arbitrary files, so it is blocked; %s", display, noRetry)), true
+		return deny(RuleProcfs, fmt.Sprintf("reading what %s holds reaches process information under /proc, "+
+			"which can expose secrets and reach arbitrary files, so it is blocked; %s", display, noRetry)), true
 	case "/dev":
 		return deny(RuleDevFD, fmt.Sprintf("reading what %s holds reaches /dev/fd and /dev/std*, which name the agent's open files, so it is blocked; %s", display, noRetry)), true
 	}
 	return Verdict{}, false
 }
 
-// isDigits reports whether s is a non-empty string of ASCII digits
+// isDigits reports whether s is a non-empty string of ASCII digits.
 func isDigits(s string) bool {
 	if s == "" {
 		return false
@@ -752,7 +758,7 @@ func isDigits(s string) bool {
 	return true
 }
 
-// evalFile decides a read or write of a.Path by the agent's own file tools
+// evalFile decides a read or write of a.Path by the agent's own file tools.
 func (c *Compiled) evalFile(a Action) Verdict {
 	env, err := prepareFileEnv(a)
 	if err != nil {

@@ -25,21 +25,21 @@ import (
 // denied, so a format change in Codex blocks commands and never lets them
 // through unchecked
 
-// RuleCallNotFound denies a call the transcript can't vouch for
+// RuleCallNotFound denies a call the transcript can't vouch for.
 const RuleCallNotFound = "adapter.callNotFound"
 
 // The call is near the end of the transcript, so only the last
-// transcriptTail bytes are read, and a line longer than maxLine is skipped
+// transcriptTail bytes are read, and a line longer than maxLine is skipped.
 const (
 	transcriptTail = 8 << 20
 	maxLine        = 4 << 20
 )
 
 // transcriptWait is how long to wait for the call to reach the transcript
-// (Codex persists it before running the tool, but the write may lag)
+// (Codex persists it before running the tool, but the write may lag).
 const transcriptWait = 1500 * time.Millisecond
 
-// execCall holds the arguments exec_command received from the model
+// execCall holds the arguments exec_command received from the model.
 type execCall struct {
 	Cmd           string  `json:"cmd"`
 	Workdir       *string `json:"workdir"`
@@ -55,7 +55,7 @@ func callError(format string, args ...any) error {
 }
 
 // lookupExecCall finds the exec_command call with the hook's tool_use_id,
-// or, for a call made from a code-mode script, the script's call running cmd
+// or, for a call made from a code-mode script, the script's call running cmd.
 func lookupExecCall(in *Input, cmd string) (*execCall, error) {
 	if in.TranscriptPath == nil || *in.TranscriptPath == "" {
 		return nil, callError("the hook input has no transcript_path")
@@ -82,7 +82,7 @@ func lookupExecCall(in *Input, cmd string) (*execCall, error) {
 
 var errNotYet = errors.New("call not in the transcript yet")
 
-// transcriptLine is a line of Codex's rollout file
+// transcriptLine is a line of Codex's rollout file.
 type transcriptLine struct {
 	Type    string `json:"type"`
 	Payload struct {
@@ -96,13 +96,13 @@ type transcriptLine struct {
 	} `json:"payload"`
 }
 
-// codeModeID marks tool calls made from a code-mode script
+// codeModeID marks tool calls made from a code-mode script.
 const codeModeID = "exec-"
 
 // scanTranscript reads the end of the transcript at path and returns the
 // exec_command call with ID callID, or for a call made from a code-mode
 // script, the script's call that runs cmd. It returns errNotYet while the
-// call isn't in the transcript, so that the caller can wait for Codex to write it
+// call isn't in the transcript, so that the caller can wait for Codex to write it.
 func scanTranscript(path, callID, cmd string) (*execCall, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -205,7 +205,7 @@ func scanTranscript(path, callID, cmd string) (*execCall, error) {
 	return &call, nil
 }
 
-// objectKeys returns the keys of a JSON object in order, repeats included
+// objectKeys returns the keys of a JSON object in order, repeats included.
 func objectKeys(data string) ([]string, error) {
 	dec := json.NewDecoder(strings.NewReader(data))
 	if t, err := dec.Token(); err != nil || t != json.Delim('{') {
@@ -226,7 +226,7 @@ func objectKeys(data string) ([]string, error) {
 	return keys, nil
 }
 
-// execFields are the JSON names of execCall's fields
+// execFields are the JSON names of execCall's fields.
 var execFields = func() []string {
 	var names []string
 	for f := range reflect.TypeFor[execCall]().Fields() {
@@ -242,7 +242,7 @@ var execFields = func() []string {
 // case folding, such as "Workdir" or a key with the Kelvin sign for its k,
 // and keeps the last of several. The hook could then see another working
 // directory or shell than the one the command runs in
-// Audit lines with such keys are rejected for the same reason
+// Audit lines with such keys are rejected for the same reason.
 func checkArgKeys(keys []string) error {
 	seen := map[string]bool{}
 	for _, k := range keys {
@@ -260,7 +260,7 @@ func checkArgKeys(keys []string) error {
 }
 
 // readLine reads one line. A line longer than maxLine comes back empty,
-// since the call isn't in one
+// since the call isn't in one.
 func readLine(r *bufio.Reader) ([]byte, error) {
 	var buf []byte
 	skip := false

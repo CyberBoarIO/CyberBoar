@@ -4,7 +4,7 @@ import "mvdan.cc/sh/v3/syntax"
 
 // The command budget bounds every set to four 64-bit words. Store graph
 // rows directly, rather than hashing individual edges or allocating a
-// boolean slice for each row of the reachability matrix
+// boolean slice for each row of the reachability matrix.
 type commandSet [(MaxCommands + 63) / 64]uint64
 
 func (s commandSet) has(id int) bool {
@@ -23,11 +23,11 @@ func (s *commandSet) merge(other commandSet) {
 
 type commandSpan struct{ start, end int }
 
-// indexCommands records subtree ranges in a single preorder list of ids
+// indexCommands records subtree ranges in a single preorder list of ids.
 // The ranges reproduce cmdsIn's old Walk order without rescanning overlapping
-// subtrees (notably every left-hand prefix of a long pipeline)
+// subtrees (notably every left-hand prefix of a long pipeline).
 // Only node types queried by linkFile need an entry. Inline-code ASTs have their own
-// index; their graph relations are connected separately by transparency
+// index; their graph relations are connected separately by transparency.
 func indexCommands(f *syntax.File, ids map[*syntax.Stmt]int) (map[syntax.Node]commandSpan, []int) {
 	spans := make(map[syntax.Node]commandSpan)
 	order := make([]int, 0, len(ids))

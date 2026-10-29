@@ -3,7 +3,7 @@ package pwsh
 import "strings"
 
 // tokenKind follows PowerShell's TokenKind, keeping only the kinds the lexer
-// produces. Keywords share one kind and carry their text in token.keyword
+// produces. Keywords share one kind and carry their text in token.keyword.
 type tokenKind uint8
 
 const (
@@ -78,7 +78,7 @@ const (
 	tokSubExpr // an unscanned $(...) inside an expandable string
 )
 
-// Traits of token kinds, from PowerShell's TokenFlags table
+// Traits of token kinds, from PowerShell's TokenFlags table.
 const (
 	kindParseModeInvariant = 1 << iota
 	kindUnaryOperator
@@ -111,7 +111,7 @@ func (k tokenKind) traits() int {
 
 func (k tokenKind) is(trait int) bool { return k.traits()&trait != 0 }
 
-// precedence returns a binary operator's precedence, from PowerShell's TokenFlags.BinaryPrecedence values
+// precedence returns a binary operator's precedence, from PowerShell's TokenFlags.BinaryPrecedence values.
 func (k tokenKind) precedence() int {
 	switch k {
 	case tokAnd, tokOr, tokXor:
@@ -136,11 +136,11 @@ func (k tokenKind) precedence() int {
 
 // keywords is the tokenizer's keyword table. A word in it is a keyword only
 // in command mode, and only when a token boundary follows it. Elsewhere it is
-// a plain word
+// a plain word.
 var keywords = map[string]bool{}
 
 func init() {
-	for _, k := range strings.Fields(`elseif if else switch foreach from in for while until do try
+	for k := range strings.FieldsSeq(`elseif if else switch foreach from in for while until do try
 		catch finally trap data return continue break exit throw begin process end dynamicparam
 		function filter param class define var using workflow parallel sequence inlinescript
 		configuration public private static interface enum namespace module type assembly command
@@ -151,7 +151,7 @@ func init() {
 
 // operators maps the words after a dash in expression mode to their kinds.
 // Comparison-like operators share tokComparison, and their token keeps the
-// word in token.op
+// word in token.op.
 var operators = map[string]tokenKind{
 	"bnot": tokBnot, "not": tokNot, "f": tokFormat, "and": tokAnd, "band": tokBand, "or": tokOr,
 	"bor": tokBor, "xor": tokXor, "bxor": tokBxor, "join": tokJoin, "split": tokIsplit,
@@ -159,7 +159,7 @@ var operators = map[string]tokenKind{
 }
 
 func init() {
-	for _, k := range strings.Fields(`eq ieq ceq ne ine cne ge ige cge gt igt cgt lt ilt clt le ile
+	for k := range strings.FieldsSeq(`eq ieq ceq ne ine cne ge ige cge gt igt cgt lt ilt clt le ile
 		cle like ilike clike notlike inotlike cnotlike match imatch cmatch notmatch inotmatch
 		cnotmatch replace ireplace creplace contains icontains ccontains notcontains inotcontains
 		cnotcontains in iin cin notin inotin cnotin isnot is as shl shr`) {
@@ -167,10 +167,10 @@ func init() {
 	}
 }
 
-// Stream is a redirection's stream, numbered as PowerShell's RedirectionStream
+// Stream is a redirection's stream, numbered as PowerShell's RedirectionStream.
 type Stream int
 
-// The streams, in PowerShell's order. StreamAll is the * of *> and *>&1
+// The streams, in PowerShell's order. StreamAll is the * of *> and *>&1.
 const (
 	StreamAll Stream = iota
 	StreamOutput
@@ -183,7 +183,7 @@ const (
 
 var streamNames = [...]string{"All", "Output", "Error", "Warning", "Verbose", "Debug", "Information"}
 
-// String returns the stream's name in PowerShell's RedirectionStream
+// String returns the stream's name in PowerShell's RedirectionStream.
 func (s Stream) String() string { return streamNames[s] }
 
 type token struct {
@@ -236,7 +236,7 @@ var comparisonNames = map[string]string{
 }
 
 // kindName returns the operator's name in PowerShell's TokenKind, such as
-// Plus, Ieq, Format or AndAnd. The syntax tree names operators this way
+// Plus, Ieq, Format or AndAnd. The syntax tree names operators this way.
 func kindName(t *token) string {
 	if t.kind == tokComparison {
 		return comparisonNames[t.op]

@@ -8,14 +8,14 @@ need Go. Source builds require **Go 1.27.3 or later**.
 
 Release tooling builds all six targets with `CGO_ENABLED=0`.
 
-| Platform | Target | Minimum / validation target | Native verification |
+| Platform | Target | Minimum / validation target | Native CI ([details](#platform-validation)) |
 |---|---|---|---|
-| macOS Intel | `darwin/amd64` | macOS 13 Ventura or later | Manual binary and component smoke tests passed |
-| macOS Apple Silicon | `darwin/arm64` | macOS 13 Ventura or later | Continuous native CI |
-| Windows Intel/AMD | `windows/amd64` | Windows 10 / Server 2016 or later; use a maintained release | Continuous native CI |
-| Windows ARM | `windows/arm64` | Windows 11 on ARM | Manual binary and component smoke tests passed |
-| Linux Intel/AMD | `linux/amd64` | 64-bit Linux supported by Go 1.27 | Continuous native CI |
-| Linux ARM | `linux/arm64` | 64-bit Linux supported by Go 1.27 | Native PR and weekly tests configured; first hosted run pending |
+| macOS Intel | `darwin/amd64` | macOS 13 Ventura or later | Native component tests |
+| macOS Apple Silicon | `darwin/arm64` | macOS 13 Ventura or later | Native component tests |
+| Windows Intel/AMD | `windows/amd64` | Windows 10 / Server 2016 or later; use a maintained release | Native component tests |
+| Windows ARM | `windows/arm64` | Windows 11 on ARM | Native component tests |
+| Linux Intel/AMD | `linux/amd64` | 64-bit Linux supported by Go 1.27 | Go test suite |
+| Linux ARM | `linux/arm64` | 64-bit Linux supported by Go 1.27 | Go test suite |
 
 The OS minimums follow [Go 1.27](https://go.dev/doc/go1.27) and [Go's
 requirements](https://go.dev/wiki/MinimumRequirements). CyberBoar has not independently

@@ -12,40 +12,40 @@ import (
 // are partial: an option not in the table makes the command
 // possibly-anything, which is the strict fallback (a deny rule that could match asks)
 
-// toolSub is how one subcommand runs a command
+// toolSub is how one subcommand runs a command.
 type toolSub struct {
 	opts longOpts
-	// skip is the number of operands before the command (direnv exec DIR)
+	// skip is the number of operands before the command (direnv exec DIR).
 	skip int
 	// dashOnly: the command follows "--"; the operands before it are not
-	// commands (mise exec TOOL@VERSION -- …, chamber exec SERVICE -- …)
+	// commands (mise exec TOOL@VERSION -- …, chamber exec SERVICE -- …).
 	dashOnly bool
-	// lineOpts take a shell command line as their value (npx -c, nix-shell --run)
+	// lineOpts take a shell command line as their value (npx -c, nix-shell --run).
 	lineOpts []string
-	// restOpts take the rest of the words as the command (nix develop -c)
+	// restOpts take the rest of the words as the command (nix develop -c).
 	restOpts []string
-	// shellOpts make the command words a shell command line (pnpm exec -c)
+	// shellOpts make the command words a shell command line (pnpm exec -c).
 	shellOpts []string
-	// lineOperand: the operand after skip is a shell command line (sops exec-env FILE 'cmd')
+	// lineOperand: the operand after skip is a shell command line (sops exec-env FILE 'cmd').
 	lineOperand bool
-	// noArgv: operands are not a command (nix-shell's are files)
+	// noArgv: operands are not a command (nix-shell's are files).
 	noArgv bool
 	// stdinShell: without a command it starts a shell that reads commands
-	// from stdin, like a bare bash (nix-shell, poetry shell, machinectl shell)
+	// from stdin, like a bare bash (nix-shell, poetry shell, machinectl shell).
 	stdinShell bool
 	// alwaysShell: the command words are a shell command line unless an
-	// execOpt says otherwise (watchexec, wsl)
+	// execOpt says otherwise (watchexec, wsl).
 	alwaysShell bool
 	execOpts    []string
 	// entryOpts name the program to run instead of the operand's own
 	// (flatpak run --command=X APP ARGS runs X ARGS); without one, the
-	// operand runs only its own code and no command is seen
+	// operand runs only its own code and no command is seen.
 	entryOpts []string
 	dirOpts   []string // options naming the directory the command runs in
 }
 
 // tool is a program's global options and its subcommands that run commands,
-// keyed by their words ("run", "tool run"); "" is the program itself (npx)
+// keyed by their words ("run", "tool run"); "" is the program itself (npx).
 type tool struct {
 	global  longOpts
 	dirOpts []string // global options naming the directory the command runs in (uv --directory)
@@ -873,7 +873,7 @@ func registerTools() {
 	}
 }
 
-// both is what either wrapper finds
+// both is what either wrapper finds.
 func both(f, g wrapperFunc) wrapperFunc {
 	return func(a *analyzer, name string, args []Elem) unwrapped {
 		u, v := f(a, name, args), g(a, name, args)
@@ -885,10 +885,10 @@ func both(f, g wrapperFunc) wrapperFunc {
 			argvs = append(argvs, w.extra...)
 		}
 		r := runsEach(argvs, u.unknown || v.unknown)
-		r.code = append(u.code, v.code...)
-		r.cmdLines = append(u.cmdLines, v.cmdLines...)
-		r.assigns = append(u.assigns, v.assigns...)
-		r.files = append(u.files, v.files...)
+		r.code = slices.Concat(u.code, v.code)
+		r.cmdLines = slices.Concat(u.cmdLines, v.cmdLines)
+		r.assigns = slices.Concat(u.assigns, v.assigns)
+		r.files = slices.Concat(u.files, v.files)
 		r.stdin = u.stdin
 		if r.stdin == nil {
 			r.stdin = v.stdin
@@ -897,8 +897,8 @@ func both(f, g wrapperFunc) wrapperFunc {
 	}
 }
 
-// wrapTool finds a tool's global options, a subcommand that runs a command, and the command
-func wrapTool(a *analyzer, name string, args []Elem) unwrapped {
+// wrapTool finds a tool's global options, a subcommand that runs a command, and the command.
+func wrapTool(_ *analyzer, name string, args []Elem) unwrapped {
 	t := tools[fold.String(name)]
 	var starts []int
 	amb := false
@@ -951,7 +951,7 @@ func wrapTool(a *analyzer, name string, args []Elem) unwrapped {
 	return r
 }
 
-// lastValue returns the value of the last of the options names given in args, or nil
+// lastValue returns the value of the last of the options names given in args, or nil.
 func lastValue(args []Elem, names []string, o longOpts) *Elem {
 	var last *Elem
 	for i := 0; i < len(args); i++ {
@@ -966,7 +966,7 @@ func lastValue(args []Elem, names []string, o longOpts) *Elem {
 	return last
 }
 
-// subcommand returns how many words of args spell words ("tool run"), or 0
+// subcommand returns how many words of args spell words ("tool run"), or 0.
 func subcommand(args []Elem, words string) int {
 	ws := strings.Fields(words)
 	if len(args) < len(ws) {
@@ -981,7 +981,7 @@ func subcommand(args []Elem, words string) int {
 }
 
 // optValue matches args[i] against the options in names and returns the
-// option's value (the next word if not joined) and the index after it
+// option's value (the next word if not joined) and the index after it.
 func optValue(args []Elem, i int, names []string, o longOpts) (v Elem, next int, ok bool) {
 	t := args[i].Text
 	for _, n := range names {
@@ -1018,7 +1018,7 @@ func optValue(args []Elem, i int, names []string, o longOpts) (v Elem, next int,
 	return Elem{}, i, false
 }
 
-// run reads the subcommand's words
+// run reads the subcommand's words.
 func (s toolSub) run(name string, args []Elem) unwrapped {
 	var u unwrapped
 	shell, exec, ran := false, false, false
@@ -1079,7 +1079,7 @@ func (s toolSub) run(name string, args []Elem) unwrapped {
 	var argvs [][]Elem
 	if s.skip > 0 {
 		// Options may follow the skipped operands (lxc exec C1 --env A=1 --
-		// CMD, aws-vault exec PROFILE --duration 1h -- CMD)
+		// CMD, aws-vault exec PROFILE --duration 1h -- CMD).
 		var after []int
 		for _, i := range starts {
 			next, amb2 := operandStarts(args, min(i+s.skip, len(args)), s.opts)
@@ -1121,7 +1121,7 @@ func (s toolSub) run(name string, args []Elem) unwrapped {
 }
 
 // wrapArch reads macOS arch: architecture flags (-x86_64, -arm64e, …), -e
-// NAME=VALUE and -d NAME, then the command
+// NAME=VALUE and -d NAME, then the command.
 func wrapArch(_ *analyzer, _ string, args []Elem) unwrapped {
 	for i := 0; i < len(args); i++ {
 		e := args[i]
@@ -1140,7 +1140,7 @@ func wrapArch(_ *analyzer, _ string, args []Elem) unwrapped {
 	return unwrapped{}
 }
 
-// withValues is o with names taking a value
+// withValues is o with names taking a value.
 func withValues(o longOpts, names []string) longOpts {
 	lv := map[string]bool{}
 	for k := range o.longValue {

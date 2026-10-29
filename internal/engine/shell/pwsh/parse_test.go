@@ -9,9 +9,9 @@ import (
 )
 
 // Every construct Parse refuses (docs/powershell.md "Refused") fails closed:
-// an *Error marked Refused that wraps limits.ErrUnparseable, so the engine denies the line
+// an *Error marked Refused that wraps limits.ErrUnparseable, so the engine denies the line.
 // Each refusal in the lexer and the parser has a case here;
-// the differential can't show them, since PowerShell accepts them all
+// the differential can't show them, since PowerShell accepts them all.
 func TestRefused(t *testing.T) {
 	for _, in := range []string{
 		"\"`e[31m\"",                    // `e: 5.1 reads e
@@ -53,7 +53,7 @@ func TestRefused(t *testing.T) {
 	}
 }
 
-// Syntax errors fail closed too: an *Error, not Refused, wrapping limits.ErrUnparseable
+// Syntax errors fail closed too: an *Error, not Refused, wrapping limits.ErrUnparseable.
 func TestSyntaxErrors(t *testing.T) {
 	for _, in := range []string{
 		"(", ")", "{", "}", "[", "\"", "'", "@'\nx", "@\"\nx", "$(", "@(", "@{", "${",
@@ -74,7 +74,7 @@ func TestSyntaxErrors(t *testing.T) {
 	}
 }
 
-// The limits are the bash analyzer's: input size, nesting, and commands
+// The limits are the bash analyzer's: input size, nesting, and commands.
 func TestLimits(t *testing.T) {
 	for name, tc := range map[string]struct {
 		in   string
@@ -144,7 +144,7 @@ func TestVariableNameAndDrive(t *testing.T) {
 	}
 }
 
-// Inspect visits every node once, parents before children, in source order
+// Inspect visits every node once, parents before children, in source order.
 func TestInspect(t *testing.T) {
 	sb, err := Parse(`if ($a) { ls -r "x$y" | sort } else { $z = @{k = 1} }`)
 	if err != nil {

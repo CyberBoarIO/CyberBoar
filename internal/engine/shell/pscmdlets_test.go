@@ -7,7 +7,7 @@ import (
 	"cyberboar.dev/cyberboar/internal/fold"
 )
 
-// What a cmdlet parameter's value does, for TestPSCmdletParamsClassified
+// What a cmdlet parameter's value does, for TestPSCmdletParamsClassified.
 const (
 	psData    = "data the cmdlet computes with or sends: no path, no code"
 	psNarrows = "narrows or names a part of the paths given to -Path, which are checked"
@@ -16,7 +16,7 @@ const (
 )
 
 // psParamEffects says what every parameter of psCmdletSpecs that takes a
-// value other than a path does. Shared names first, then Cmdlet.Param
+// value other than a path does. Shared names first, then Cmdlet.Param.
 var psParamEffects = map[string]string{
 	"Filter": psNarrows, "Include": psNarrows, "Exclude": psNarrows, "Stream": psNarrows,
 	"Credential": psSession, "Encoding": psData, "InputObject": psData, "Delimiter": psData,
@@ -71,7 +71,7 @@ func init() {
 
 // Every parameter of a bound cmdlet has a decision: a path or a switch,
 // which the binder handles, a variable name (psNamedVariables), or an entry
-// in psParamEffects. One added to the table without a decision fails here
+// in psParamEffects. One added to the table without a decision fails here.
 func TestPSCmdletParamsClassified(t *testing.T) {
 	common := map[*psParam]bool{}
 	for _, p := range psCommonParams.list {

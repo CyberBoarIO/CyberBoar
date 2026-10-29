@@ -37,7 +37,7 @@ type lexer struct {
 	// PowerShell's SkippedCharOffsets does, so offsets map back to the
 	// input. It is a list rather than a set over the whole input, so that a
 	// string with thousands of $(...) costs memory in proportion to the
-	// characters they drop, not to the input once for each of them
+	// characters they drop, not to the input once for each of them.
 	skipped  []int
 	cur      int // _currentIndex, which can pass len(src) by one, as in GetChar
 	tokStart int
@@ -68,8 +68,8 @@ func (l *lexer) peekChar() uint16 {
 
 func (l *lexer) skipChar() { l.cur++ }
 
-// atEOF reports whether getChar has returned the end of input
-// The input holds no NUL (Parse refuses it), so a 0 from getChar always means the end
+// atEOF reports whether getChar has returned the end of input.
+// The input holds no NUL (Parse refuses it), so a 0 from getChar always means the end.
 func (l *lexer) atEOF() bool { return l.cur > len(l.src) }
 
 func (l *lexer) text(start, end int) string {
@@ -91,17 +91,14 @@ func (l *lexer) refuse(at int, msg string) {
 }
 
 func (l *lexer) newToken(kind tokenKind) *token {
-	end := l.cur
-	if end > len(l.src) {
-		end = len(l.src)
-	}
+	end := min(l.cur, len(l.src))
 	pos, endPos := l.extent(l.tokStart, end)
 	return &token{kind: kind, start: l.tokStart, end: end, pos: pos, endPos: endPos,
 		text: l.text(l.tokStart, end)}
 }
 
 // extent is Tokenizer.CurrentExtent. It maps local offsets to the whole
-// input's, counting the characters a subexpression's text dropped
+// input's, counting the characters a subexpression's text dropped.
 func (l *lexer) extent(start, end int) (int, int) {
 	pos := l.whole(start)
 	// newToken clamps end to the source, so a token read past the end of
@@ -115,7 +112,7 @@ func (l *lexer) extent(start, end int) (int, int) {
 // whole maps the local offset k to the whole input. The result is the first
 // offset at or after l.offset with k characters between the two that a
 // subexpression's text didn't drop. Each lookup is a binary search, so
-// mapping every token's extent stays cheap on a long input
+// mapping every token's extent stays cheap on a long input.
 func (l *lexer) whole(k int) int {
 	s := l.skipped
 	first := sort.SearchInts(s, l.offset)
@@ -128,7 +125,7 @@ func (l *lexer) whole(k int) int {
 }
 
 // skipNewlines is Tokenizer.SkipNewlines. It skips whitespace, comments, line
-// continuations, newlines and, if skipSemis is set, semicolons
+// continuations, newlines and, if skipSemis is set, semicolons.
 func (l *lexer) skipNewlines(skipSemis bool) {
 	for {
 		c := l.getChar()
@@ -190,7 +187,7 @@ func (l *lexer) normalizeCRLF(c uint16) {
 
 // resync moves back to a token's start, to scan it again in another mode
 // start is an offset in the whole input, mapped back as Tokenizer.Resync
-// does, including its counting of dropped characters only before start-1
+// does, including its counting of dropped characters only before start-1.
 func (l *lexer) resync(start int) {
 	adjustment := l.offset
 	if n := sort.SearchInts(l.skipped, start-1) - sort.SearchInts(l.skipped, l.offset); n > 0 {
@@ -204,18 +201,18 @@ func (l *lexer) resync(start int) {
 	}
 }
 
-// restorePoint is Tokenizer.GetRestorePoint
-// It returns the current position as an offset in the whole input, for resync
+// restorePoint is Tokenizer.GetRestorePoint.
+// It returns the current position as an offset in the whole input, for resync.
 func (l *lexer) restorePoint() int {
 	l.tokStart = l.cur
 	pos, _ := l.extent(l.cur, l.cur)
 	return pos
 }
 
-// isPipeContinuation is Tokenizer.IsPipeContinuation
+// isPipeContinuation is Tokenizer.IsPipeContinuation.
 // It reports whether the newline that ends at offset end is followed, on a later line,
-// by a | that continues the pipeline
-// PowerShell 7.2 and later read the lines that way
+// by a | that continues the pipeline.
+// PowerShell 7.2 and later read the lines that way.
 // Windows PowerShell 5.1 fails to parse them, so it runs nothing.
 func (l *lexer) isPipeContinuation(end int) bool {
 	if end >= len(l.src) {
@@ -277,7 +274,7 @@ func skipBlockComment(s []uint16, i int) int {
 // backtick is Tokenizer.Backtick. It returns the character that a backtick
 // followed by c stands for. `e and `u{...} are PowerShell 7 escapes that 5.1
 // reads as the letters e and u, so the two versions would run different
-// strings, and backtick refuses them
+// strings, and backtick refuses them.
 func (l *lexer) backtick(c uint16) uint16 {
 	switch c {
 	case '0':
@@ -302,9 +299,9 @@ func (l *lexer) backtick(c uint16) uint16 {
 	return c
 }
 
-// scanLineComment skips a # comment
+// scanLineComment skips a # comment.
 // A comment that starts with "requires" is a #Requires statement, which can
-// load modules and stop the script, so it is refused
+// load modules and stop the script, so it is refused.
 func (l *lexer) scanLineComment() {
 	start := l.cur
 	for {
@@ -335,7 +332,7 @@ func (l *lexer) scanBlockComment() {
 	}
 }
 
-// scanStringLiteral appends the rest of a single-quoted string to sb
+// scanStringLiteral appends the rest of a single-quoted string to sb.
 func (l *lexer) scanStringLiteral(sb *[]uint16) {
 	errorIndex := l.cur - 1
 	c := l.getChar()
@@ -355,7 +352,7 @@ func (l *lexer) scanStringLiteral(sb *[]uint16) {
 }
 
 // scanSubExpression scans a $(...) inside an expandable string, counting
-// parentheses only, as PowerShell does. The parser reads the text later
+// parentheses only, as PowerShell does. The parser reads the text later.
 func (l *lexer) scanSubExpression(hereString bool) *token {
 	l.tokStart = l.cur - 2
 	sb := []uint16{'$', '('}
@@ -400,13 +397,13 @@ func (l *lexer) scanSubExpression(hereString bool) *token {
 // is the text with escapes removed and the expansions as written. format is
 // PowerShell's format string, which its compiler formats with the -f
 // operator at run time. It is the literal text with its braces doubled and
-// {0}, {1}, ... in place of the expansions, which nested holds in order
+// {0}, {1}, ... in place of the expansions, which nested holds in order.
 type expandable struct {
 	value, format []uint16
 	nested        []*token
 }
 
-// add appends a literal character
+// add appends a literal character.
 func (s *expandable) add(c uint16) {
 	s.value = append(s.value, c)
 	s.format = append(s.format, c)
@@ -476,7 +473,7 @@ func (l *lexer) stringExpandableToken(kind tokenKind, s *expandable) *token {
 	return t
 }
 
-// scanAfterHereStringHeader checks that a here-string's @' or @" ends its line
+// scanAfterHereStringHeader checks that a here-string's @' or @" ends its line.
 func (l *lexer) scanAfterHereStringHeader() {
 	headerOffset := l.cur - 2
 	c := l.getChar()
@@ -605,7 +602,7 @@ func (l *lexer) scanHereStringExpandable() *token {
 	return l.stringExpandableToken(tokHereStringExpandable, &s)
 }
 
-// scanVariable is Tokenizer.ScanVariable, after the $ or @
+// scanVariable is Tokenizer.ScanVariable, after the $ or @.
 func (l *lexer) scanVariable(splatted, inStringExpandable bool) *token {
 	errorStart := l.cur
 	var sb []uint16
@@ -712,7 +709,7 @@ func (l *lexer) scanVariable(splatted, inStringExpandable bool) *token {
 	return t
 }
 
-// scanParameter is Tokenizer.ScanParameter, after the dash
+// scanParameter is Tokenizer.ScanParameter, after the dash.
 func (l *lexer) scanParameter() *token {
 	var sb []uint16
 	sawColon := false
@@ -769,7 +766,7 @@ scan:
 
 // lookupOperator finds an operator word case-insensitively. In expression
 // mode scanParameter only collects ASCII letters, so case folding outside
-// ASCII never comes into it
+// ASCII never comes into it.
 func lookupOperator(name string) (tokenKind, string, bool) {
 	kind, ok := operators[strings.ToLower(name)]
 	return kind, strings.ToLower(name), ok
@@ -791,7 +788,7 @@ func lookupKeyword(l *lexer, word string) (string, bool) {
 }
 
 // foldToASCII lowers ASCII letters and replaces each other letter by an
-// ASCII one its upper case, lower case or case folding reaches, if any
+// ASCII one its upper case, lower case or case folding reaches, if any.
 func foldToASCII(word string) string {
 	var b strings.Builder
 	for _, r := range word {
@@ -833,7 +830,7 @@ func (l *lexer) checkOperatorInCommandMode(prefix []uint16, kind tokenKind) *tok
 // scanGenericToken is Tokenizer.ScanGenericToken. It scans a word in command
 // mode, after the characters in sb, up to a character that starts a new
 // token. Quoted parts join their contents to the word, and a $ expansion
-// makes it expandable
+// makes it expandable.
 func (l *lexer) scanGenericToken(sb []uint16) *token {
 	// PowerShell copies the characters already scanned, and the contents of
 	// a single-quoted part, into the format string without doubling their braces
@@ -912,8 +909,8 @@ type numberScan struct {
 	multiplier int64
 }
 
-// scanNumberHelper is Tokenizer.ScanNumberHelper
-// It reports false when the characters aren't a number at all
+// scanNumberHelper is Tokenizer.ScanNumberHelper.
+// It reports false when the characters aren't a number at all.
 func (l *lexer) scanNumberHelper(first uint16) (n numberScan, ok bool) {
 	n.multiplier = 1
 	notNumber := false
@@ -1028,7 +1025,7 @@ func (l *lexer) scanNumberHelper(first uint16) (n numberScan, ok bool) {
 // word in command mode and an error in expression mode, as in PowerShell. We
 // keep values that fit in an int64 or a finite float64 and refuse numbers
 // PowerShell would hold in a decimal, a BigInteger or an infinity, and hex
-// numbers with a multiplier
+// numbers with a multiplier.
 func (l *lexer) scanNumber(first uint16) *token {
 	n, ok := l.scanNumberHelper(first)
 	if !ok {
@@ -1054,8 +1051,8 @@ func (l *lexer) scanNumber(first uint16) *token {
 	return t
 }
 
-// Number is a numeric constant
-// It is the integer Int, or the real Float when Real is set
+// Number is a numeric constant.
+// It is the integer Int, or the real Float when Real is set.
 type Number struct {
 	Int   int64
 	Real  bool
@@ -1068,7 +1065,7 @@ const (
 	numberRefused // PowerShell can convert it, but this package doesn't
 )
 
-// numberValue is TryGetNumberValue for numbers without a suffix
+// numberValue is TryGetNumberValue for numbers without a suffix.
 func numberValue(n numberScan) (Number, int) {
 	s := n.digits
 	if n.real {
@@ -1157,7 +1154,7 @@ func (l *lexer) scanDot() *token {
 
 // scanIdentifier is Tokenizer.ScanIdentifier, for a word that starts with a
 // letter. In command mode, the word is a keyword or an identifier when a token
-// boundary follows it, and otherwise the start of a generic word
+// boundary follows it, and otherwise the start of a generic word.
 func (l *lexer) scanIdentifier(first uint16) *token {
 	sb := []uint16{first}
 	var c uint16
@@ -1201,7 +1198,7 @@ func (l *lexer) scanTypeName() *token {
 	return l.newToken(tokIdentifier)
 }
 
-// scanLabel is Tokenizer.ScanLabel, after a colon in command mode
+// scanLabel is Tokenizer.ScanLabel, after a colon in command mode.
 func (l *lexer) scanLabel() *token {
 	c := l.getChar()
 	if !isIdentifierStart(c) {
@@ -1229,10 +1226,10 @@ func (l *lexer) scanLabel() *token {
 	return t
 }
 
-// memberAccessOperator is Tokenizer.GetMemberAccessOperator
+// memberAccessOperator is Tokenizer.GetMemberAccessOperator.
 // It returns the operator that follows an expression with nothing but block comments in
-// between: ., ::, ?., or, if allowLBracket is set, [ or ?[
-// It returns nil if there is none
+// between: ., ::, ?., or, if allowLBracket is set, [ or ?[.
+// It returns nil if there is none.
 func (l *lexer) memberAccessOperator(allowLBracket bool) *token {
 	c := l.peekChar()
 	for c == '<' {
@@ -1294,9 +1291,9 @@ func (l *lexer) memberAccessOperator(allowLBracket bool) *token {
 	return nil
 }
 
-// invokeMemberOpenParen is Tokenizer.GetInvokeMemberOpenParen
-// It returns the ( or { that opens a method call's arguments, or nil
-// Either must follow the member name directly
+// invokeMemberOpenParen is Tokenizer.GetInvokeMemberOpenParen.
+// It returns the ( or { that opens a method call's arguments, or nil.
+// Either must follow the member name directly.
 func (l *lexer) invokeMemberOpenParen() *token {
 	switch l.peekChar() {
 	case '(':
@@ -1311,8 +1308,8 @@ func (l *lexer) invokeMemberOpenParen() *token {
 	return nil
 }
 
-// lBracket is Tokenizer.GetLBracket, which reads the [ of an attribute
-// Whitespace and comments may come before it
+// lBracket is Tokenizer.GetLBracket, which reads the [ of an attribute.
+// Whitespace and comments may come before it.
 func (l *lexer) lBracket() *token {
 	resyncPoint := l.cur
 	resyncIfMemberAccess := false
@@ -1360,8 +1357,8 @@ func (l *lexer) lBracket() *token {
 	}
 }
 
-// assemblyNameSpec is Tokenizer.GetAssemblyNameSpec
-// Assembly-qualified type names load assemblies by name, so they are refused
+// assemblyNameSpec is Tokenizer.GetAssemblyNameSpec.
+// Assembly-qualified type names load assemblies by name, so they are refused.
 func (l *lexer) assemblyNameSpec() {
 	l.refuse(l.cur, "assembly-qualified type names are not analyzed")
 }
@@ -1387,7 +1384,7 @@ func (l *lexer) merging(from, to Stream) *token {
 	return t
 }
 
-// next is Tokenizer.NextToken
+// next is Tokenizer.NextToken.
 func (l *lexer) next() *token {
 	for {
 		l.tokStart = l.cur
@@ -1642,7 +1639,7 @@ func (l *lexer) next() *token {
 	}
 }
 
-// unqualified is VariablePath.UnqualifiedPath, the name after any scope or drive prefix
+// unqualified is VariablePath.UnqualifiedPath, the name after any scope or drive prefix.
 func unqualified(path string) string {
 	p, _ := splitVariablePath(path)
 	return p
@@ -1650,7 +1647,7 @@ func unqualified(path string) string {
 
 // splitVariablePath is the VariablePath constructor. It returns the name
 // without its scope or drive, and the drive ("env" for $env:X) when the path
-// is drive-qualified. Like the constructor, it recognizes only one scope prefix
+// is drive-qualified. Like the constructor, it recognizes only one scope prefix.
 func splitVariablePath(path string) (name, drive string) {
 	colon := -1
 	if path != "" {

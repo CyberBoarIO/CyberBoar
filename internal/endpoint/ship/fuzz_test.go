@@ -9,7 +9,7 @@ import (
 )
 
 // FuzzReadBatch: reading never panics, never moves past the input, and only
-// returns lines the console would accept
+// returns lines the console would accept.
 func FuzzReadBatch(f *testing.F) {
 	f.Add(line(1, "deny") + "junk\n" + line(2, "ask") + `{"decision":`)
 	f.Add("\n\n\r\n")

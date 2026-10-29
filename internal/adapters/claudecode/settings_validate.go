@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// validateSettings checks retained hook and permission structures before merging
-// Unknown fields and events are preserved
+// validateSettings checks retained hook and permission structures before merging.
+// Unknown fields and events are preserved.
 func validateSettings(settings map[string]any) error {
 	if value, present := settings["hooks"]; present {
 		hooks, ok := value.(map[string]any)

@@ -8,8 +8,8 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// writePrivate applies a protected DACL at creation, before writing key bytes
-// POSIX mode 0600 does not restrict an inherited Windows ACL
+// writePrivate applies a protected DACL at creation, before writing key bytes.
+// POSIX mode 0600 does not restrict an inherited Windows ACL.
 func writePrivate(path string, data []byte) error {
 	user, err := windows.GetCurrentProcessToken().GetTokenUser()
 	if err != nil {

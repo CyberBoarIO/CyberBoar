@@ -10,7 +10,7 @@ import (
 
 // lock takes an exclusive, non-blocking lock on stateDir/ship.lock. Windows
 // releases it when the handle is closed or the process dies, so a crash
-// never wedges shipping
+// never wedges shipping.
 func lock(stateDir string) (unlock func(), err error) {
 	if err := os.MkdirAll(stateDir, 0o700); err != nil {
 		return nil, err

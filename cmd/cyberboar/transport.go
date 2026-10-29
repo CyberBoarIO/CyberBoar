@@ -14,7 +14,7 @@ import (
 )
 
 // tlsFlags adds the flags that say how enroll, ship and pull verify the
-// console. Traffic to a console is always encrypted
+// console. Traffic to a console is always encrypted.
 func tlsFlags(fs *flag.FlagSet, getenv func(string) string) *httpsclient.TLS {
 	t := &httpsclient.TLS{}
 	fs.StringVar(&t.CAFile, "ca", getenv(envName("ca")), "trust only certificates from the CAs in this PEM file, e.g. a private CA or a self-signed certificate (env "+envName("ca")+")")
@@ -22,7 +22,7 @@ func tlsFlags(fs *flag.FlagSet, getenv func(string) string) *httpsclient.TLS {
 	return t
 }
 
-// warnSkipVerify says on every run that the server is not being verified
+// warnSkipVerify says on every run that the server is not being verified.
 func warnSkipVerify(stderr io.Writer, cmd string, t *httpsclient.TLS) {
 	if t.SkipVerify {
 		fmt.Fprintf(stderr, "%s: WARNING: --insecure-skip-verify: the server's certificate is not checked; anyone on the network path can pose as it\n", cmd)
@@ -31,7 +31,7 @@ func warnSkipVerify(stderr io.Writer, cmd string, t *httpsclient.TLS) {
 
 // enrolledClient returns the endpoint enrolled in stateDir and the client
 // that talks to its console. Without an enrollment both are nil.
-// Nothing falls back to unauthenticated requests
+// Nothing falls back to unauthenticated requests.
 func enrolledClient(stateDir string, t *httpsclient.TLS, now func() time.Time) (*enroll.Endpoint, *http.Client, error) {
 	ep, err := enroll.Load(stateDir, now)
 	if errors.Is(err, enroll.ErrNotEnrolled) {
@@ -49,7 +49,7 @@ func enrolledClient(stateDir string, t *httpsclient.TLS, now func() time.Time) (
 
 // renewIfDue renews the client certificate when half its lifetime has
 // passed. Only an expired certificate is an error. A renewal that fails
-// while the certificate still works is retried on the next run
+// while the certificate still works is retried on the next run.
 func renewIfDue(ctx context.Context, ep *enroll.Endpoint, client *http.Client, stderr io.Writer, cmd string) (bool, error) {
 	renewed, err := ep.RenewIfDue(ctx, client)
 	if errors.Is(err, enroll.ErrExpired) {

@@ -18,10 +18,10 @@ import (
 
 // ManagedFiles are the machine-wide hooks.json files Cursor reads first, on
 // Linux and on macOS. Cursor runs commands in PowerShell on native Windows,
-// where it is denied, so C:\ProgramData\Cursor\hooks.json is not written
+// where it is denied, so C:\ProgramData\Cursor\hooks.json is not written.
 var ManagedFiles = []string{path.Join(ManagedDir("linux"), "hooks.json"), path.Join(ManagedDir("darwin"), "hooks.json")}
 
-// ManagedDir is the directory of the machine-wide hooks.json on goos
+// ManagedDir is the directory of the machine-wide hooks.json on goos.
 func ManagedDir(goos string) string {
 	if goos == "darwin" {
 		return "/Library/Application Support/Cursor"
@@ -29,9 +29,10 @@ func ManagedDir(goos string) string {
 	return "/etc/cursor"
 }
 
-// Scope is where a hooks.json lives
+// Scope is where a hooks.json lives.
 type Scope string
 
+// The scopes apply installs into, by the settings file each one writes.
 const (
 	ScopeUser    Scope = "user"    // ~/.cursor/hooks.json
 	ScopeProject Scope = "project" // <project>/.cursor/hooks.json (committed)
@@ -39,11 +40,11 @@ const (
 )
 
 // HookTimeout is the hook timeout in seconds. Hooks are installed with
-// failClosed, so a timeout denies
-// The hook's deadline stays below it, so that the hook gives its reason instead
+// failClosed, so a timeout denies.
+// The hook's deadline stays below it, so that the hook gives its reason instead.
 const HookTimeout = 15
 
-// FragmentOptions describe the hook command to install
+// FragmentOptions describe the hook command to install.
 type FragmentOptions struct {
 	Command  string // cyberboar executable, as an absolute path or a name on PATH
 	Policy   string // policy path, relative to the project root for ScopeProject
@@ -54,19 +55,19 @@ type FragmentOptions struct {
 	Briefing bool // install the sessionStart briefing (the policy's spec.session.briefing)
 }
 
-// HookArgs returns the arguments of the hook command
+// HookArgs returns the arguments of the hook command.
 func HookArgs(o FragmentOptions) []string {
 	return adapters.HookArgs("cursor", o.Policy, o.Audit, o.State, o.PubKey, o.Deadline)
 }
 
-// BriefArgs returns the arguments of the sessionStart briefing command
+// BriefArgs returns the arguments of the sessionStart briefing command.
 func BriefArgs(o FragmentOptions) []string {
 	return adapters.BriefArgs("cursor", o.Policy, o.PubKey)
 }
 
 // commandLine returns a hook command line. Cursor runs it through a shell,
 // so every word is quoted. Cursor silently ignores a whole hooks.json in which
-// any command holds a URL, so one is refused
+// any command holds a URL, so one is refused.
 func commandLine(exe string, args []string) (string, error) {
 	words := []string{adapters.ShellQuote(exe)}
 	for _, a := range args {
@@ -81,7 +82,7 @@ func commandLine(exe string, args []string) (string, error) {
 
 // ours reports whether a hook entry runs CyberBoar for Cursor, so it is
 // replaced rather than duplicated. The command is read as shell words, so an
-// entry written by hand as the docs show it counts as well as one apply wrote
+// entry written by hand as the docs show it counts as well as one apply wrote.
 func ours(entry map[string]any) bool {
 	if kind, ok := entry["type"]; ok && kind != "command" {
 		return false
@@ -104,7 +105,7 @@ func ours(entry map[string]any) bool {
 
 // commandWords returns the words of a one-command line, unquoted, with ""
 // for a word that isn't a plain literal. A line that isn't one simple
-// command gives none
+// command gives none.
 func commandWords(line string) []string {
 	f, err := syntax.NewParser(syntax.Variant(syntax.LangBash)).Parse(strings.NewReader(line), "")
 	if err != nil || len(f.Stmts) != 1 {
@@ -142,7 +143,7 @@ func commandWords(line string) []string {
 // and replacing an earlier CyberBoar entry. Cursor has one hooks.json per
 // scope, so the file is shared. existing may be empty. The hook has no
 // matcher, so it runs for every tool, MCP tools included. failClosed makes
-// Cursor deny when the hook crashes or times out instead of running the tool
+// Cursor deny when the hook crashes or times out instead of running the tool.
 func MergeHooks(existing []byte, o FragmentOptions) ([]byte, error) {
 	doc := map[string]any{}
 	if len(bytes.TrimSpace(existing)) > 0 {
@@ -224,8 +225,8 @@ func MergeHooks(existing []byte, o FragmentOptions) ([]byte, error) {
 	return append(out, '\n'), nil
 }
 
-// validateHooks checks existing definitions before they are retained in the merged file
-// Unknown events and properties are preserved, including their number representations
+// validateHooks checks existing definitions before they are retained in the merged file.
+// Unknown events and properties are preserved, including their number representations.
 func validateHooks(hooks map[string]any) error {
 	for _, event := range slices.Sorted(maps.Keys(hooks)) {
 		list, ok := hooks[event].([]any)
@@ -282,7 +283,7 @@ func validateHooks(hooks map[string]any) error {
 }
 
 // SessionStartOutput returns Cursor's sessionStart answer, which puts the
-// text in additional_context. Empty text gives no output
+// text in additional_context. Empty text gives no output.
 func (Adapter) SessionStartOutput(text string) []byte {
 	if text == "" {
 		return nil

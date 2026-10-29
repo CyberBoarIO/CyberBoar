@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"path"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -39,20 +40,20 @@ type FileRef struct {
 	// it (git stash, git reset --hard).
 	Modifies bool
 	Repo     bool
-	// Windows only. Refused says why the path is denied outright (UNC,
-	// drive-relative, an unknown mount). Mount is the cleaned Git Bash path
-	// of a word outside the drives, for Git Bash's emulated /proc and /dev,
-	// which the built-in rules decide first. Alts are the other readings of
-	// Path: Git Bash's own, where ".." or a name makes it differ (see
-	// gitBashNames), and on POSIX the kernel's, after a cd whose ".." left
-	// a link (dir.alt). All are checked.
+	// Refused and Mount are for Windows only. Refused says why the path is
+	// denied outright (UNC, drive-relative, an unknown mount). Mount is the
+	// cleaned Git Bash path of a word outside the drives, for Git Bash's
+	// emulated /proc and /dev, which the built-in rules decide first.
 	Refused string
 	Mount   string
-	Alts    []string
+	// Alts are the other readings of Path, all checked: on Windows Git Bash's
+	// own, where ".." or a name makes it differ (see gitBashNames), and on
+	// POSIX the kernel's, after a cd whose ".." left a link (dir.alt).
+	Alts []string
 	// Shape is the run-time word's Elem.Shape when Certain is false, so the
-	// built-in rules can check what its literal parts pin it to
+	// built-in rules can check what its literal parts pin it to.
 	Shape string
-	// Src is the word as written ("$C/x") when Display is its shape ("*/x"), for messages
+	// Src is the word as written ("$C/x") when Display is its shape ("*/x"), for messages.
 	Src string
 }
 
@@ -70,8 +71,8 @@ var namesOnly = set("cd", "pushd", "popd", "ls", "dir", "mkdir", "rmdir", "stat"
 
 // innerName is the command a wrapper chain finally runs.
 func innerName(layers [][]Elem) (string, []Elem) {
-	for i := len(layers) - 1; i >= 0; i-- {
-		l := layers[i]
+	for _, l := range slices.Backward(layers) {
+
 		if len(l) > 0 && l[0].Kind == Lit {
 			return l[0].Text, l
 		}
@@ -490,7 +491,7 @@ func pathCandidates(w string) []string {
 // fileURLPath returns the path a file URL names as curl opens it: the
 // scheme in any case, file:/x or file://host/x, without the query or
 // fragment, %XX decoded and a "%" that starts no escape kept. Dot
-// segments it removes are the lexical reading checkPath adds
+// segments it removes are the lexical reading checkPath adds.
 func fileURLPath(v string) (string, bool) {
 	if len(v) < 5 || !strings.EqualFold(v[:5], "file:") {
 		return "", false
@@ -699,7 +700,7 @@ func (a *analyzer) expandGlob(pattern string, d dir, o globOpts) (matches []stri
 // classes, path.Match's. An error means the segment can't be read (a
 // collating symbol, an unknown class), so neither can the glob. Neither
 // can a bracket expression for a name that isn't ASCII, whose classes and
-// ranges depend on the locale
+// ranges depend on the locale.
 func (a *analyzer) globMatcher(seg string, nocase bool) func(string) (bool, error) {
 	if a.powershell {
 		seg = strings.Replace(seg, "[!", "[^", -1)
@@ -745,7 +746,7 @@ func (a *analyzer) globMatcher(seg string, nocase bool) func(string) (bool, erro
 
 var errLocaleBracket = errors.New("a bracket expression matches a name that isn't ASCII by the locale")
 
-// bytewise spells s with one character per byte
+// bytewise spells s with one character per byte.
 func bytewise(s string) string {
 	r := make([]rune, len(s))
 	for i := 0; i < len(s); i++ {

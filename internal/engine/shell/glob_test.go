@@ -10,7 +10,7 @@ import (
 )
 
 // Every name bash expands a glob to is among the paths the analysis
-// checks, or the analysis gives up on the glob, in the C locale too
+// checks, or the analysis gives up on the glob, in the C locale too.
 func TestGlobCoversBash(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("fixture uses POSIX paths")
@@ -56,7 +56,7 @@ func TestGlobCoversBash(t *testing.T) {
 					checked[strings.TrimPrefix(f.Path, dir+"/")] = true
 				}
 				pattern := line[strings.LastIndex(line, " ")+1:]
-				for _, name := range strings.Fields(string(out)) {
+				for name := range strings.FieldsSeq(string(out)) {
 					if name != pattern && !checked[name] {
 						t.Errorf("bash matched %q, the analysis checks %v", name, checked)
 					}

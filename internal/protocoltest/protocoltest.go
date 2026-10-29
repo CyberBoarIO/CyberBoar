@@ -685,7 +685,7 @@ func checkEndpoint(e audit.Endpoint) error {
 
 // etagMatches implements If-None-Match with the weak comparison of RFC 9110.
 func etagMatches(header, etag string) bool {
-	for _, t := range strings.Split(header, ",") {
+	for t := range strings.SplitSeq(header, ",") {
 		t = strings.TrimPrefix(strings.TrimSpace(t), "W/")
 		if t == "*" || t == etag {
 			return true

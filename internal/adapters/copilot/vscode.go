@@ -26,7 +26,7 @@ import (
 )
 
 // RuleUncheckedTool denies a VS Code tool that does something the hook
-// can't check, such as typing into a running terminal
+// can't check, such as typing into a running terminal.
 const RuleUncheckedTool = "adapter.uncheckedTool"
 
 //go:embed vscode-tools.yaml
@@ -87,18 +87,18 @@ var vscodeClassification = sync.OnceValues(func() (map[string]vscodeSpec, error)
 	})
 })
 
-// vscodeMCPPrefix starts the name of every MCP tool VS Code offers the model
+// vscodeMCPPrefix starts the name of every MCP tool VS Code offers the model.
 const vscodeMCPPrefix = engine.VSCodeMCPPrefix
 
 // vscodePrefixMax is the longest prefix VS Code puts before an MCP tool's
 // name: "mcp_", the server's label, a number when labels collide, and "_",
-// with the label cut to fit (McpToolName.MaxPrefixLen, McpPrefixGenerator)
+// with the label cut to fit (McpToolName.MaxPrefixLen, McpPrefixGenerator).
 const vscodePrefixMax = 18
 
 // vscodeUserDirs are where VS Code keeps user settings, under the home
 // directory: the desktop app's on Linux and macOS, VS Code Server's, and
 // Codespaces'. Each holds settings.json, and profiles/<id>/settings.json
-// for every other profile
+// for every other profile.
 var vscodeUserDirs = []string{
 	".config/Code/User", ".config/Code - Insiders/User",
 	"Library/Application Support/Code/User", "Library/Application Support/Code - Insiders/User",
@@ -106,7 +106,7 @@ var vscodeUserDirs = []string{
 }
 
 // vscodeMachineDirs are where VS Code Server and Codespaces keep the remote
-// machine's settings, under the home directory
+// machine's settings, under the home directory.
 var vscodeMachineDirs = []string{".vscode-server/data/Machine", ".vscode-server-insiders/data/Machine", ".vscode-remote/data/Machine"}
 
 // VSCodeSettingsFiles returns the VS Code settings that can switch the hook
@@ -114,7 +114,7 @@ var vscodeMachineDirs = []string{".vscode-server/data/Machine", ".vscode-server-
 // user's (every profile's) and machine's where VS Code keeps them on this
 // machine. With chat.useClaudeHooks on, VS Code also runs the hooks in
 // Claude Code's settings files, so those are returned too, and so are the
-// places of agents and agent plugins, which can declare hooks of their own
+// places of agents and agent plugins, which can declare hooks of their own.
 func VSCodeSettingsFiles(env Env) []string {
 	out := vscodeProjectFiles(env.ProjectDir)
 	if env.Home == "" {
@@ -137,7 +137,7 @@ func VSCodeSettingsFiles(env Env) []string {
 // in VS Code or add hooks of their own: its settings, Claude Code's
 // settings, whose hooks VS Code runs with chat.useClaudeHooks on, and
 // Claude Code's agents, whose hooks VS Code runs when the model starts the
-// agent (runSubagent with agentName)
+// agent (runSubagent with agentName).
 func vscodeProjectFiles(dir string) []string {
 	return []string{adapters.Under(false, dir, ".vscode", "settings.json"),
 		adapters.Under(false, dir, ".claude", "settings.json"),
@@ -147,7 +147,7 @@ func vscodeProjectFiles(dir string) []string {
 
 // guardFiles returns every file that installs, changes or switches off the
 // hook for Copilot CLI and VS Code alike, since both read the same hook
-// files: the user's, and those of every folder projectDirs returns
+// files: the user's, and those of every folder projectDirs returns.
 func guardFiles(env Env, cwd string) []string {
 	dirs := projectDirs(cwd, env.ProjectDir)
 	env.ProjectDir = ""
@@ -165,7 +165,7 @@ func guardFiles(env Env, cwd string) []string {
 // tree's hooks and VS Code reads the workspace folder's, and its parent
 // repository's with chat.useCustomizationsInParentRepositories on. Outside
 // a work tree, they are cwd and the folders up to the project directory
-// when it holds cwd
+// when it holds cwd.
 func projectDirs(cwd, projectDir string) []string {
 	var out []string
 	if projectDir != "" {
@@ -195,7 +195,7 @@ func projectDirs(cwd, projectDir string) []string {
 // parseVSCode reads a Local agent call. VS Code runs the hook in the
 // workspace folder, which is the input's cwd, and doesn't set
 // COPILOT_PROJECT_DIR. Its input names no other folder, so in a multi-root
-// workspace only this one is known
+// workspace only this one is known.
 func parseVSCode(in *Input, env Env) *adapters.Call {
 	env.ProjectDir = ""
 	c := &adapters.Call{Session: in.SessionID, ToolUseID: in.ToolUseID, Cwd: in.Cwd, Project: in.Cwd, Tool: *in.ToolNameVSCode}
@@ -204,8 +204,8 @@ func parseVSCode(in *Input, env Env) *adapters.Call {
 	return c
 }
 
-// VSCodeActions maps a Local agent call to the engine actions to evaluate
-// No actions and no error means the tool touches nothing CyberBoar governs
+// VSCodeActions maps a Local agent call to the engine actions to evaluate.
+// No actions and no error means the tool touches nothing CyberBoar governs.
 func VSCodeActions(in *Input, env Env) ([]engine.Action, error) {
 	name := *in.ToolNameVSCode
 	base := engine.Action{Cwd: in.Cwd, Home: env.Home}
@@ -369,14 +369,14 @@ func VSCodeActions(in *Input, env Env) ([]engine.Action, error) {
 
 // uriLike is how VS Code's file tools tell a URI from a path: a string that
 // isn't absolute and holds this anywhere is parsed as a URI (Copilot Chat
-// 0.70's resolveFilePath)
+// 0.70's resolveFilePath).
 var uriLike = regexp.MustCompile(`\w[\w\d+.-]*:\S`)
 
 // vscodePath returns the path VS Code's file tools reach for p. An absolute
 // path is itself and a file: URI is its path. Any other URI is an error,
 // and so is a string VS Code would read as a URI with no scheme, which it
 // makes absolute ("a/b:c" is /a/b:c). Other relative paths, which the tools
-// refuse, are left to the engine
+// refuse, are left to the engine.
 func vscodePath(p string) (string, error) {
 	if strings.HasPrefix(p, "/") || !uriLike.MatchString(p) {
 		return p, nil
@@ -394,10 +394,10 @@ func vscodePath(p string) (string, error) {
 	return local, nil
 }
 
-// memoriesRoot is the root of the memory tool's paths
+// memoriesRoot is the root of the memory tool's paths.
 const memoriesRoot = "/memories/"
 
-// remoteSchemes are URL schemes that name nothing on this machine's disk
+// remoteSchemes are URL schemes that name nothing on this machine's disk.
 var remoteSchemes = map[string]bool{"http": true, "https": true, "about": true, "data": true}
 
 // urlPath returns the local file a URL names: a file: URL's path, or a
@@ -405,7 +405,7 @@ var remoteSchemes = map[string]bool{"http": true, "https": true, "about": true, 
 // name nothing local. Any other scheme is an error, since VS Code may map it
 // to a file (vscode-remote:, vscode-userdata:, …), and so is a file: URL
 // with a host, even localhost: VS Code's file tools read file://localhost/p
-// as //localhost/p, which is /localhost/p, while a browser reads /p
+// as //localhost/p, which is /localhost/p, while a browser reads /p.
 func urlPath(s string) (string, bool, error) {
 	u, err := url.Parse(s)
 	if err != nil || u.Scheme == "" {
@@ -428,7 +428,7 @@ func urlPath(s string) (string, bool, error) {
 }
 
 // replacementWrites returns one write per file that multi_replace_string_in_file
-// edits, with that file's edits applied in order
+// edits, with that file's edits applied in order.
 func replacementWrites(tool string, v any, base engine.Action) ([]engine.Action, error) {
 	list, ok := v.([]any)
 	if !ok || len(list) == 0 {
@@ -462,12 +462,12 @@ func replacementWrites(tool string, v any, base engine.Action) ([]engine.Action,
 // taskKeys are the task properties the hook can check. Any other one may
 // change what runs or where: options.env and options.shell, per-platform
 // overrides (linux: {command: …}), dependsOn, or runOptions, which can run
-// the task again whenever the folder opens
+// the task again whenever the folder opens.
 var taskKeys = map[string]bool{"label": true, "type": true, "command": true, "args": true, "isBackground": true,
 	"problemMatcher": true, "group": true, "detail": true, "options": true}
 
 // plainWord matches a task argument that the shell reads the same whether
-// VS Code quotes it or not
+// VS Code quotes it or not.
 var plainWord = regexp.MustCompile(`^[A-Za-z0-9_./=:,@%+-]+$`)
 
 // taskActions reads create_and_run_task's input: it saves a shell task in
@@ -477,7 +477,7 @@ var plainWord = regexp.MustCompile(`^[A-Za-z0-9_./=:,@%+-]+$`)
 // as it sees fit, so with arguments, the command and every argument must be
 // a plain word, which reads the same either way; a command line goes in the
 // command alone. VS Code substitutes ${…} variables in tasks, and
-// ${command:…} runs a command, so a task holding one is refused
+// ${command:…} runs a command, so a task holding one is refused.
 func taskActions(input map[string]any, base engine.Action, env Env) ([]engine.Action, error) {
 	const tool = "create_and_run_task"
 	folder, ok := input["workspaceFolder"].(string)
@@ -486,7 +486,8 @@ func taskActions(input map[string]any, base engine.Action, env Env) ([]engine.Ac
 		return nil, adapters.Invalid("the %s tool input has no workspaceFolder string or task object", tool)
 	}
 	if base.Cwd == "" || path.Clean(folder) != path.Clean(base.Cwd) {
-		return nil, adapters.Invalid("the %s task's workspaceFolder %q is not the folder the hook runs in (%q), the only one VS Code tells it; run the command with run_in_terminal instead", tool, folder, base.Cwd)
+		return nil, adapters.Invalid("the %s task's workspaceFolder %q is not the folder the hook runs in (%q), "+
+			"the only one VS Code tells it; run the command with run_in_terminal instead", tool, folder, base.Cwd)
 	}
 	for k := range task {
 		if !taskKeys[k] {
@@ -562,7 +563,7 @@ func taskActions(input map[string]any, base engine.Action, env Env) ([]engine.Ac
 // vscodeMCPActions reads mcp_<prefix>_<tool>. The prefix comes from the
 // server's label, which can hold "_", so every split within the prefix's
 // length is evaluated and the strictest verdict wins. The engine matches
-// the tool of any server (engine.NamesVSCode)
+// the tool of any server (engine.NamesVSCode).
 func vscodeMCPActions(name string, base engine.Action) ([]engine.Action, error) {
 	var out []engine.Action
 	last := min(vscodePrefixMax, len(name)-1)

@@ -12,9 +12,9 @@ import (
 )
 
 // validatePatterns checks what the schema cannot, which is pattern syntax and
-// patterns that would load fine but never match anything, a silent no-op rule
+// patterns that would load fine but never match anything, a silent no-op rule.
 // A file pattern is checked in the form translateDrive gives it, and an error
-// quotes it as written
+// quotes it as written.
 func validatePatterns(p *Policy) error {
 	for _, l := range ruleLists("spec.files", p.Spec.Files.Rules) {
 		for i, pat := range l.patterns {
@@ -49,13 +49,13 @@ type ruleList struct {
 	patterns []string
 }
 
-// ruleLists returns each rule list with its document path, in a fixed order
+// ruleLists returns each rule list with its document path, in a fixed order.
 func ruleLists(prefix string, r Rules) []ruleList {
 	return []ruleList{{prefix + ".allow", r.Allow}, {prefix + ".ask", r.Ask}, {prefix + ".deny", r.Deny}}
 }
 
 // validateFilePattern enforces the anchoring forms of file patterns: "/abs",
-// "~/home-relative", "**/anywhere", or workspace-relative
+// "~/home-relative", "**/anywhere", or workspace-relative.
 func validateFilePattern(pat string) error {
 	rest := pat
 	switch {
@@ -86,7 +86,7 @@ func validateFilePattern(pat string) error {
 	if strings.HasSuffix(pat, "/") {
 		return fmt.Errorf(`trailing "/" never matches; to match a directory's contents, end with "/**"`)
 	}
-	for _, seg := range strings.Split(rest, "/") {
+	for seg := range strings.SplitSeq(rest, "/") {
 		switch seg {
 		case "":
 			return fmt.Errorf(`empty path segment ("//") never matches`)
@@ -106,7 +106,7 @@ func validateFilePattern(pat string) error {
 // quietly becomes another one: "**\.env*" is "**.env*", a name at the
 // workspace root, and "config\*.json" names a literal "config*.json". Windows
 // names can't hold the characters worth escaping, and a bracket expression
-// such as [*] matches them literally on other systems
+// such as [*] matches them literally on other systems.
 func checkBackslashes(pat string) error {
 	inClass := false
 	for i := 0; i < len(pat); i++ {
@@ -127,7 +127,7 @@ func checkBackslashes(pat string) error {
 // leadingAlternatives returns the alternatives of a brace group at the start
 // of pat, and those of groups at the start of an alternative, in order. It
 // returns nil when pat doesn't start with a group or the group doesn't close,
-// which doublestar.ValidatePattern reports
+// which doublestar.ValidatePattern reports.
 func leadingAlternatives(pat string) []string {
 	if !strings.HasPrefix(pat, "{") {
 		return nil
@@ -161,10 +161,10 @@ func leadingAlternatives(pat string) []string {
 	return nil
 }
 
-// validateMCPPattern checks each "server" or "tool" segment is a valid glob
-// The schema has already enforced the "server" / "server/tool" shape
+// validateMCPPattern checks each "server" or "tool" segment is a valid glob.
+// The schema has already enforced the "server" / "server/tool" shape.
 func validateMCPPattern(pat string) error {
-	for _, seg := range strings.Split(pat, "/") {
+	for seg := range strings.SplitSeq(pat, "/") {
 		if _, err := path.Match(seg, ""); err != nil {
 			return fmt.Errorf("malformed glob")
 		}
@@ -172,11 +172,11 @@ func validateMCPPattern(pat string) error {
 	return nil
 }
 
-// MinTripwireWindow is the shortest tripwire window
-// A shorter one would reset the count between two quick retries
+// MinTripwireWindow is the shortest tripwire window.
+// A shorter one would reset the count between two quick retries.
 const MinTripwireWindow = time.Minute
 
-// Endpoint intervals bound the request rate even when the policy sets it
+// Endpoint intervals bound the request rate even when the policy sets it.
 const (
 	MinShipInterval = time.Second
 	MinPullInterval = 10 * time.Second
@@ -201,7 +201,7 @@ func validateSync(p *Policy) error {
 	return nil
 }
 
-// validateSession checks what the schema cannot about session settings
+// validateSession checks what the schema cannot about session settings.
 func validateSession(p *Policy) error {
 	w := p.Spec.Session.Tripwire.Window
 	if w == "" {
@@ -214,7 +214,7 @@ func validateSession(p *Policy) error {
 	return nil
 }
 
-// translateDrivePatterns applies translateDrive to every file pattern
+// translateDrivePatterns applies translateDrive to every file pattern.
 func translateDrivePatterns(r *Rules) {
 	for _, list := range [][]string{r.Allow, r.Ask, r.Deny} {
 		for i, pat := range list {
@@ -227,7 +227,7 @@ func translateDrivePatterns(r *Rules) {
 // C:\x or C:/x, into the engine's form /c/x, and returns any other pattern
 // unchanged. After a drive, "\" separates names, so it can't escape a glob
 // character there. Windows names can't hold * or ?, and a [ or { in such a
-// pattern is glob syntax
+// pattern is glob syntax.
 func translateDrive(pat string) string {
 	if len(pat) >= 3 && pat[1] == ':' && isLetter(pat[0]) && (pat[2] == '\\' || pat[2] == '/') {
 		return "/" + strings.ToLower(pat[:1]) + "/" + strings.ReplaceAll(pat[3:], `\`, "/")

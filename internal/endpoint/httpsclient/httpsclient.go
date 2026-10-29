@@ -1,6 +1,6 @@
 // Package httpsclient makes the HTTP client an endpoint uses to reach the
 // console or a static policy host. The client speaks only TLS 1.3, verifies
-// the server and follows no redirects
+// the server and follows no redirects.
 package httpsclient
 
 import (
@@ -16,28 +16,28 @@ import (
 )
 
 // TLS says how an endpoint verifies the console it talks to
-// Traffic is always TLS 1.3, and plain http is never used
+// Traffic is always TLS 1.3, and plain http is never used.
 type TLS struct {
 	// CAFile is a PEM file of CA certificates. When set, only certificates
 	// issued by these CAs are trusted, instead of the system's roots. That
 	// is the way to use a private CA or a self-signed certificate and still
-	// verify the server
+	// verify the server.
 	CAFile string
 	// SkipVerify accepts any server certificate. The traffic stays encrypted,
 	// but nothing proves which server it reaches. It exists for self-signed
-	// setups, though CAFile is the safer way to the same end
+	// setups, though CAFile is the safer way to the same end.
 	SkipVerify bool
 }
 
-// maxCAFile bounds the CA bundle read from disk
+// maxCAFile bounds the CA bundle read from disk.
 const maxCAFile = 1 << 20
 
-// timeout bounds one request, response included
+// timeout bounds one request, response included.
 const timeout = 30 * time.Second
 
 // New returns the client endpoints use. It speaks only TLS 1.3, verifies
 // the server as t says, and follows no redirects, which could send audit
-// events to another host
+// events to another host.
 func New(t TLS) (*http.Client, error) {
 	if t.CAFile != "" && t.SkipVerify {
 		return nil, errors.New("a CA file and skipping verification contradict each other; choose one")
@@ -63,7 +63,7 @@ func New(t TLS) (*http.Client, error) {
 	}, nil
 }
 
-// loadCAs returns a pool with the PEM certificates in the file at path
+// loadCAs returns a pool with the PEM certificates in the file at path.
 func loadCAs(path string) (*x509.CertPool, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -88,8 +88,8 @@ func loadCAs(path string) (*x509.CertPool, error) {
 
 // CheckURL accepts only an absolute https URL without credentials. Audit
 // events name files and commands, so they must not cross the network in clear
-// text, loopback included
-// Credentials in a URL end up in logs
+// text, loopback included.
+// Credentials in a URL end up in logs.
 func CheckURL(raw string) error {
 	u, err := url.Parse(raw)
 	if err != nil {

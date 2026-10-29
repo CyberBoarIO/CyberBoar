@@ -21,7 +21,7 @@ func digest(s string) []byte {
 	return d[:]
 }
 
-// checkSigns signs with k and verifies the signature with its public key
+// checkSigns signs with k and verifies the signature with its public key.
 func checkSigns(t *testing.T, k crypto.Signer) {
 	t.Helper()
 	d := digest("request")
@@ -69,7 +69,7 @@ func TestFileKey(t *testing.T) {
 	}
 }
 
-// Every key file Load can't use fully is an error
+// Every key file Load can't use fully is an error.
 func TestLoadRefuses(t *testing.T) {
 	file, _ := Create(File)
 	p384, _ := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
@@ -138,7 +138,7 @@ func TestAutoFallsBackWithoutTPM(t *testing.T) {
 	}
 }
 
-// A store that signs with some other key is caught before the signature is used
+// A store that signs with some other key is caught before the signature is used.
 func TestSignatureFromAnotherKey(t *testing.T) {
 	k, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	other, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)

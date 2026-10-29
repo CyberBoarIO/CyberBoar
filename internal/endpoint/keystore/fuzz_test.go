@@ -7,8 +7,8 @@ import (
 )
 
 // FuzzLoad feeds Load key files: it must return a P-256 key or an error,
-// never panic. The fuzzer picks the PEM type and writes the body
-// The seeds are built here so that no key file sits in the repository as text
+// never panic. The fuzzer picks the PEM type and writes the body.
+// The seeds are built here so that no key file sits in the repository as text.
 func FuzzLoad(f *testing.F) {
 	types := []string{pemFile, pemTPM, pemCNG, "PUBLIC KEY"}
 	k, _ := Create(File)

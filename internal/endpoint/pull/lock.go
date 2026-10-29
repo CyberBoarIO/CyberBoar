@@ -8,13 +8,13 @@ import (
 	"path/filepath"
 )
 
-// ErrBusy means another process is committing a policy to this destination
-// The caller can retry the pull; no part of this install was written
+// ErrBusy means another process is committing a policy to this destination.
+// The caller can retry the pull; no part of this install was written.
 var ErrBusy = errors.New("another policy install is in progress")
 
-// lockInstall resolves directory aliases and holds a persistent lock inode
+// lockInstall resolves directory aliases and holds a persistent lock inode.
 // Neither the lock nor its directory is removed on release: unlinking a locked
-// file would let another writer acquire a different inode under the same name
+// file would let another writer acquire a different inode under the same name.
 func lockInstall(out string) (canonical string, unlock func(), err error) {
 	abs, err := filepath.Abs(out)
 	if err != nil {

@@ -33,7 +33,7 @@ func TestHooksOff(t *testing.T) {
 	}
 }
 
-// Text inside strings is kept as it is
+// Text inside strings is kept as it is.
 func TestJSONCKeepsStrings(t *testing.T) {
 	var v map[string]string
 	if err := json.Unmarshal(jsonc([]byte(`{"u": "http://x/*y*/ // z", "q": "a\",}"} // end`)), &v); err != nil {

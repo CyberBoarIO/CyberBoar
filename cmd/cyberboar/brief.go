@@ -12,8 +12,8 @@ import (
 
 // runBrief answers a SessionStart hook. It always exits 0, because a
 // briefing is advisory (the PreToolUse hook enforces the policy) and must
-// never stop a session from starting
-func runBrief(h host, fs *flag.FlagSet, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+// never stop a session from starting.
+func runBrief(h host, fs *flag.FlagSet, args []string, stdin io.Reader, stdout, _ io.Writer) int {
 	fs.SetOutput(io.Discard)
 	agent := fs.String("agent", "claude-code", "agent: "+agentList()+" (the answer is in the shape the agent reads)")
 	policyPath := fs.String("policy", "", "policy file") // no environment fallbacks, as for the hook

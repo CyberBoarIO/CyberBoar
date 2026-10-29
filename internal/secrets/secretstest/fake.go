@@ -1,7 +1,7 @@
 // Package secretstest makes up credentials for tests: each one has the shape
 // a rule of package secrets looks for, but none was ever issued. They are
 // built at run time from a fixed seed, so no file in the repository holds
-// one that a secret scanner (ours, gitleaks, push protection) would report
+// one that a secret scanner (ours, gitleaks, push protection) would report.
 package secretstest
 
 import (
@@ -23,7 +23,7 @@ const (
 	digits  = "0123456789"
 )
 
-// randFrom returns n bytes drawn from alphabet
+// randFrom returns n bytes drawn from alphabet.
 func randFrom(r *rand.Rand, alphabet string, n int) string {
 	b := make([]byte, n)
 	for i := range b {
@@ -32,7 +32,7 @@ func randFrom(r *rand.Rand, alphabet string, n int) string {
 	return string(b)
 }
 
-// The literals are split so that the source itself matches no rule
+// The literals are split so that the source itself matches no rule.
 var makers = map[string]func(r *rand.Rand) string{
 	"aws-access-token": func(r *rand.Rand) string { return "AK" + "IA" + randFrom(r, upper32, 16) },
 	"github-pat":       func(r *rand.Rand) string { return "gh" + "p_" + randFrom(r, alnum, 36) },
@@ -51,7 +51,7 @@ var makers = map[string]func(r *rand.Rand) string{
 	},
 }
 
-// Rules returns the rule ids Fake can make a credential for, sorted
+// Rules returns the rule ids Fake can make a credential for, sorted.
 func Rules() []string {
 	ids := make([]string, 0, len(makers))
 	for id := range makers {
@@ -62,12 +62,12 @@ func Rules() []string {
 }
 
 // Fake returns a made-up credential that the rule id finds, the same one on
-// every call. ok is false for a rule it has none for
+// every call. ok is false for a rule it has none for.
 func Fake(id string) (secret string, ok bool) {
 	return FakeN(id, 0)
 }
 
-// FakeN is Fake's n-th credential for the rule: different n, different credential
+// FakeN is Fake's n-th credential for the rule: different n, different credential.
 func FakeN(id string, n uint64) (secret string, ok bool) {
 	mk, ok := makers[id]
 	if !ok {
@@ -83,7 +83,7 @@ func FakeN(id string, n uint64) (secret string, ok bool) {
 
 // Expand replaces every {{fake:RULE}} in s with Fake(RULE), and
 // {{fake:RULE:N}} with FakeN(RULE, N). {{fake:RULE:N:HOW}} also hides the
-// credential the way HOW names (Hide). Anything it can't read is left as written
+// credential the way HOW names (Hide). Anything it can't read is left as written.
 func Expand(s string) string {
 	const open = "{{fake:"
 	var b strings.Builder
@@ -128,7 +128,7 @@ func Expand(s string) string {
 // "head" and "tail" are its first 8 bytes and the rest,
 // to be put together later; "ansic" writes its first 4 bytes as \x escapes
 // (for $'…' and printf); "lookalike" has its first '-' replaced by U+2010,
-// a hyphen that looks the same. ok is false for another how
+// a hyphen that looks the same. ok is false for another how.
 func Hide(secret, how string) (string, bool) {
 	split := func(sep string) string { return secret[:2] + sep + secret[2:] }
 	switch how {

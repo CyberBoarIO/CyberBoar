@@ -363,8 +363,8 @@ func Once(ctx context.Context, o Options) (*Endpoint, Outcome, error) {
 		return nil, 0, fmt.Errorf("the console's answer is for endpoint %q and policy %q; this is endpoint %s", ans.EndpointID, ans.Policy, id)
 	}
 	ep := &Endpoint{
-		Enrollment: Enrollment{Console: server, EndpointID: id, Policy: ans.Policy, ConsoleKey: ans.ConsoleKey},
-		StateDir:   o.StateDir, key: key, consoleKey: consoleKey, now: o.Now,
+		Console: server, EndpointID: id, Policy: ans.Policy, ConsoleKey: ans.ConsoleKey,
+		StateDir: o.StateDir, key: key, consoleKey: consoleKey, now: o.Now,
 	}
 	// The certificate goes first. A record without it reads as unfinished,
 	// and enrolling again completes it.

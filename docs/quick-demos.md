@@ -2,15 +2,11 @@
 
 See an ordinary read succeed and a fake secret read get blocked, using your own agent.
 Each walkthrough takes about a minute **after** CyberBoar and the agent are installed,
-signed in, and ready to use. Downloads, first-time trust review, and model response
-times are extra; this is a quick interaction, not a latency benchmark.
+signed in, and ready to use. Downloads, first-time trust prompts and model response
+times come on top.
 
-The demos are ordered by reported workplace adoption in [JetBrains' Developer
-Ecosystem Survey 2026](https://blog.jetbrains.com/research/2026/08/ai-coding-agent-adoption-2026/)
-(May–July fieldwork): Claude Code, GitHub Copilot, Codex, Cursor, then opencode.
-Copilot and Codex figures cover their products, not just their CLIs; this is an
-ordering proxy, not a CLI market-share claim. See the [capability
-matrix](capability-matrix.md) for CyberBoar's enforcement coverage.
+See the [capability matrix](capability-matrix.md) for CyberBoar's enforcement
+coverage of each agent.
 
 Using an editor instead of a CLI? Follow [Editor integrations](editor-integrations.md)
 for the supported Claude Code, Codex, opencode, Cursor and Copilot in VS Code
@@ -56,8 +52,8 @@ YAML
 The last command should report a valid policy. `cyberboar_bin` must be an absolute
 executable path, not an alias or shell function; if necessary, set it to the full path
 of your installed binary. The policy blocks `.env*` files and otherwise permits
-actions subject to CyberBoar's built-in protections. It is a demonstration, not a
-complete deployment policy or an OS sandbox.
+actions subject to CyberBoar's built-in protections. For a real starting point, see
+the [baseline policy](../examples/baseline.yaml).
 
 ## Claude Code
 
@@ -158,9 +154,8 @@ loading the settings; this walkthrough is not for a remote/cloud agent.
 **Try (about 20 seconds).** Send the two [demo prompts](#demo-prompts) separately in
 Agent chat. Expect the ordinary text, then a denied fake-secret read.
 
-**Verify (about 20 seconds).** [Check the audit log](#verify-the-result). **Real-agent
-validation for the Cursor editor is pending**: this is a verification walkthrough, not a claim
-of a completed end-to-end test. If hooks do not run, check Cursor's hook diagnostics
+**Verify (about 20 seconds).** [Check the audit log](#verify-the-result). Real-agent
+validation of the Cursor editor is still pending. If hooks do not run, check Cursor's hook diagnostics
 and the [capability matrix](capability-matrix.md) before relying on this integration.
 See [manual Cursor hooks](agents.md#cursor) and the
 [official hooks documentation](https://cursor.com/docs/hooks).

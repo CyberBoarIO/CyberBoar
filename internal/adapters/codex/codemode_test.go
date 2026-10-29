@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// Scripts in the form Codex 0.155 writes them in code mode
+// Scripts in the form Codex 0.155 writes them in code mode.
 func TestCallFromScriptCaptured(t *testing.T) {
 	for _, tc := range []struct{ src, cmd, workdir string }{
 		{"const r = await tools.exec_command({cmd:\"ls\",max_output_tokens:2000});\ntext(r.output);\n", "ls", ""},
@@ -26,7 +26,7 @@ func TestCallFromScriptCaptured(t *testing.T) {
 }
 
 // Anything but straight-line literal calls is untrusted: a script could
-// otherwise show a decoy call while running another
+// otherwise show a decoy call while running another.
 func TestCallFromScriptRejects(t *testing.T) {
 	for name, src := range map[string]string{
 		"aliased tools":          "const t = tools; await t.exec_command({cmd:\"ls\"});",
@@ -63,7 +63,7 @@ func TestCallFromScriptRejects(t *testing.T) {
 }
 
 // FuzzCallFromScript: no script panics the parser, and a trusted call always
-// has the command asked for
+// has the command asked for.
 func FuzzCallFromScript(f *testing.F) {
 	f.Add("const r = await tools.exec_command({cmd:\"ls\",workdir:\"src\"});\ntext(r.output);\n", "ls")
 	f.Add("await tools.apply_patch(\"x\"); text(JSON.stringify(r))", "x")
@@ -76,7 +76,7 @@ func FuzzCallFromScript(f *testing.F) {
 	})
 }
 
-// A terminal requested by any matching call in a script counts
+// A terminal requested by any matching call in a script counts.
 func TestCallFromScriptTty(t *testing.T) {
 	for _, c := range []struct {
 		src string

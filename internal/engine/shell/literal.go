@@ -9,7 +9,7 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// Bounds for Literals: nesting, word count and total expanded text
+// Bounds for Literals: nesting, word count and total expanded text.
 const (
 	maxLiteralDepth = MaxDepth
 	maxLiteralWords = 4096
@@ -25,13 +25,13 @@ const (
 // with backslash escapes is also given as printf and echo -e would print
 // it, and a word whose value contains quotes or backslashes is read again
 // as shell code, so the words in code passed to sh -c and friends are
-// returned too. Here-document bodies are left out: quotes are literal there
-// A command line that doesn't parse returns nothing, and is denied elsewhere
+// returned too. Here-document bodies are left out: quotes are literal there.
+// A command line that doesn't parse returns nothing, and is denied elsewhere.
 //
 // It also returns, run together, the arguments of every command in src
 // that aren't options (printf %s%s gh p_x, echo -n in turn, or one
-// command's words split up), as bash may print them one after another
-// Exceeding a limit returns no partial result and ErrTooLarge or ErrTooComplex
+// command's words split up), as bash may print them one after another.
+// Exceeding a limit returns no partial result and ErrTooLarge or ErrTooComplex.
 func Literals(src string) (words []string, args string, err error) {
 	l := literals{vars: map[string]string{}}
 	l.read(src, 0)
@@ -50,7 +50,7 @@ type literals struct {
 }
 
 // reserve charges text before building or retaining it, including temporary
-// expansions and the joined output, so repeated assignments cannot grow unchecked
+// expansions and the joined output, so repeated assignments cannot grow unchecked.
 func (l *literals) reserve(n int) bool {
 	if l.err != nil {
 		return false
@@ -141,7 +141,7 @@ func (l *literals) read(src string, depth int) {
 }
 
 // word adds the values of w, and reports whether Walk should go into it:
-// for the command substitutions in a word not wholly known
+// for the command substitutions in a word not wholly known.
 func (l *literals) word(src string, w *syntax.Word, depth int) bool {
 	v, known := l.value(w)
 	if l.err != nil {
@@ -170,7 +170,7 @@ func (l *literals) word(src string, w *syntax.Word, depth int) bool {
 }
 
 // value returns w's value as bash makes it, without brace expansion
-// ({1..99999999} stays one word), and whether all of it is known
+// ({1..99999999} stays one word), and whether all of it is known.
 func (l *literals) value(w *syntax.Word) (string, bool) {
 	var b strings.Builder
 	known := true
@@ -214,7 +214,7 @@ func (l *literals) value(w *syntax.Word) (string, bool) {
 }
 
 // param writes the value of $NAME or ${NAME} when the line assigned it,
-// and reports whether it did
+// and reports whether it did.
 func (l *literals) param(b *strings.Builder, p *syntax.ParamExp) bool {
 	if p.Param == nil || p.Excl || p.Length || p.Width || p.Index != nil || p.Slice != nil || p.Repl != nil || p.Names != 0 || p.Exp != nil {
 		return false
@@ -227,8 +227,8 @@ func (l *literals) param(b *strings.Builder, p *syntax.ParamExp) bool {
 }
 
 // unescape writes s without its backslash escapes: every escape, or with
-// only set non-empty, only those before a byte in it (inside double quotes)
-// A backslash-newline is removed whole
+// only set non-empty, only those before a byte in it (inside double quotes).
+// A backslash-newline is removed whole.
 func unescape(b *strings.Builder, s, only string) {
 	for i := 0; i < len(s); i++ {
 		if s[i] == '\\' && i+1 < len(s) {
@@ -245,7 +245,7 @@ func unescape(b *strings.Builder, s, only string) {
 }
 
 // cEscapes reads the backslash escapes in s as bash reads them in $'…' and
-// printf's format, or with echo as echo -e reads them (\0nnn for octal)
+// printf's format, or with echo as echo -e reads them (\0nnn for octal).
 func cEscapes(s string, echo bool) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {

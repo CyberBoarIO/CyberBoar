@@ -14,8 +14,8 @@ import (
 	"cyberboar.dev/cyberboar/pkg/sign"
 )
 
-// BenchmarkPolicyValidation separates the costs paid by a signed hook
-// These are warm-process timings; a fresh CLI also pays package startup
+// BenchmarkPolicyValidation separates the costs paid by a signed hook.
+// These are warm-process timings; a fresh CLI also pays package startup.
 func BenchmarkPolicyValidation(b *testing.B) {
 	data, err := os.ReadFile("../../examples/baseline.yaml")
 	if err != nil {

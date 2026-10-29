@@ -76,8 +76,8 @@ func TestShellPowerShellOptionsCannotHideInlineCode(t *testing.T) {
 	}
 }
 
-// Exceeding a scan limit must block even when the policy asks about secrets
-// The audit log must not retain a command that could not be checked fully
+// Exceeding a scan limit must block even when the policy asks about secrets.
+// The audit log must not retain a command that could not be checked fully.
 func TestShellLiteralLimitsBlockAndRedact(t *testing.T) {
 	for name, command := range map[string]string{
 		"doubling":   "A=x;" + strings.Repeat("A=$A$A;", 20) + "echo $A",
@@ -100,7 +100,7 @@ func TestShellLiteralLimitsBlockAndRedact(t *testing.T) {
 }
 
 // protectedFixture writes the marker file rel under root, a policy denying
-// it, and returns the compiled policy
+// it, and returns the compiled policy.
 func protectedFixture(t *testing.T, root, rel string) *Compiled {
 	t.Helper()
 	target := filepath.Join(root, rel)
@@ -117,7 +117,7 @@ func protectedFixture(t *testing.T, root, rel string) *Compiled {
 
 // reachesMarker runs command with bash in dir, skipping when bash or a
 // program it needs is missing, and fails when it doesn't print the marker:
-// the fixture must read the protected file for real
+// the fixture must read the protected file for real.
 func reachesMarker(t *testing.T, dir, command string, needs ...string) {
 	t.Helper()
 	for _, prog := range append([]string{"bash"}, needs...) {
@@ -134,7 +134,7 @@ func reachesMarker(t *testing.T, dir, command string, needs ...string) {
 }
 
 // bash's cd applies ".." to the path as written, so link/.. is the
-// directory holding the link, not the parent of its target
+// directory holding the link, not the parent of its target.
 func TestShellLogicalCdCannotAllowProtectedRead(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("fixture uses POSIX engine paths")
@@ -178,7 +178,7 @@ func TestShellLogicalCdCannotAllowProtectedRead(t *testing.T) {
 	}
 }
 
-// Globs match with bash's grammar, character classes included
+// Globs match with bash's grammar, character classes included.
 func TestShellGlobClassesCannotHideProtectedFile(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("fixture uses POSIX engine paths")
@@ -208,7 +208,7 @@ func TestShellGlobClassesCannotHideProtectedFile(t *testing.T) {
 }
 
 // curl decodes a file URL's path, takes its scheme in any case, and drops
-// its query, fragment and dot segments
+// its query, fragment and dot segments.
 func TestShellFileURLCannotHideProtectedFile(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("fixture uses POSIX engine paths")
@@ -247,7 +247,7 @@ func powerShellAction(root, command string) Action {
 }
 
 // Start-Process -Environment sets the started program's environment, as
-// $env: does
+// $env: does.
 func TestShellStartProcessEnvironmentCannotHideCode(t *testing.T) {
 	root := t.TempDir()
 	c := mustCompile(t, emptyPolicy(policy.DenyListed))
@@ -269,7 +269,7 @@ func TestShellStartProcessEnvironmentCannotHideCode(t *testing.T) {
 	}
 }
 
-// PowerShell's own quoting and escapes, which bash reads differently
+// PowerShell's own quoting and escapes, which bash reads differently.
 func TestShellPowerShellSecretsCannotHide(t *testing.T) {
 	root := t.TempDir()
 	c := mustCompile(t, secretsPolicy(policy.SecretsDeny))
@@ -302,7 +302,7 @@ func TestShellPowerShellSecretsCannotHide(t *testing.T) {
 	}
 }
 
-// Cmdlet parameters that reach a file or set a variable for the cmdlet
+// Cmdlet parameters that reach a file or set a variable for the cmdlet.
 func TestShellPowerShellParametersCannotHideProtectedFile(t *testing.T) {
 	root := t.TempDir()
 	protectedFixture(t, root, "vault/token.txt") // its rule names the POSIX path: C:\vault\token.txt needs its own

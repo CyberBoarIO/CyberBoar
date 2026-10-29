@@ -19,11 +19,11 @@ import (
 )
 
 // ManagedDir is where Codex reads managed requirements (requirements.toml)
-// and system configuration outside Windows
+// and system configuration outside Windows.
 const ManagedDir = "/etc/codex"
 
 // WindowsManagedDir is ManagedDir on Windows: OpenAI\Codex in the
-// ProgramData folder, programData, or in C:\ProgramData when it is unset
+// ProgramData folder, programData, or in C:\ProgramData when it is unset.
 func WindowsManagedDir(programData string) string {
 	if programData == "" {
 		programData = `C:\ProgramData`
@@ -31,9 +31,10 @@ func WindowsManagedDir(programData string) string {
 	return adapters.Under(true, programData, "OpenAI", "Codex")
 }
 
-// Scope is where Codex hook configuration lives
+// Scope is where Codex hook configuration lives.
 type Scope string
 
+// The scopes apply installs into, by the settings file each one writes.
 const (
 	ScopeUser    Scope = "user"    // ~/.codex/hooks.json
 	ScopeProject Scope = "project" // <repo>/.codex/hooks.json (committed)
@@ -41,16 +42,16 @@ const (
 )
 
 // HookTimeout is the Codex hook timeout in seconds. The hook's own deadline
-// must stay well below it, because a hook killed by the timeout fails open
+// must stay well below it, because a hook killed by the timeout fails open.
 const HookTimeout = 10
 
-// statusMessage and briefingMessage mark CyberBoar's own handlers in hooks.json
+// statusMessage and briefingMessage mark CyberBoar's own handlers in hooks.json.
 const (
 	statusMessage   = brand.Name + ": checking policy"
 	briefingMessage = brand.Name + ": briefing"
 )
 
-// FragmentOptions describe the hook command to install
+// FragmentOptions describe the hook command to install.
 type FragmentOptions struct {
 	Scope    Scope
 	Command  string // cyberboar executable, as an absolute path or a name on PATH
@@ -62,13 +63,13 @@ type FragmentOptions struct {
 	Lock     bool // in managed scope, set allow_managed_hooks_only
 	Briefing bool // install the SessionStart briefing (the policy's spec.session.briefing)
 	// Windows makes the hook a command line for cmd.exe, which Codex runs
-	// hooks with on Windows; its paths are Windows paths (CheckWindows)
+	// hooks with on Windows; its paths are Windows paths (CheckWindows).
 	Windows bool
 }
 
 // HookCommand returns the shell command line Codex runs for the hook. Codex
-// runs hook commands through a shell in the session cwd
-// A project-scope policy is found from the git root, as the Codex docs recommend
+// runs hook commands through a shell in the session cwd.
+// A project-scope policy is found from the git root, as the Codex docs recommend.
 func HookCommand(o FragmentOptions) string {
 	q := quoter(o)
 	cmd := program(o) + " hook --agent codex --policy " + policyArg(o)
@@ -84,7 +85,7 @@ func HookCommand(o FragmentOptions) string {
 	return cmd + " --deadline " + q(o.Deadline)
 }
 
-// policyArg returns the --policy value as the shell sees it
+// policyArg returns the --policy value as the shell sees it.
 func policyArg(o FragmentOptions) string {
 	if o.Scope == ScopeProject && !o.Windows {
 		return `"$(git rev-parse --show-toplevel)"/` + adapters.ShellQuote(o.Policy)
@@ -92,7 +93,7 @@ func policyArg(o FragmentOptions) string {
 	return quoter(o)(o.Policy)
 }
 
-// BriefCommand returns the shell command line for the SessionStart briefing
+// BriefCommand returns the shell command line for the SessionStart briefing.
 func BriefCommand(o FragmentOptions) string {
 	cmd := program(o) + " brief --agent codex --policy " + policyArg(o)
 	if o.PubKey != "" {
@@ -103,7 +104,7 @@ func BriefCommand(o FragmentOptions) string {
 
 // quoter returns how a value is quoted in the hook's command line: for a
 // POSIX shell, or on Windows in double quotes, which PowerShell, cmd.exe and
-// the program's own argument parsing all take literally (CheckWindows)
+// the program's own argument parsing all take literally (CheckWindows).
 func quoter(o FragmentOptions) func(string) string {
 	if o.Windows {
 		return func(s string) string { return `"` + s + `"` }
@@ -113,7 +114,7 @@ func quoter(o FragmentOptions) func(string) string {
 
 // program returns the hook's executable as its command line starts. On
 // Windows it stays unquoted: PowerShell reads a quoted first word as a
-// string, not a command (CheckWindows)
+// string, not a command (CheckWindows).
 func program(o FragmentOptions) string {
 	if o.Windows {
 		return o.Command
@@ -122,11 +123,11 @@ func program(o FragmentOptions) string {
 }
 
 // bareProgram matches the program paths that PowerShell and cmd.exe both
-// read as one plain word
+// read as one plain word.
 var bareProgram = regexp.MustCompile(`^[\p{L}\p{N}_.~:\\-]+$`)
 
 // BareWindowsProgram reports whether path can start the hook's command line
-// on Windows unquoted (CheckWindows)
+// on Windows unquoted (CheckWindows).
 func BareWindowsProgram(path string) bool {
 	return bareProgram.MatchString(path)
 }
@@ -139,13 +140,14 @@ func BareWindowsProgram(path string) bool {
 // double quotes, which stay literal in both unless they hold a quote
 // (PowerShell also counts “ ” „), a $ or ` (PowerShell expands them), a % (cmd
 // expands %VAR%) or a line break, or end in a backslash, which would escape
-// the closing quote. There is no git root to find a project's policy from either
+// the closing quote. There is no git root to find a project's policy from either.
 func CheckWindows(o FragmentOptions) error {
 	if o.Scope == ScopeProject {
 		return errors.New("--scope project is not supported for Codex on Windows, which runs hooks in PowerShell or cmd.exe, where the policy can't be found from the git root; use --scope user")
 	}
 	if !BareWindowsProgram(o.Command) {
-		return fmt.Errorf("%q can't start a Codex hook on Windows, where PowerShell and cmd.exe run it: put %s.exe in a folder whose path has only letters, digits and _ . ~ - (no spaces), or pass that path with --command", o.Command, brand.Name)
+		return fmt.Errorf("%q can't start a Codex hook on Windows, where PowerShell and cmd.exe run it: put %s.exe in a folder "+
+			"whose path has only letters, digits and _ . ~ - (no spaces), or pass that path with --command", o.Command, brand.Name)
 	}
 	for _, v := range []string{o.Policy, o.Audit, o.State, o.PubKey, o.Deadline} {
 		if strings.ContainsAny(v, "\"“”„$`%\r\n") || strings.HasSuffix(v, `\`) {
@@ -164,7 +166,7 @@ func briefHandler(o FragmentOptions) map[string]any {
 }
 
 // withWindows gives a Windows handler its command as commandWindows too,
-// which Codex runs instead of command on Windows
+// which Codex runs instead of command on Windows.
 func withWindows(o FragmentOptions, h map[string]any) map[string]any {
 	if o.Windows {
 		h["commandWindows"] = h["command"]
@@ -173,7 +175,7 @@ func withWindows(o FragmentOptions, h map[string]any) map[string]any {
 }
 
 // MergeHooksJSON adds CyberBoar's PreToolUse handler to a hooks.json,
-// replacing one a previous apply installed and keeping everything else
+// replacing one a previous apply installed and keeping everything else.
 func MergeHooksJSON(existing []byte, o FragmentOptions) ([]byte, error) {
 	doc := map[string]any{}
 	if len(bytes.TrimSpace(existing)) > 0 {
@@ -221,8 +223,8 @@ func MergeHooksJSON(existing []byte, o FragmentOptions) ([]byte, error) {
 	return append(out, '\n'), nil
 }
 
-// validateHooks checks retained event groups and handlers before the merge changes them
-// Unknown properties and events are preserved
+// validateHooks checks retained event groups and handlers before the merge changes them.
+// Unknown properties and events are preserved.
 func validateHooks(hooks map[string]any) error {
 	for _, event := range slices.Sorted(maps.Keys(hooks)) {
 		groups, ok := hooks[event].([]any)
@@ -310,18 +312,18 @@ func validateHandler(handler map[string]any, where string) error {
 }
 
 // RequirementsHeader starts every requirements.toml this package writes, so a
-// later apply knows it may replace the file
+// later apply knows it may replace the file.
 const RequirementsHeader = "# Generated by `" + brand.Name + " apply --agent codex --scope managed`; changes are overwritten.\n"
 
 // literalWords matches the command patterns that Codex's prefix_rule can
-// express, which are plain words with no globs, quotes or pipelines
+// express, which are plain words with no globs, quotes or pipelines.
 var literalWords = regexp.MustCompile(`^[A-Za-z0-9_./@%+=:,-]+( [A-Za-z0-9_./@%+=:,-]+)*$`)
 
 // Requirements builds /etc/codex/requirements.toml. It installs the hook as a
 // managed hook, which policy trusts and the user can't disable, pins hooks
 // on, and adds the policy's literal command deny and ask rules as
 // prefix_rules, which Codex enforces even if the hook can't run. The notes it
-// returns list what only the hook enforces
+// returns list what only the hook enforces.
 func Requirements(p *policy.Policy, o FragmentOptions) ([]byte, []string) {
 	var b strings.Builder
 	var notes []string
@@ -359,7 +361,7 @@ func Requirements(p *policy.Policy, o FragmentOptions) ([]byte, []string) {
 			return
 		}
 		var toks []string
-		for _, w := range strings.Fields(pat) {
+		for w := range strings.FieldsSeq(pat) {
 			toks = append(toks, "{ token = "+tomlString(w)+" }")
 		}
 		rules = append(rules, fmt.Sprintf("  { pattern = [%s], decision = %s, justification = %s },",
@@ -380,7 +382,7 @@ func Requirements(p *policy.Policy, o FragmentOptions) ([]byte, []string) {
 	return []byte(b.String()), notes
 }
 
-// tomlString quotes s as a TOML basic string
+// tomlString quotes s as a TOML basic string.
 func tomlString(s string) string {
 	var b strings.Builder
 	b.WriteByte('"')

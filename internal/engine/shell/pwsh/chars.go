@@ -79,7 +79,7 @@ var traits = func() [128]uint16 {
 
 func has(c uint16, trait uint16) bool { return c < 128 && traits[c]&trait != 0 }
 
-// isWhitespace is CharExtensions.IsWhitespace, for which newlines are not whitespace
+// isWhitespace is CharExtensions.IsWhitespace, for which newlines are not whitespace.
 func isWhitespace(c uint16) bool {
 	switch {
 	case c < 128:
@@ -90,13 +90,13 @@ func isWhitespace(c uint16) bool {
 	return isSeparator(c)
 }
 
-// isSeparator is .NET's char.IsSeparator, which is true for the categories Zs, Zl and Zp
+// isSeparator is .NET's char.IsSeparator, which is true for the categories Zs, Zl and Zp.
 func isSeparator(c uint16) bool {
 	r := rune(c)
 	return unicode.In(r, unicode.Zs, unicode.Zl, unicode.Zp)
 }
 
-// isDotNetWhiteSpace is .NET's char.IsWhiteSpace, which, unlike isWhitespace, includes newlines
+// isDotNetWhiteSpace is .NET's char.IsWhiteSpace, which, unlike isWhitespace, includes newlines.
 func isDotNetWhiteSpace(c uint16) bool {
 	switch c {
 	case '\t', '\n', '\v', '\f', '\r', ' ', nextLine, noBreakSpace:
@@ -127,7 +127,7 @@ func isDoubleQuote(c uint16) bool {
 // the two versions then reads differently. A dash followed by U+1C80, a letter
 // since Unicode 9.0, starts a parameter here. A PowerShell whose tables
 // predate the letter passes the two as a bare word, a positional argument,
-// and reads $a followed by U+1C80 as the variable $a and then text
+// and reads $a followed by U+1C80 as the variable $a and then text.
 func isLetter(c uint16) bool { return unicode.IsLetter(rune(c)) }
 
 func isLetterOrDigit(c uint16) bool {

@@ -74,7 +74,7 @@ func TestWindowsShortName(t *testing.T) {
 	}
 }
 
-// An administrator can give a file any 8.3 name, one without "~" too
+// An administrator can give a file any 8.3 name, one without "~" too.
 func TestWindowsShortNameWithoutTilde(t *testing.T) {
 	c, home, repo := windowsFixture(t)
 	out, err := exec.Command("fsutil", "file", "setshortname", filepath.Join(repo, ".env"), "NOTES.TXT").CombinedOutput()

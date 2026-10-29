@@ -27,7 +27,7 @@ func TestConcurrentInstallSerialFloor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for attempt := 0; attempt < 100; attempt++ {
+	for attempt := range 100 {
 		out := filepath.Join(t.TempDir(), "policy.yaml")
 		start := make(chan struct{})
 		var wg sync.WaitGroup

@@ -28,7 +28,7 @@ func loadPolicy(t *testing.T, name string) *policy.Policy {
 	return p
 }
 
-// Generated settings are reviewed as diffs of these golden files
+// Generated settings are reviewed as diffs of these golden files.
 func TestFragmentGolden(t *testing.T) {
 	for _, tc := range []struct {
 		golden, policy string
@@ -95,7 +95,7 @@ func TestNativeFile(t *testing.T) {
 }
 
 // Every scope keeps Claude's file tools off the settings files that install
-// the hook, whatever the policy says
+// the hook, whatever the policy says.
 func TestGuardRulesInEveryScope(t *testing.T) {
 	p, err := policy.Load([]byte("apiVersion: cyberboar.dev/v1\nkind: Policy\nmetadata: {name: empty}\nspec: {commands: {denyInterpreters: false}}\n"))
 	if err != nil {
@@ -165,8 +165,8 @@ func TestMerge(t *testing.T) {
 }
 
 // Claude Code runs no hook while settings set disableAllHooks, so merging
-// the hook into such settings is refused rather than reported as done
-// The key is the user's setting and is not removed behind their back
+// the hook into such settings is refused rather than reported as done.
+// The key is the user's setting and is not removed behind their back.
 func TestMergeRefusesHooksSwitchedOff(t *testing.T) {
 	frag := BuildFragment(loadPolicy(t, "baseline.yaml"), FragmentOptions{Scope: ScopeUser,
 		Command: "/opt/bin/cyberboar", Policy: "/p.yaml", Deadline: "5s"}).Settings
@@ -183,7 +183,7 @@ func TestMergeRefusesHooksSwitchedOff(t *testing.T) {
 }
 
 // The briefing is a SessionStart handler; turning it off in the policy and
-// applying again removes CyberBoar's handler and keeps the user's
+// applying again removes CyberBoar's handler and keeps the user's.
 func TestMergeBriefing(t *testing.T) {
 	p := loadPolicy(t, "baseline.yaml")
 	o := FragmentOptions{Scope: ScopeUser, Command: "/opt/bin/cyberboar", Policy: "/p.yaml", PubKey: "/k.pub", Deadline: "5s"}
@@ -235,7 +235,7 @@ func TestManagedDir(t *testing.T) {
 // The PowerShell tool stays on, since the hook checks it on Windows: no rule
 // names the whole tool, and every Bash rule has a PowerShell twin, without
 // which Claude Code would turn the tool off. Under denyInterpreters the
-// PowerShell tool also gets a rule for Invoke-Expression
+// PowerShell tool also gets a rule for Invoke-Expression.
 func TestFragmentPowerShellRules(t *testing.T) {
 	for _, name := range []string{"baseline.yaml", "allow-listed.yaml"} {
 		p := loadPolicy(t, name)

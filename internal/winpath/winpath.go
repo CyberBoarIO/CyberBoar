@@ -1,5 +1,5 @@
 // Package winpath reads Windows paths into the engine's path space, where
-// the drive path C:\Users\dev is /c/Users/dev
+// the drive path C:\Users\dev is /c/Users/dev.
 //
 // It applies what Win32 does to a path before any file is opened: "\" and
 // "/" both separate names, and trailing dots and spaces are stripped from
@@ -7,9 +7,9 @@
 // refused: UNC paths (\\host\share, which reach local drives too as
 // \\localhost\c$), the \\?\, \\.\ and \??\ namespaces, drive-relative paths
 // (C:x), paths rooted without a drive (\x), alternate data streams (a ":"
-// in a name) and reserved device names (CON, NUL, COM1, ...)
+// in a name) and reserved device names (CON, NUL, COM1, ...).
 //
-// ".." is kept, so callers can resolve links before or after applying it
+// ".." is kept, so callers can resolve links before or after applying it.
 package winpath
 
 import (
@@ -17,7 +17,7 @@ import (
 	"strings"
 )
 
-// Error is a path the engine refuses to read
+// Error is a path the engine refuses to read.
 type Error struct {
 	Path string
 	Why  string
@@ -28,7 +28,7 @@ func (e *Error) Error() string { return fmt.Sprintf("%q: %s", e.Path, e.Why) }
 func refuse(p, why string) error { return &Error{Path: p, Why: why} }
 
 // Path reads p, absolute (C:\x, C:/x) or relative (x\y), and returns it in
-// the engine's form: "/c/x" or "x/y". abs reports which
+// the engine's form: "/c/x" or "x/y". abs reports which.
 func Path(p string) (out string, abs bool, err error) {
 	s := strings.ReplaceAll(p, `\`, "/")
 	switch {
@@ -57,7 +57,7 @@ func Path(p string) (out string, abs bool, err error) {
 	return "/" + drive + "/" + rest, true, nil
 }
 
-// Abs is Path for a path that must be absolute
+// Abs is Path for a path that must be absolute.
 func Abs(p string) (string, error) {
 	out, abs, err := Path(p)
 	if err == nil && !abs {
@@ -69,7 +69,7 @@ func Abs(p string) (string, error) {
 // Target reads the target of a symbolic link or junction as Windows stores
 // it. Drive and \\?\ (or \??\) drive targets are absolute; a target rooted
 // without a drive is on the link's drive; anything else is relative to the
-// link's directory. Volume GUID and UNC targets are refused
+// link's directory. Volume GUID and UNC targets are refused.
 func Target(t, linkDrive string) (out string, abs bool, err error) {
 	s := strings.ReplaceAll(t, `\`, "/")
 	for _, prefix := range []string{"//?/", "/??/"} {
@@ -90,7 +90,7 @@ func Target(t, linkDrive string) (out string, abs bool, err error) {
 	return Path(t)
 }
 
-// names checks and rewrites the names of a "/"-separated path
+// names checks and rewrites the names of a "/"-separated path.
 func names(orig, s string) (string, error) {
 	parts := strings.Split(s, "/")
 	out := parts[:0]
@@ -120,18 +120,18 @@ func names(orig, s string) (string, error) {
 
 // Forbidden reports whether Win32 forbids c in a file name: the characters
 // ", *, :, <, >, ? and |, and the control characters. A name with one can't
-// be opened by Windows programs
+// be opened by Windows programs.
 func Forbidden(c byte) bool {
 	return c < 0x20 || strings.IndexByte(`"*:<>?|`, c) >= 0
 }
 
 // devices are the reserved names Win32 maps to devices in any directory,
-// with or without an extension
+// with or without an extension.
 var devices = map[string]bool{"con": true, "prn": true, "aux": true, "nul": true, "conin$": true, "conout$": true}
 
 // IsDevice reports whether a name (trailing dots and spaces already removed)
 // is a reserved device name: CON, PRN, AUX, NUL, CONIN$, CONOUT$, COM0-9 and
-// LPT0-9 (including the superscript digits ¹²³), with any extension
+// LPT0-9 (including the superscript digits ¹²³), with any extension.
 func IsDevice(name string) bool {
 	base, _, _ := strings.Cut(name, ".")
 	base = strings.ToLower(strings.TrimRight(base, " "))
@@ -152,7 +152,7 @@ func IsDevice(name string) bool {
 // FromGitBash turns a directory the harness gives in Git Bash's form, /c/x
 // or /cygdrive/c/x, into the Windows path C:\x. Anything else is returned
 // unchanged. Only for paths the harness sets (the environment, the hook
-// input's cwd): a path the model chose in that form is refused instead
+// input's cwd): a path the model chose in that form is refused instead.
 func FromGitBash(p string) string {
 	rest, ok := strings.CutPrefix(p, "/")
 	if !ok {
@@ -169,7 +169,7 @@ func FromGitBash(p string) string {
 }
 
 // SameDir reports whether two absolute Windows paths name the same
-// directory as far as their spelling shows: NTFS ignores case
+// directory as far as their spelling shows: NTFS ignores case.
 func SameDir(a, b string) bool {
 	ca, errA := Abs(a)
 	cb, errB := Abs(b)

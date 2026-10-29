@@ -9,7 +9,7 @@ import (
 	"cyberboar.dev/cyberboar/internal/engine/osfs"
 )
 
-// psWin analyzes src as PowerShell on Windows, in C:\work\repo
+// psWin analyzes src as PowerShell on Windows, in C:\work\repo.
 func psWin(t *testing.T, src string) *Analysis {
 	t.Helper()
 	an, err := AnalyzePowerShell(src, "/c/Users/dev", Options{Cwd: "/c/work/repo", FS: osfs.FS{Windows: true}})
@@ -42,7 +42,7 @@ func codeWhats(an *Analysis) []string {
 }
 
 // fileFlags renders a file as path (or display, for a path only known at
-// run time) and its flags: a accessed, c contents, m modifies, r refused
+// run time) and its flags: a accessed, c contents, m modifies, r refused.
 func fileFlags(an *Analysis) []string {
 	var out []string
 	for _, f := range an.Files {
@@ -184,7 +184,7 @@ func TestPowerShellFiles(t *testing.T) {
 	}
 }
 
-// What Select-String searches is text unless the pipeline gives it files
+// What Select-String searches is text unless the pipeline gives it files.
 func TestPowerShellSelectStringInput(t *testing.T) {
 	for src, piped := range map[string]bool{
 		`git log | Select-String foo`:       false,
@@ -238,7 +238,7 @@ func TestPowerShellCodeAndHidden(t *testing.T) {
 
 // Bash code a PowerShell line starts reads paths as Git Bash does: a
 // mount path is refused without the mount table, where PowerShell reads
-// it on the working directory's drive
+// it on the working directory's drive.
 func TestPowerShellRunsBashAsBash(t *testing.T) {
 	an := psWin(t, `bash -c 'cat /etc/passwd'; Get-Content /etc/passwd`)
 	got := fileFlags(an)
@@ -268,7 +268,7 @@ func TestPowerShellPipelineFeeds(t *testing.T) {
 	}
 }
 
-// Outside Windows, pwsh's ls and cat are the programs, not aliases
+// Outside Windows, pwsh's ls and cat are the programs, not aliases.
 func TestPowerShellUnixAliases(t *testing.T) {
 	an, err := AnalyzePowerShell(`ls; Get-Content /etc/passwd`, "/home/dev", Options{Cwd: "/work"})
 	if err != nil {
@@ -300,7 +300,7 @@ func TestPowerShellFailsClosed(t *testing.T) {
 	}
 }
 
-// Every positional parameter of the table names one of its parameters
+// Every positional parameter of the table names one of its parameters.
 func TestPowerShellCmdletTable(t *testing.T) {
 	for name, c := range psCmdlets {
 		for _, p := range c.positional {

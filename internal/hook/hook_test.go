@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"maps"
 	"os"
 	"runtime"
 	"slices"
@@ -53,7 +54,7 @@ type hookCase struct {
 	Input    map[string]any    `yaml:"input"`
 	RawInput *string           `yaml:"rawInput"`
 	// GOOS lists the operating systems (runtime.GOOS values) the case runs
-	// on, for an adapter that reads the one it runs on. Empty means every one
+	// on, for an adapter that reads the one it runs on. Empty means every one.
 	GOOS   []string `yaml:"goos"`
 	Expect struct {
 		Decision       string `yaml:"decision"` // what the agent is told: deny | ask | none
@@ -133,12 +134,8 @@ func runCases(t *testing.T, casesPath string, adapter adapters.Adapter, check fu
 				stdin = []byte(*c.RawInput)
 			} else {
 				merged := map[string]any{}
-				for k, v := range cf.Defaults.Input {
-					merged[k] = v
-				}
-				for k, v := range c.Input {
-					merged[k] = v
-				}
+				maps.Copy(merged, cf.Defaults.Input)
+				maps.Copy(merged, c.Input)
 				js, err := json.Marshal(expandFakes(merged))
 				if err != nil {
 					t.Fatal(err)
@@ -177,14 +174,14 @@ func checkProtocol(t *testing.T, want string, r hook.Result) {
 
 // checkCodexProtocol asserts Codex's contract: Claude Code's JSON, but a deny
 // exits 0 with nothing on stderr, since PowerShell turns a hook's exit 2 into
-// 1, which Codex treats as a failed hook
+// 1, which Codex treats as a failed hook.
 func checkCodexProtocol(t *testing.T, want string, r hook.Result) {
 	t.Helper()
 	checkHookSpecificOutput(t, want, r, 0)
 }
 
 // checkHookSpecificOutput asserts the hookSpecificOutput answer, with a deny
-// exiting denyExit; a deny that exits 2 also gives its reason on stderr
+// exiting denyExit; a deny that exits 2 also gives its reason on stderr.
 func checkHookSpecificOutput(t *testing.T, want string, r hook.Result, denyExit int) {
 	t.Helper()
 	if want == "none" {
@@ -230,8 +227,8 @@ func checkHookSpecificOutput(t *testing.T, want string, r hook.Result, denyExit 
 
 // checkCopilotProtocol asserts Copilot CLI's preToolUse contract: deny exits
 // 2 with the JSON decision (Copilot shows its reason) and the reason on
-// stderr; ask exits 0 with the JSON decision
-// The same decision is in hookSpecificOutput, for VS Code's Local agent
+// stderr; ask exits 0 with the JSON decision.
+// The same decision is in hookSpecificOutput, for VS Code's Local agent.
 func checkCopilotProtocol(t *testing.T, want string, r hook.Result) {
 	t.Helper()
 	if want == "none" {

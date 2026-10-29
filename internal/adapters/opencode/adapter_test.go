@@ -24,7 +24,7 @@ func TestClassificationLoads(t *testing.T) {
 }
 
 // Every input captured from a real opencode run maps cleanly: known tool,
-// well-formed input
+// well-formed input.
 func TestCapturedInputs(t *testing.T) {
 	files, _ := filepath.Glob(filepath.Join(testdata, "captured-*.jsonl"))
 	if len(files) == 0 {
@@ -52,8 +52,8 @@ func TestCapturedInputs(t *testing.T) {
 }
 
 // read lists a directory and reads anything else, so the action depends on
-// what the path names on disk
-// A path that doesn't exist is read
+// what the path names on disk.
+// A path that doesn't exist is read.
 func TestReadListsDirectories(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the adapter's path resolution takes POSIX absolute paths")
@@ -89,7 +89,7 @@ func TestReadListsDirectories(t *testing.T) {
 
 // Every tool a captured opencode offers the model is classified, and the
 // ones left out on purpose stay out, so a new tool shows up here before it
-// reaches a user
+// reaches a user.
 func TestCapturedToolsClassified(t *testing.T) {
 	files, _ := filepath.Glob(filepath.Join(testdata, "tools-*.json"))
 	if len(files) == 0 {
@@ -223,7 +223,7 @@ func TestSessionStartOutput(t *testing.T) {
 	}
 }
 
-// Generated plugins are reviewed as diffs of golden files
+// Generated plugins are reviewed as diffs of golden files.
 func TestShimGolden(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -253,7 +253,7 @@ func TestShimGolden(t *testing.T) {
 }
 
 // Paths are baked in as JSON string literals: quotes, newlines, a closing
-// comment or a template marker in a path can't change the code
+// comment or a template marker in a path can't change the code.
 func TestShimLiterals(t *testing.T) {
 	odd := "/opt/x\"y\n*/ @@NAME@@ \u2028`${process.exit(0)}`/cyberboar"
 	out, err := Shim(ShimOptions{Scope: ScopeUser, Command: odd, Policy: odd, Deadline: "5s"})
@@ -262,7 +262,7 @@ func TestShimLiterals(t *testing.T) {
 	}
 	var command string
 	var args []string
-	for _, line := range strings.Split(string(out), "\n") {
+	for line := range strings.SplitSeq(string(out), "\n") {
 		if v, ok := strings.CutPrefix(line, "const command = "); ok {
 			if err := json.Unmarshal([]byte(strings.TrimSuffix(v, ";")), &command); err != nil {
 				t.Fatalf("command literal %s: %v", v, err)

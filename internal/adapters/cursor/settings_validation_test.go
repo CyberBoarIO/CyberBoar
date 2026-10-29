@@ -125,7 +125,7 @@ func TestMergePreservesRetainedHooks(t *testing.T) {
 }
 
 // An earlier CyberBoar entry is replaced however its command is quoted, and
-// commands that only mention the words are kept
+// commands that only mention the words are kept.
 func TestMergeReplacesManualEntries(t *testing.T) {
 	existing := []byte(`{"version":1,"hooks":{"preToolUse":[
   {"command":"cyberboar hook --agent cursor --policy .cyberboar/policy.yaml --deadline 5s","timeout":15,"failClosed":true},

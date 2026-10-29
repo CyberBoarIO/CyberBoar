@@ -15,7 +15,7 @@ var update = flag.Bool("update", false, "rewrite the golden files")
 
 const testdata = "testdata"
 
-// Cursor runs a preToolUse "ask" as allow, so ask must come out as deny, saying why
+// Cursor runs a preToolUse "ask" as allow, so ask must come out as deny, saying why.
 func TestRespondAskIsDeny(t *testing.T) {
 	out := Adapter{}.Respond(engine.Verdict{Decision: engine.Ask, Reason: "needs confirmation"}, "cyberboar: ")
 	var got map[string]string
@@ -114,7 +114,7 @@ func TestSessionStartOutput(t *testing.T) {
 
 // Every input captured from a real Cursor run maps cleanly, and the agent
 // shell's commands are checked as running in a persistent shell whose
-// directory the input doesn't give
+// directory the input doesn't give.
 func TestCapturedInputs(t *testing.T) {
 	files, _ := filepath.Glob(filepath.Join(testdata, "captured*.jsonl"))
 	if len(files) == 0 {

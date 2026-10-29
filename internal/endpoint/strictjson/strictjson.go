@@ -1,6 +1,6 @@
 // Package strictjson decodes JSON that an endpoint reads from a file or
 // receives from a console and acts on. Anything unexpected is refused rather
-// than ignored
+// than ignored.
 package strictjson
 
 import (
@@ -13,7 +13,7 @@ import (
 )
 
 // Decode decodes data into v. Fields v has no place for, and anything after
-// the one JSON value, duplicate keys and case aliases are errors
+// the one JSON value, duplicate keys and case aliases are errors.
 func Decode(data []byte, v any) error {
 	if err := audit.CheckKeys(data, v); err != nil {
 		return err

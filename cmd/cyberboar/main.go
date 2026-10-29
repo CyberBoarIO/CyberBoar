@@ -41,7 +41,7 @@ import (
 )
 
 // version is set at build time with -ldflags "-X main.version=VERSION";
-// without it, init falls back to the module version Go records in the binary
+// without it, init falls back to the module version Go records in the binary.
 var version = "dev"
 
 func init() {
@@ -51,7 +51,7 @@ func init() {
 
 // buildVersion is v, or when v is the unset "dev", the main module's version
 // from info: what `go install module@version` and a build in a VCS checkout
-// record. A build with no module version, such as a test binary's, stays "dev"
+// record. A build with no module version, such as a test binary's, stays "dev".
 func buildVersion(v string, info *debug.BuildInfo, ok bool) string {
 	if v != "dev" || !ok || info == nil {
 		return v
@@ -62,7 +62,7 @@ func buildVersion(v string, info *debug.BuildInfo, ok bool) string {
 	return v
 }
 
-// host is what the commands read from the machine they run on
+// host is what the commands read from the machine they run on.
 type host struct {
 	getenv func(string) string
 	goos   string           // a runtime.GOOS value
@@ -74,10 +74,10 @@ func main() {
 	os.Exit(h.run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
-// command runs one command with a new flag set named after it
+// command runs one command with a new flag set named after it.
 type command func(h host, fs *flag.FlagSet, args []string, stdin io.Reader, stdout, stderr io.Writer) int
 
-// commands are the commands that take flags, by name
+// commands are the commands that take flags, by name.
 var commands = map[string]command{
 	"hook":    runHook,
 	"brief":   runBrief,
@@ -126,7 +126,7 @@ func (h host) run(args []string, stdin io.Reader, stdout, stderr io.Writer) int 
 	return 2
 }
 
-// defaultStateDir follows the XDG base directory spec, and on Windows uses the local application data dir
+// defaultStateDir follows the XDG base directory spec, and on Windows uses the local application data dir.
 func (h host) defaultStateDir() (string, error) {
 	if d := h.getenv("XDG_STATE_HOME"); filepath.IsAbs(d) {
 		return filepath.Join(d, brand.Name), nil
@@ -144,7 +144,7 @@ func (h host) defaultStateDir() (string, error) {
 func usage(w io.Writer) {
 	fmt.Fprintf(w, `usage: %[1]s <command> [flags]
 
-  hook     answer one PreToolUse hook call on stdin (--agent claude-code, codex, copilot-cli, cursor or opencode)
+  hook     answer one PreToolUse hook call on stdin (--agent %[2]s)
   brief    answer a SessionStart hook with the policy's briefing for the agent
   check    validate policy files
   test     run YAML policy regression cases
@@ -161,10 +161,10 @@ func usage(w io.Writer) {
   version  print the version
 
 Run "%[1]s <command> --help" for a command's flags.
-`, brand.Name)
+`, brand.Name, agentList())
 }
 
-// agents are the hook protocols `cyberboar hook --agent` speaks
+// agents are the hook protocols `cyberboar hook --agent` speaks.
 var agents = map[string]adapters.Adapter{
 	claudecode.Adapter{}.Name(): claudecode.Adapter{},
 	codex.Adapter{}.Name():      codex.Adapter{},
@@ -173,7 +173,7 @@ var agents = map[string]adapters.Adapter{
 	opencode.Adapter{}.Name():   opencode.Adapter{},
 }
 
-// agentList is the --agent values, sorted, for flag help
+// agentList is the --agent values, sorted, for flag help.
 func agentList() string {
 	names := make([]string, 0, len(agents))
 	for n := range agents {
@@ -183,7 +183,7 @@ func agentList() string {
 	return strings.Join(names, ", ")
 }
 
-// commandFlagSet keeps the standard flag parser and displays long flags in help
+// commandFlagSet keeps the standard flag parser and displays long flags in help.
 func commandFlagSet(name string) *flag.FlagSet {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.Usage = func() {
@@ -193,7 +193,15 @@ func commandFlagSet(name string) *flag.FlagSet {
 	return fs
 }
 
-// printFlagDefaults uses Go's help formatting with double-dash long flag names
+// flagWasSet tells a flag given on the command line, even with its zero value
+// (--every 0s), from an omitted one.
+func flagWasSet(fs *flag.FlagSet, name string) bool {
+	set := false
+	fs.Visit(func(f *flag.Flag) { set = set || f.Name == name })
+	return set
+}
+
+// printFlagDefaults uses Go's help formatting with double-dash long flag names.
 func printFlagDefaults(fs *flag.FlagSet) {
 	var b bytes.Buffer
 	out := fs.Output()
@@ -209,7 +217,7 @@ func printFlagDefaults(fs *flag.FlagSet) {
 }
 
 // parseFlags parses a command's flags. When ok is false, the command stops
-// with exit status code: 0 for --help (or -h) and 2 for any other error (docs/cli.md)
+// with exit status code: 0 for --help (or -h) and 2 for any other error (docs/cli.md).
 func parseFlags(fs *flag.FlagSet, args []string) (code int, ok bool) {
 	switch err := fs.Parse(args); {
 	case err == nil:
@@ -220,7 +228,7 @@ func parseFlags(fs *flag.FlagSet, args []string) (code int, ok bool) {
 	return 2, false
 }
 
-// envName is the environment variable for a flag, e.g. CYBERBOAR_POLICY
+// envName is the environment variable for a flag, e.g. CYBERBOAR_POLICY.
 func envName(flagName string) string {
 	return brand.EnvPrefix + strings.ToUpper(strings.ReplaceAll(flagName, "-", "_"))
 }

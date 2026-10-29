@@ -8,8 +8,8 @@ import (
 
 // ShellDependent reports whether a command line has a $'…' escape that
 // shells read differently (see ansiC), which the analyzer treats as a
-// run-time word instead of any one shell's reading
-// The bash differential (differential_test.go) uses it
+// run-time word instead of any one shell's reading.
+// The bash differential (differential_test.go) uses it.
 func ShellDependent(src string) bool {
 	f, err := syntax.NewParser().Parse(strings.NewReader(src), "")
 	if err != nil {

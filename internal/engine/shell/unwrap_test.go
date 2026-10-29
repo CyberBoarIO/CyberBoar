@@ -18,7 +18,7 @@ func TestParseOptsLongPrefixes(t *testing.T) {
 		{grep, "--binary-f text pat", "pat", "binary-files"},
 	} {
 		var args []Elem
-		for _, w := range strings.Fields(c.args) {
+		for w := range strings.FieldsSeq(c.args) {
 			args = append(args, Elem{Kind: Lit, Text: w})
 		}
 		p := parseOpts(args, c.spec)

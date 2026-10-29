@@ -10,7 +10,7 @@ import (
 // not listed here is read like a program: every word it is given is checked
 // as a path, and if it takes input from a pipeline, that input may name any path
 
-// psUse is what a cmdlet does with the paths it is given
+// psUse is what a cmdlet does with the paths it is given.
 type psUse int
 
 const (
@@ -21,7 +21,7 @@ const (
 	psModify              // deletes, moves or replaces them (Remove-Item)
 )
 
-// psParam is one parameter of a cmdlet
+// psParam is one parameter of a cmdlet.
 type psParam struct {
 	name     string
 	isSwitch bool
@@ -30,25 +30,25 @@ type psParam struct {
 	use      psUse
 }
 
-// psCmdlet is a cmdlet with the parameters the analysis binds
+// psCmdlet is a cmdlet with the parameters the analysis binds.
 type psCmdlet struct {
 	name string
 	use  psUse
-	// params are keyed by folded name and alias; list has each once, in order
+	// params are keyed by folded name and alias; list has each once, in order.
 	params     map[string]*psParam
 	list       []*psParam
 	names      []string // every folded name and alias, for prefix matching
 	positional []string // the parameters bound by position, in order
-	// pipePaths: input from a pipeline may bind to a path parameter
+	// pipePaths: input from a pipeline may bind to a path parameter.
 	pipePaths bool
 }
 
-// psCommon are the common parameters every cmdlet takes
+// psCommon are the common parameters every cmdlet takes.
 const psCommon = "Verbose=vb! Debug=db! ErrorAction=ea WarningAction=wa InformationAction=infa ProgressAction=proga " +
 	"ErrorVariable=ev WarningVariable=wv InformationVariable=iv OutVariable=ov OutBuffer=ob PipelineVariable=pv " +
 	"WhatIf=wi! Confirm=cf! UseTransaction=usetx!"
 
-// psPathParams are the path parameters most file cmdlets share
+// psPathParams are the path parameters most file cmdlets share.
 const psPathParams = "Path* LiteralPath=PSPath,LP@ Filter Include Exclude Credential "
 
 // psCmdletSpecs lists each cmdlet with its aliases and parameters. A
@@ -56,7 +56,7 @@ const psPathParams = "Path* LiteralPath=PSPath,LP@ Filter Include Exclude Creden
 // wildcards, "@" for a literal path or "!" for a switch, and nothing for
 // another value. A path parameter may end in n, r, w or m when only its
 // name is read, or it is read, written or modified, instead of what the
-// cmdlet does with the others
+// cmdlet does with the others.
 var psCmdletSpecs = []struct {
 	name, aliases, params, positional string
 	use                               psUse
@@ -117,7 +117,7 @@ var psCmdletSpecs = []struct {
 }
 
 // psPrintCmdlets only print or compute with what they are given. Their
-// words are checked like echo's: against deny and ask rules alone
+// words are checked like echo's: against deny and ask rules alone.
 var psPrintCmdlets = []struct{ name, aliases string }{
 	{"Write-Output", "echo write"}, {"Write-Host", ""}, {"Write-Error", ""}, {"Write-Warning", ""},
 	{"Write-Verbose", ""}, {"Write-Debug", ""}, {"Write-Information", ""}, {"Write-Progress", ""},
@@ -136,11 +136,11 @@ var psPrintCmdlets = []struct{ name, aliases string }{
 }
 
 // psUnixAliases are aliases PowerShell defines only on Windows: elsewhere
-// these names run the programs
+// these names run the programs.
 var psUnixAliases = set("cat", "cp", "ls", "man", "mv", "ps", "rm", "rmdir", "sleep", "sort", "tee", "write", "diff", "clear", "mkdir", "mount")
 
 // psLegacyAliases are aliases only Windows PowerShell 5.1 defines; in
-// PowerShell 7 these names run the programs. Both readings are checked
+// PowerShell 7 these names run the programs. Both readings are checked.
 var psLegacyAliases = map[string]string{"curl": "Invoke-WebRequest", "wget": "Invoke-WebRequest", "sc": "Set-Content"}
 
 var (
@@ -175,12 +175,12 @@ func init() {
 }
 
 // psCommonParams has the common parameters alone, to find them among the
-// arguments of a cmdlet whose others aren't bound
+// arguments of a cmdlet whose others aren't bound.
 var psCommonParams = &psCmdlet{name: "common parameters", params: map[string]*psParam{}}
 
 func psAddCmdlet(c *psCmdlet, aliases string) {
 	psCmdlets[fold.String(c.name)] = c
-	for _, al := range strings.Fields(aliases) {
+	for al := range strings.FieldsSeq(aliases) {
 		psAliases[fold.String(al)] = c.name
 	}
 }
@@ -190,10 +190,10 @@ type psParamKeys struct {
 	keys  []string
 }
 
-// psParseParams reads a parameter list written as psCmdletSpecs describes
+// psParseParams reads a parameter list written as psCmdletSpecs describes.
 func psParseParams(spec string, use psUse) []psParamKeys {
 	var out []psParamKeys
-	for _, f := range strings.Fields(spec) {
+	for f := range strings.FieldsSeq(spec) {
 		p := &psParam{use: use}
 		if u, ok := map[byte]psUse{'n': psNames, 'r': psRead, 'w': psWrite, 'm': psModify}[f[len(f)-1]]; ok {
 			if n := len(f); n > 1 && (f[n-2] == '*' || f[n-2] == '@') {
@@ -213,7 +213,7 @@ func psParseParams(spec string, use psUse) []psParamKeys {
 		name, aliases, _ := strings.Cut(f, "=")
 		p.name = name
 		keys := []string{fold.String(name)}
-		for _, al := range strings.Split(aliases, ",") {
+		for al := range strings.SplitSeq(aliases, ",") {
 			if al != "" {
 				keys = append(keys, fold.String(al))
 			}
@@ -225,7 +225,7 @@ func psParseParams(spec string, use psUse) []psParamKeys {
 
 // param finds the parameter -name names: by its name or an alias, or by a
 // prefix of exactly one of them, as PowerShell's binder does. nil when no
-// parameter or more than one matches
+// parameter or more than one matches.
 func (c *psCmdlet) param(name string) *psParam {
 	n := fold.String(name)
 	if p, ok := c.params[n]; ok {
@@ -244,7 +244,7 @@ func (c *psCmdlet) param(name string) *psParam {
 }
 
 // psVerbs are PowerShell's approved verbs (Get-Verb). A name made of one of
-// them, "-" and a noun is a cmdlet or function, not a program
+// them, "-" and a noun is a cmdlet or function, not a program.
 var psVerbs = set("add", "approve", "assert", "backup", "block", "build", "checkpoint", "clear", "close", "compare",
 	"complete", "compress", "confirm", "connect", "convert", "convertfrom", "convertto", "copy", "debug", "deny",
 	"deploy", "disable", "disconnect", "dismount", "edit", "enable", "enter", "exit", "expand", "export", "find",
@@ -257,10 +257,10 @@ var psVerbs = set("add", "approve", "assert", "backup", "block", "build", "check
 	"foreach", "sort", "tee", "write")
 
 // psModifyVerbs are the verbs of cmdlets that may delete, move or replace
-// what they are given
+// what they are given.
 var psModifyVerbs = set("clear", "move", "remove", "rename", "reset", "set", "uninstall", "unregister")
 
-// psVerbNoun reports a name shaped like a cmdlet's, Verb-Noun, and its verb
+// psVerbNoun reports a name shaped like a cmdlet's, Verb-Noun, and its verb.
 func psVerbNoun(name string) (verb string, ok bool) {
 	v, noun, found := strings.Cut(fold.String(name), "-")
 	if !found || noun == "" || !psVerbs[v] {
@@ -270,7 +270,7 @@ func psVerbNoun(name string) (verb string, ok bool) {
 }
 
 // psSafeTypes are .NET types whose static members only compute: their
-// methods read or change no file and run no code. nil allows every method
+// methods read or change no file and run no code. nil allows every method.
 var psSafeTypes = map[string]map[string]bool{
 	"math": nil, "string": nil, "char": nil, "int": nil, "int16": nil, "int32": nil, "int64": nil, "long": nil,
 	"uint32": nil, "uint64": nil, "double": nil, "single": nil, "float": nil, "decimal": nil, "bool": nil,
@@ -286,7 +286,7 @@ var psSafeTypes = map[string]map[string]bool{
 	"wildcardpattern":                       set("escape", "containswildcardcharacters", "unescape"),
 }
 
-// psSafeType reports whether a static call of method on type t only computes
+// psSafeType reports whether a static call of method on type t only computes.
 func psSafeType(t, method string) bool {
 	t = strings.TrimPrefix(fold.String(t), "system.")
 	methods, ok := psSafeTypes[t]
@@ -294,12 +294,12 @@ func psSafeType(t, method string) bool {
 }
 
 // psCodeMethods are instance methods that run code they are given or that
-// the object holds: script blocks and the engine's own entry points
+// the object holds: script blocks and the engine's own entry points.
 var psCodeMethods = set("invoke", "invokereturnasis", "invokewithcontext", "invokescript", "newscriptblock",
 	"expandstring", "getnewclosure", "addscript", "addcommand", "begininvoke")
 
 // psSafeMethods are instance methods that only compute on the strings,
-// numbers and collections they are called on
+// numbers and collections they are called on.
 var psSafeMethods = set("trim", "trimstart", "trimend", "tostring", "toupper", "tolower", "toupperinvariant",
 	"tolowerinvariant", "split", "replace", "substring", "contains", "startswith", "endswith", "indexof",
 	"indexofany", "lastindexof", "lastindexofany", "padleft", "padright", "equals", "gettype", "compareto",

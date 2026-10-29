@@ -11,7 +11,7 @@ import (
 
 // Keep the pre-optimization graph algorithm as a test oracle. Transparent
 // wrappers are not ordinary edges: adding outer<->inner edges would invent
-// feeds relations when the wrapper has no input/output edges of its own
+// feeds relations when the wrapper has no input/output edges of its own.
 type referenceGraph struct {
 	n           int
 	edges       map[[2]int]bool
@@ -90,12 +90,12 @@ func (g *referenceGraph) closure() [][]bool {
 	}
 	for changed := true; changed; {
 		changed = false
-		for k := 0; k < n; k++ {
-			for i := 0; i < n; i++ {
+		for k := range n {
+			for i := range n {
 				if !m[i][k] {
 					continue
 				}
-				for j := 0; j < n; j++ {
+				for j := range n {
 					if m[k][j] && !m[i][j] {
 						m[i][j] = true
 					}
@@ -103,7 +103,7 @@ func (g *referenceGraph) closure() [][]bool {
 			}
 		}
 		for _, t := range g.transparent {
-			for x := 0; x < n; x++ {
+			for x := range n {
 				for _, in := range t.inner {
 					if m[x][t.outer] && x != in && !m[x][in] {
 						m[x][in], changed = true, true
@@ -185,7 +185,7 @@ func compareFileFeeds(t *testing.T, f *syntax.File) {
 
 // CheckFeedGraph exposes the test-only oracle to the external corpus test
 // corpustest imports engine, so importing it from an internal shell test
-// would create a cycle. No helper or reference algorithm ships in the binary
+// would create a cycle. No helper or reference algorithm ships in the binary.
 func CheckFeedGraph(t *testing.T, src string) {
 	t.Helper()
 	f, err := syntax.NewParser().Parse(strings.NewReader(src), "")
@@ -202,12 +202,12 @@ func TestClosureMatchesReference(t *testing.T) {
 		nil, {{0, []int{1, 2}}}, {{0, []int{1}}, {1, []int{2, 3}}},
 		{{1, []int{2, 3}}, {0, []int{1}}},
 	} {
-		for mask := 0; mask < 1<<12; mask++ {
+		for mask := range 1 << 12 {
 			a := &analyzer{cmds: make([]Command, 4), transparent: tr}
 			ref := &referenceGraph{n: 4, edges: map[[2]int]bool{}, transparent: tr}
 			bit := 0
-			for i := 0; i < 4; i++ {
-				for j := 0; j < 4; j++ {
+			for i := range 4 {
+				for j := range 4 {
 					if i == j {
 						continue
 					}

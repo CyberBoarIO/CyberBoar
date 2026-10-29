@@ -5,9 +5,9 @@
 // System.Management.Automation.Language AST, extents in UTF-16 units
 // included. The parser's output is checked against PowerShell's own parser,
 // as docs/powershell.md describes. The adapted source is copyright Microsoft
-// Corporation and licensed under MIT; see LICENSE.PowerShell
+// Corporation and licensed under MIT; see LICENSE.PowerShell.
 //
 // Parse fails closed. What PowerShell reports as a syntax error, what this
 // package refuses to analyze (Error.Refused) and what is over a limit all
-// come back as an error the engine denies
+// come back as an error the engine denies.
 package pwsh

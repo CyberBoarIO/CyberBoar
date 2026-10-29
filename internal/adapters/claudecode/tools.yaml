@@ -22,7 +22,8 @@
 #   passthrough: the tool touches no local file and runs no command; CyberBoar adds nothing
 #
 # Field paths: "a" a field, "a[]" every element of an array, "a.*" every value of
-# an object, combinable ("files.*.from"). Values that aren't strings are ignored.
+# an object, combinable ("files.*.from"). A value of another type that no other path
+# reads into makes the call malformed: deny. null counts as absent.
 # Relative paths resolve against the hook input's cwd
 #
 # Sources: Claude Code hooks reference (tool_input tables), the tool schemas of

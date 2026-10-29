@@ -300,13 +300,12 @@ Fields may be added.
 
 ## `cyberboar keygen`
 
-Optional convenience command that creates an Ed25519 key pair for policy signing. It is
-not a recommendation to use CyberBoar instead of your existing key-management tools.
-Every compatible key is accepted, regardless of which tool generated it: the private key
+Creates an Ed25519 key pair for policy signing. Keys made with any other tool work as
+well: the private key
 must be unencrypted PKCS#8 PEM (`PRIVATE KEY`), and the public key must be PKIX/SPKI PEM
 (`PUBLIC KEY`), both Ed25519. OpenSSH and encrypted private-key files are not accepted
-directly. `sign` currently reads a private-key file; direct HSM or remote signing
-integration is not implemented. Store the private key in your protected signing
+directly. `sign` reads the private key from a file; it can't use an HSM or a remote
+signer. Store the private key in your protected signing
 environment and distribute only the public key. The policy-signing key is separate from
 the endpoint identity key that `enroll` can create in the OS key store or TPM.
 
@@ -486,7 +485,7 @@ Stdout (exit `0`):
 ```text
 usage: cyberboar <command> [flags]
 
-  hook     answer one PreToolUse hook call on stdin (--agent claude-code, codex, copilot-cli, cursor or opencode)
+  hook     answer one PreToolUse hook call on stdin (--agent claude-code, codex, copilot-cli, cursor, opencode)
   brief    answer a SessionStart hook with the policy's briefing for the agent
   check    validate policy files
   test     run YAML policy regression cases
@@ -709,8 +708,7 @@ signed  policies/starter.yaml (starter, serial 42, expires <UTC expiry>)
 ```
 
 Creates `policies/starter.yaml.sig`. `<UTC expiry>` represents the expiry timestamp,
-720 hours after your run. Increase the serial on subsequent signatures; repeatedly using `42`
-is not a signing schedule.
+720 hours after your run. Increase the serial each time you sign again.
 
 ### `verify`
 

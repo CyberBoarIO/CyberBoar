@@ -9,7 +9,7 @@ import (
 )
 
 // Rules use shell quoting too, so equivalent argument spellings must match
-// after the policy is loaded, for deny, ask and allow rules
+// after the policy is loaded, for deny, ask and allow rules.
 func TestQuotedCommandPatternEscapes(t *testing.T) {
 	for _, tc := range []struct {
 		pattern, command string

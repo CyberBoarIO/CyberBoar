@@ -6,7 +6,7 @@ import (
 )
 
 // longName asks Windows for the long form of op's last name
-// (GetLongPathNameW), which expands 8.3 short names
+// (GetLongPathNameW), which expands 8.3 short names.
 func longName(op string) (string, error) {
 	p, err := syscall.UTF16PtrFromString(op)
 	if err != nil {

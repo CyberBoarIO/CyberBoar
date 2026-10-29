@@ -1,17 +1,18 @@
 // Package cursor maps Cursor's agent hook inputs to engine actions and engine
 // verdicts to hook output. It covers the Cursor editor's agent and the
-// Cursor CLI (cursor-agent), which share hooks.json
+// Cursor CLI (cursor-agent), which share hooks.json.
 //
 // One hook command answers several events, which hook_event_name tells
 // apart. They are preToolUse for every tool, and beforeShellExecution,
 // beforeMCPExecution, beforeReadFile and beforeTabFileRead, which Cursor
-// fires as well, with inputs it documents more precisely
-// A call checked twice is only ever stricter
+// fires as well, with inputs it documents more precisely.
+// A call checked twice is only ever stricter.
 package cursor
 
 import (
 	"bytes"
 	"encoding/json"
+	"slices"
 	"sort"
 	"strings"
 
@@ -19,18 +20,18 @@ import (
 	"cyberboar.dev/cyberboar/internal/engine"
 )
 
-// Adapter speaks Cursor's hook protocol
+// Adapter speaks Cursor's hook protocol.
 type Adapter struct{}
 
-// Name returns "cursor", the agent name used on the command line and in audit events
+// Name returns "cursor", the agent name used on the command line and in audit events.
 func (Adapter) Name() string { return "cursor" }
 
-// Events are the hook events the adapter answers
-// The apply command installs a hook for each
+// Events are the hook events the adapter answers.
+// The apply command installs a hook for each.
 var Events = []string{"preToolUse", "beforeShellExecution", "beforeMCPExecution", "beforeReadFile", "beforeTabFileRead"}
 
-// Input is a hook input
-// It holds the fields every event carries and those of the events in Events
+// Input is a hook input.
+// It holds the fields every event carries and those of the events in Events.
 type Input struct {
 	Event          string   `json:"hook_event_name"`
 	ConversationID string   `json:"conversation_id"`
@@ -38,49 +39,47 @@ type Input struct {
 	Cwd            string   `json:"cwd"`
 
 	// Fields of preToolUse. beforeMCPExecution has tool_name and tool_input
-	// too, with tool_input as a JSON-encoded string
+	// too, with tool_input as a JSON-encoded string.
 	ToolName  string          `json:"tool_name"`
 	ToolInput json.RawMessage `json:"tool_input"`
 	ToolUseID string          `json:"tool_use_id"`
 
-	// beforeShellExecution
+	// beforeShellExecution.
 	Command *string `json:"command"`
 
-	// beforeMCPExecution
+	// beforeMCPExecution.
 	MCPServerName string `json:"mcp_server_name"`
 
-	// beforeReadFile, beforeTabFileRead
+	// beforeReadFile, beforeTabFileRead.
 	FilePath    string `json:"file_path"`
 	Attachments []struct {
 		FilePath string `json:"file_path"`
 	} `json:"attachments"`
 }
 
-// ParseInput decodes exactly one JSON object naming one of Events
+// ParseInput decodes exactly one JSON object naming one of Events.
 func ParseInput(data []byte) (*Input, error) {
 	var in Input
 	if err := adapters.DecodeHookInput(data, &in); err != nil {
 		return nil, err
 	}
-	for _, e := range Events {
-		if in.Event == e {
-			return &in, nil
-		}
+	if slices.Contains(Events, in.Event) {
+		return &in, nil
 	}
 	return nil, adapters.Invalid("the hook input's hook_event_name %q is not one this hook answers", in.Event)
 }
 
-// Env is what the adapter takes from the hook's environment
+// Env is what the adapter takes from the hook's environment.
 type Env struct {
-	// ProjectDir is CURSOR_PROJECT_DIR, the workspace root Cursor sets for every hook
+	// ProjectDir is CURSOR_PROJECT_DIR, the workspace root Cursor sets for every hook.
 	ProjectDir string
 	Home       string
-	// Shell is SHELL, the shell Cursor's agent runs commands in
+	// Shell is SHELL, the shell Cursor's agent runs commands in.
 	Shell  string
 	CDPath bool
 }
 
-// Parse decodes a hook input into engine actions
+// Parse decodes a hook input into engine actions.
 func (Adapter) Parse(data []byte, getenv func(string) string) (*adapters.Call, error) {
 	in, err := ParseInput(data)
 	if err != nil {
@@ -94,8 +93,8 @@ func (Adapter) Parse(data []byte, getenv func(string) string) (*adapters.Call, e
 	return c, nil
 }
 
-// toolLabel names the call in audit events
-// It is the tool for preToolUse and MCP calls, and the event otherwise
+// toolLabel names the call in audit events.
+// It is the tool for preToolUse and MCP calls, and the event otherwise.
 func toolLabel(in *Input) string {
 	if in.ToolName != "" {
 		return in.ToolName
@@ -106,7 +105,7 @@ func toolLabel(in *Input) string {
 // SettingsFiles returns the files that install, change or switch off the
 // hook, which agents may not change (builtin.guarded). They are hooks.json in
 // every scope with the hook scripts beside it, the CLI's configuration, the
-// editor's user settings, and Claude Code's settings, whose hooks Cursor also runs
+// editor's user settings, and Claude Code's settings, whose hooks Cursor also runs.
 func SettingsFiles(env Env, roots []string) []string {
 	var out []string
 	if env.Home != "" {
@@ -137,9 +136,9 @@ func projectDirs(env Env, roots []string) []string {
 
 // Respond turns a verdict into hook output, which is a JSON permission answer
 // on stdout and exit status 0. Cursor ignores "ask" from preToolUse and runs
-// the tool, and preToolUse comes first, so ask is answered as deny
-// Allow is "{}", with no decision, which leaves Cursor's own approval flow in charge
-// An empty answer would be invalid JSON, which blocks
+// the tool, and preToolUse comes first, so ask is answered as deny.
+// Allow is "{}", with no decision, which leaves Cursor's own approval flow in charge.
+// An empty answer would be invalid JSON, which blocks.
 func (Adapter) Respond(v engine.Verdict, prefix string) adapters.Output {
 	var reason string
 	switch v.Decision {
@@ -154,8 +153,8 @@ func (Adapter) Respond(v engine.Verdict, prefix string) adapters.Output {
 	return adapters.Output{Stdout: append(body, '\n'), Stderr: reason + "\n"}
 }
 
-// Actions maps a hook input to the engine actions to evaluate
-// No actions and no error means the call touches nothing CyberBoar governs
+// Actions maps a hook input to the engine actions to evaluate.
+// No actions and no error means the call touches nothing CyberBoar governs.
 func Actions(in *Input, env Env) ([]engine.Action, error) {
 	base := engine.Action{Cwd: in.Cwd, Home: env.Home, CDPath: env.CDPath}
 	base.Workspaces = projectDirs(env, in.WorkspaceRoots)
@@ -211,8 +210,8 @@ func Actions(in *Input, env Env) ([]engine.Action, error) {
 	return toolActions(in, base, env, file)
 }
 
-// preToolUse maps the tool names Cursor documents for preToolUse matchers to how they are checked
-// A tool not listed is denied, because new tools are never trusted by default
+// preToolUse maps the tool names Cursor documents for preToolUse matchers to how they are checked.
+// A tool not listed is denied, because new tools are never trusted by default.
 var preToolUse = map[string]struct {
 	tool     engine.Tool // "" for the shell
 	required bool        // a path must be found
@@ -284,7 +283,7 @@ func toolActions(in *Input, base engine.Action, env Env, file func(engine.Tool, 
 // so the keys are matched loosely and every match is checked, since an extra
 // path can only make the verdict stricter. Directories a tool runs in rather
 // than acts on, such as cwd, are left out, because the project root would
-// read as a directory holding every protected file
+// read as a directory holding every protected file.
 func pathValues(v any) []string {
 	var out []string
 	var walk func(key string, v any)
@@ -332,7 +331,7 @@ func pathKey(key string) bool {
 // command for a shell other than bash, sh, dash or zsh is foreign code to the
 // analyzer. A call with no directory starts in an unknown one
 // The agent's shell persists between calls (cd, variables and aliases
-// carry over, seen in the CLI 2026.10.14), so the action says so
+// carry over, seen in the CLI 2026.10.14), so the action says so.
 func shellAction(base engine.Action, cmd, cwd string, env Env) engine.Action {
 	a := base
 	a.Tool, a.Command = engine.ToolShell, adapters.ShellCommand(env.Shell, cmd)

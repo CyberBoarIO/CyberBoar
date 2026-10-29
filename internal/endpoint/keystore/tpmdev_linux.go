@@ -9,9 +9,9 @@ import (
 	"github.com/google/go-tpm/tpm2/transport/linuxtpm"
 )
 
-// tpmDevice is the kernel's TPM resource manager
+// tpmDevice is the kernel's TPM resource manager.
 // The raw /dev/tpm0 is not used, because it serves one process at a time and
-// whatever else uses the TPM (tpm2-abrmd, systemd) would race with us on its handles
+// whatever else uses the TPM (tpm2-abrmd, systemd) would race with us on its handles.
 const tpmDevice = "/dev/tpmrm0"
 
 func openPlatformTPM() (transport.TPMCloser, error) {

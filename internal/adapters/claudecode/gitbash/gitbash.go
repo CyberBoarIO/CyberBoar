@@ -1,7 +1,7 @@
 // Package gitbash reads the mount table of Git Bash (Git for Windows' MSYS2
 // shell), which Claude Code on Windows runs commands in. The engine maps Git
 // Bash's paths outside the drives (/, /tmp, /usr/bin) through it
-// Anything it can't read exactly is an error, and the engine then refuses those paths
+// Anything it can't read exactly is an error, and the engine then refuses those paths.
 package gitbash
 
 import (
@@ -13,23 +13,23 @@ import (
 	"strings"
 )
 
-// Env is what Mounts needs from the machine
+// Env is what Mounts needs from the machine.
 type Env struct {
-	// Getenv returns the value of an environment variable, or ""
+	// Getenv returns the value of an environment variable, or "".
 	Getenv func(string) string
-	// LookPath finds an executable on PATH, as exec.LookPath does
+	// LookPath finds an executable on PATH, as exec.LookPath does.
 	LookPath func(string) (string, error)
 	// ReadFile reads a whole file.
 	ReadFile func(string) ([]byte, error)
-	// Exists reports whether a file exists
+	// Exists reports whether a file exists.
 	Exists func(string) bool
-	// WindowsDir returns the Windows directory, the last temporary-directory fallback
+	// WindowsDir returns the Windows directory, the last temporary-directory fallback.
 	WindowsDir func() (string, error)
 }
 
 // System returns the Env of the machine the caller runs on, with PATH and
 // files as they are. Environment variables are read through getenv, so a
-// caller reads the same ones as the hook
+// caller reads the same ones as the hook.
 func System(getenv func(string) string) Env {
 	return Env{
 		Getenv:     getenv,
@@ -43,7 +43,7 @@ func System(getenv func(string) string) Env {
 // Mounts returns Git Bash's mount table, which maps each mount point to a
 // Windows directory, or to "" for a mount whose directory is unknown. Git's
 // install directory comes from CLAUDE_CODE_GIT_BASH_PATH (the bash.exe Claude
-// Code uses) or else from git.exe on PATH, as Claude Code finds it
+// Code uses) or else from git.exe on PATH, as Claude Code finds it.
 func Mounts(e Env) (map[string]string, error) {
 	root, err := installDir(e)
 	if err != nil {
@@ -89,7 +89,7 @@ func Mounts(e Env) (map[string]string, error) {
 	return out, nil
 }
 
-// tempDirectory follows GetTempPathW, which MSYS2 uses for usertemp mounts
+// tempDirectory follows GetTempPathW, which MSYS2 uses for usertemp mounts.
 func tempDirectory(e Env) string {
 	for _, name := range []string{"TMP", "TEMP", "USERPROFILE"} {
 		if dir := e.Getenv(name); dir != "" {
@@ -111,7 +111,7 @@ type mountEntry struct {
 	immutable bool
 }
 
-// installDir finds Git's install directory, the one holding usr\bin\bash.exe
+// installDir finds Git's install directory, the one holding usr\bin\bash.exe.
 func installDir(e Env) (string, error) {
 	var candidates []string
 	if bash := e.Getenv("CLAUDE_CODE_GIT_BASH_PATH"); bash != "" {
@@ -129,7 +129,7 @@ func installDir(e Env) (string, error) {
 	return "", errors.New("the install directory of Git for Windows was not found (set CLAUDE_CODE_GIT_BASH_PATH)")
 }
 
-// parent returns a Windows path's directory, or "" at the top
+// parent returns a Windows path's directory, or "" at the top.
 func parent(p string) string {
 	p = strings.TrimRight(strings.ReplaceAll(p, "/", `\`), `\`)
 	i := strings.LastIndex(p, `\`)
@@ -140,7 +140,7 @@ func parent(p string) string {
 }
 
 // parseFstab applies a Cygwin fstab to table. Lines are "device mountpoint
-// type options [dump pass]", with \040 for a space. A # starts a comment
+// type options [dump pass]", with \040 for a space. A # starts a comment.
 func parseFstab(data []byte, table map[string]mountEntry, temp string, userTable bool) error {
 	for n, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
@@ -157,7 +157,7 @@ func parseFstab(data []byte, table map[string]mountEntry, temp string, userTable
 		}
 		entry := mountEntry{target: device, system: true, immutable: typ == "usertemp"}
 		override := false
-		for _, option := range strings.Split(f[3], ",") {
+		for option := range strings.SplitSeq(f[3], ",") {
 			switch option {
 			case "user":
 				entry.system = false
@@ -202,7 +202,7 @@ func parseFstab(data []byte, table map[string]mountEntry, temp string, userTable
 	return nil
 }
 
-// unescape decodes fstab's octal escapes (\040 is a space)
+// unescape decodes fstab's octal escapes (\040 is a space).
 func unescape(s string) string {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {
@@ -217,12 +217,12 @@ func unescape(s string) string {
 	return b.String()
 }
 
-// isOctal reports whether s is exactly three octal digits
+// isOctal reports whether s is exactly three octal digits.
 func isOctal(s string) bool {
 	if len(s) != 3 {
 		return false
 	}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if s[i] < '0' || s[i] > '7' {
 			return false
 		}

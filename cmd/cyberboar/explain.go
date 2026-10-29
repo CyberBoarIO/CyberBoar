@@ -19,7 +19,7 @@ import (
 )
 
 // runExplain prints the decision the policy gives for one action, and with --verbose
-// what the shell analysis found in a command line
+// what the shell analysis found in a command line.
 func runExplain(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	wd, _ := os.Getwd()
@@ -121,7 +121,7 @@ func runExplain(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, st
 	return 0
 }
 
-// absOr returns the absolute form of p, or p itself if it has none
+// absOr returns the absolute form of p, or p itself if it has none.
 func absOr(p string) string {
 	if abs, err := filepath.Abs(p); err == nil {
 		return abs

@@ -45,7 +45,7 @@ func TestSignReplacesSymlinkWithoutChangingTarget(t *testing.T) {
 	}
 }
 
-// keygen refuses to replace an existing public key, and then writes no private key either
+// keygen refuses to replace an existing public key, and then writes no private key either.
 func TestKeygenKeepsPublicKey(t *testing.T) {
 	c := newCLI(t)
 	priv, pub := filepath.Join(c.home, "k"), filepath.Join(c.home, "k.pub")
@@ -62,7 +62,7 @@ func TestKeygenKeepsPublicKey(t *testing.T) {
 }
 
 // sign takes a serial and an expiry, refuses anything vague about them, and
-// won't write a signature endpoints that have the old one would refuse
+// won't write a signature endpoints that have the old one would refuse.
 func TestSignSerialExpiry(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	for _, tc := range []struct {

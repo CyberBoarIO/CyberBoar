@@ -1,15 +1,16 @@
 // Package corpustest loads and runs the YAML corpus in testdata/corpus for
-// the engine's tests
+// the engine's tests.
 //
 // The corpus is the specification. It states, independently of the Go
-// implementation, which verdict each policy and action pair must produce
-// Only tests import this package; the binary never links it
+// implementation, which verdict each policy and action pair must produce.
+// Only tests import this package; the binary never links it.
 package corpustest
 
 import (
 	"bytes"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 
@@ -19,7 +20,7 @@ import (
 	"cyberboar.dev/cyberboar/pkg/brand"
 )
 
-// File is one corpus file
+// File is one corpus file.
 type File struct {
 	Path     string                  `yaml:"-"`
 	FS       []FSEntry               `yaml:"fs"`
@@ -28,24 +29,24 @@ type File struct {
 	Cases    []Case                  `yaml:"cases"`
 }
 
-// FSEntry is one fixture entry: exactly one of File, Dir, Symlink, Files
+// FSEntry is one fixture entry: exactly one of File, Dir, Symlink, Files.
 type FSEntry struct {
 	Path    string  `yaml:"path"`
 	File    *string `yaml:"file"`
 	Dir     bool    `yaml:"dir"`
 	Symlink string  `yaml:"symlink"`
-	// Files creates a directory of numbered empty files for resource boundaries
+	// Files creates a directory of numbered empty files for resource boundaries.
 	Files int `yaml:"files"`
 }
 
-// Defaults holds what every case in a file starts from
+// Defaults holds what every case in a file starts from.
 type Defaults struct {
-	// Action fields are merged into every case's action; the case wins
+	// Action fields are merged into every case's action; the case wins.
 	Action map[string]any `yaml:"action"`
 }
 
 // PolicySource names exactly one of: a file relative to the corpus file, an
-// inline mapping, or raw bytes
+// inline mapping, or raw bytes.
 type PolicySource struct {
 	File   string         `yaml:"file"`
 	Inline map[string]any `yaml:"inline"`
@@ -53,29 +54,29 @@ type PolicySource struct {
 }
 
 // Case is one action evaluated against one policy, with the verdict or load
-// error it must produce
+// error it must produce.
 type Case struct {
 	Name   string `yaml:"name"`
 	Policy string `yaml:"policy"`
-	// Action stays untyped until File.Action merges it with Defaults.Action
+	// Action stays untyped until File.Action merges it with Defaults.Action.
 	Action map[string]any `yaml:"action"`
 	Expect Expect         `yaml:"expect"`
 }
 
 // Expect is what a case must produce.
 type Expect struct {
-	// LoadError is the policy.Code the load must fail with; empty means it must load
+	// LoadError is the policy.Code the load must fail with; empty means it must load.
 	LoadError string `yaml:"loadError"`
-	// ErrorPath, when set, is the expected policy.Error.Path ("" is the root)
+	// ErrorPath, when set, is the expected policy.Error.Path ("" is the root).
 	ErrorPath *string `yaml:"errorPath"`
 
-	// Decision, Rule and ReasonContains check the verdict of a case with an action
+	// Decision, Rule and ReasonContains check the verdict of a case with an action.
 	Decision       string `yaml:"decision"`
 	Rule           string `yaml:"rule"`
 	ReasonContains string `yaml:"reasonContains"`
 }
 
-// Action is the corpus form of engine.Action
+// Action is the corpus form of engine.Action.
 type Action struct {
 	Tool    string `yaml:"tool"`
 	Command string `yaml:"command"`
@@ -84,7 +85,7 @@ type Action struct {
 	// changes its file instead of replacing it (package edits; Patch is an
 	// apply_patch document whose header names Path). They may hold
 	// {{fake:RULE}}, a made-up credential (internal/secrets/secretstest); so
-	// may Command and fs files
+	// may Command and fs files.
 	Content string  `yaml:"content"`
 	Edits   []Edit  `yaml:"edits"`
 	Insert  *Insert `yaml:"insert"`
@@ -96,7 +97,7 @@ type Action struct {
 	} `yaml:"mcp"`
 	Cwd        string `yaml:"cwd"`
 	CwdUnknown bool   `yaml:"cwdUnknown"`
-	// ShellPersists is engine.Action.ShellPersists
+	// ShellPersists is engine.Action.ShellPersists.
 	ShellPersists bool              `yaml:"shellPersists"`
 	Shell         string            `yaml:"shell"` // engine.Action.Shell
 	CDPath        bool              `yaml:"cdpath"`
@@ -109,29 +110,25 @@ type Action struct {
 	Mounts        map[string]string `yaml:"mounts"`
 }
 
-// Edit is the corpus form of edits.Replace
+// Edit is the corpus form of edits.Replace.
 type Edit struct {
 	Old string `yaml:"old"`
 	New string `yaml:"new"`
 	All bool   `yaml:"all"`
 }
 
-// Insert is the corpus form of edits.Insert
+// Insert is the corpus form of edits.Insert.
 type Insert struct {
 	Line int    `yaml:"line"`
 	Text string `yaml:"text"`
 }
 
 // Action merges the file defaults into the case action, substitutes {{root}}
-// and {{fake:RULE}}, and decodes it strictly
+// and {{fake:RULE}}, and decodes it strictly.
 func (f *File) Action(c Case, root string) (*Action, error) {
 	merged := map[string]any{}
-	for k, v := range f.Defaults.Action {
-		merged[k] = v
-	}
-	for k, v := range c.Action {
-		merged[k] = v
-	}
+	maps.Copy(merged, f.Defaults.Action)
+	maps.Copy(merged, c.Action)
 	data, err := yaml.Marshal(merged)
 	if err != nil {
 		return nil, err
@@ -156,7 +153,7 @@ func (f *File) Action(c Case, root string) (*Action, error) {
 }
 
 // LoadFile reads and checks a corpus file. Unknown fields are errors, so a typo
-// in the corpus can't silently weaken a case
+// in the corpus can't silently weaken a case.
 func LoadFile(path string) (*File, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -174,7 +171,7 @@ func LoadFile(path string) (*File, error) {
 }
 
 // check reports every problem in the file's policies, cases and fixture
-// entries at once, so one run shows them all
+// entries at once, so one run shows them all.
 func (f *File) check() error {
 	var errs []error
 	for name, src := range f.Policies {
@@ -249,7 +246,7 @@ func (f *File) check() error {
 	return errors.Join(errs...)
 }
 
-// PolicyBytes returns the document bytes of the named policy, with {{root}} replaced by root
+// PolicyBytes returns the document bytes of the named policy, with {{root}} replaced by root.
 func (f *File) PolicyBytes(name, root string) ([]byte, error) {
 	src, ok := f.Policies[name]
 	var data []byte
@@ -273,8 +270,8 @@ func substituteRoot(data []byte, root string) []byte {
 
 // BuildFixture creates the file's fs entries under a new temporary directory
 // and returns its symlink-free absolute path, with "/" separators so it can
-// be substituted into YAML on Windows too
-// The caller removes it
+// be substituted into YAML on Windows too.
+// The caller removes it.
 func (f *File) BuildFixture() (string, error) {
 	dir, err := os.MkdirTemp("", brand.Name+"-corpus-")
 	if err != nil {

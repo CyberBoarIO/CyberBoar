@@ -1,7 +1,7 @@
-// Package sign signs and verifies policy files with ed25519
+// Package sign signs and verifies policy files with ed25519.
 //
-// The private key stays with whoever publishes policies
-// Endpoints and the console hold only the public key
+// The private key stays with whoever publishes policies.
+// Endpoints and the console hold only the public key.
 //
 // A signature covers the policy's name, the SHA-256 of its exact bytes, a
 // serial and an expiry. A signed policy therefore cannot be edited, truncated
@@ -9,9 +9,9 @@
 // serial is lower than the one it has (a rollback). A policy with an expiry is
 // no longer trusted after that time.
 //
-// Keys are PEM encoded (PKCS #8 for private keys, PKIX for public keys)
-// The signature is a POLICY.sig file next to the policy
-// The format is part of docs/protocol
+// Keys are PEM encoded (PKCS #8 for private keys, PKIX for public keys).
+// The signature is a POLICY.sig file next to the policy.
+// The format is part of docs/protocol.
 package sign
 
 import (
@@ -35,40 +35,40 @@ import (
 	"cyberboar.dev/cyberboar/pkg/brand"
 )
 
-// SigSuffix is appended to a policy file's path for its signature
+// SigSuffix is appended to a policy file's path for its signature.
 const SigSuffix = ".sig"
 
-// MaxSerial is the largest serial
-// It is the largest value of a signed 64-bit integer
+// MaxSerial is the largest serial.
+// It is the largest value of a signed 64-bit integer.
 const MaxSerial = 1<<63 - 1
 
-// TimeFormat is the form of an expiry, which is RFC 3339 in UTC with whole seconds
+// TimeFormat is the form of an expiry, which is RFC 3339 in UTC with whole seconds.
 const TimeFormat = "2006-01-02T15:04:05Z"
 
-// maxSig bounds a signature file
+// maxSig bounds a signature file.
 const maxSig = 256
 
-// maxKey bounds PEM input; an ed25519 key block is less than 256 bytes
+// maxKey bounds PEM input; an ed25519 key block is less than 256 bytes.
 const maxKey = 4 << 10
 
-// signatureTag begins both the signed message and the signature file
+// signatureTag begins both the signed message and the signature file.
 const signatureTag = brand.APIGroup + "/policy-signature/v2"
 
-// Header is what a signature asserts besides the policy's name and bytes
+// Header is what a signature asserts besides the policy's name and bytes.
 type Header struct {
-	// Serial orders the signatures of one deployment
-	// An endpoint never installs a lower serial than the one it has
+	// Serial orders the signatures of one deployment.
+	// An endpoint never installs a lower serial than the one it has.
 	Serial uint64
-	// Expires is when endpoints stop trusting the policy - from then on the hook denies every call
-	// The zero time means the policy never expires
+	// Expires is when endpoints stop trusting the policy - from then on the hook denies every call.
+	// The zero time means the policy never expires.
 	Expires time.Time
 }
 
-// Expired reports whether the policy has expired at now
-// The expiry instant itself is expired, and a policy without expiry never is
+// Expired reports whether the policy has expired at now.
+// The expiry instant itself is expired, and a policy without expiry never is.
 func (h Header) Expired(now time.Time) bool { return !h.Expires.IsZero() && !now.Before(h.Expires) }
 
-// Expiry returns the expiry as signed, in TimeFormat in UTC or as "never"
+// Expiry returns the expiry as signed, in TimeFormat in UTC or as "never".
 func (h Header) Expiry() string {
 	if h.Expires.IsZero() {
 		return never
@@ -89,7 +89,7 @@ func (h Header) check() error {
 }
 
 // message returns what is signed, which is a domain separator, the policy
-// name, the SHA-256 of the policy file, the serial and the expiry
+// name, the SHA-256 of the policy file, the serial and the expiry.
 func message(name string, policy []byte, h Header) []byte {
 	sum := sha256.Sum256(policy)
 	return []byte(signatureTag + "\n" + name + "\n" + hex.EncodeToString(sum[:]) + "\n" +
@@ -98,11 +98,11 @@ func message(name string, policy []byte, h Header) []byte {
 
 // Keygen writes a new ed25519 key pair, the private key to privPath with mode
 // 0600 on POSIX (a protected owner/SYSTEM DACL on Windows) and the public key
-// to pubPath
+// to pubPath.
 // Neither file may exist yet, so that a key is never replaced and a pair never
-// ends up mismatched
-// An existing file fails with an error that matches fs.ErrExist
-// When Keygen fails, it leaves no file of its own behind
+// ends up mismatched.
+// An existing file fails with an error that matches fs.ErrExist.
+// When Keygen fails, it leaves no file of its own behind.
 func Keygen(privPath, pubPath string) error {
 	for _, p := range []string{privPath, pubPath} {
 		if _, err := os.Lstat(p); err == nil {
@@ -149,7 +149,7 @@ func readPEM(path, typ string) ([]byte, error) {
 	return b.Bytes, nil
 }
 
-// LoadPrivate reads an ed25519 private key
+// LoadPrivate reads an ed25519 private key.
 func LoadPrivate(path string) (ed25519.PrivateKey, error) {
 	der, err := readPEM(path, "PRIVATE KEY")
 	if err != nil {
@@ -157,7 +157,7 @@ func LoadPrivate(path string) (ed25519.PrivateKey, error) {
 	}
 	k, err := x509.ParsePKCS8PrivateKey(der)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %v", path, err)
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	priv, ok := k.(ed25519.PrivateKey)
 	if !ok {
@@ -166,7 +166,7 @@ func LoadPrivate(path string) (ed25519.PrivateKey, error) {
 	return priv, nil
 }
 
-// LoadPublic reads an ed25519 public key
+// LoadPublic reads an ed25519 public key.
 func LoadPublic(path string) (ed25519.PublicKey, error) {
 	der, err := readPEM(path, "PUBLIC KEY")
 	if err != nil {
@@ -174,7 +174,7 @@ func LoadPublic(path string) (ed25519.PublicKey, error) {
 	}
 	k, err := x509.ParsePKIXPublicKey(der)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %v", path, err)
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	pub, ok := k.(ed25519.PublicKey)
 	if !ok {
@@ -183,7 +183,7 @@ func LoadPublic(path string) (ed25519.PublicKey, error) {
 	return pub, nil
 }
 
-// Sign returns the signature file contents for a policy named name
+// Sign returns the signature file contents for a policy named name.
 func Sign(priv ed25519.PrivateKey, name string, policy []byte, h Header) (string, error) {
 	if err := h.check(); err != nil {
 		return "", err
@@ -193,11 +193,11 @@ func Sign(priv ed25519.PrivateKey, name string, policy []byte, h Header) (string
 		"\nsignature " + base64.StdEncoding.EncodeToString(sig) + "\n", nil
 }
 
-// ErrBadSignature means the signature doesn't match the policy and key, or isn't a signature file
+// ErrBadSignature means the signature doesn't match the policy and key, or isn't a signature file.
 var ErrBadSignature = errors.New("the policy signature is not valid for this key")
 
-// Parse reads a signature file's header without verifying anything
-// Only the exact form Sign writes is accepted
+// Parse reads a signature file's header without verifying anything.
+// Only the exact form Sign writes is accepted.
 func Parse(sig []byte) (Header, []byte, error) {
 	if len(sig) > maxSig {
 		return Header{}, nil, ErrBadSignature
@@ -229,8 +229,8 @@ func Parse(sig []byte) (Header, []byte, error) {
 	return h, raw, nil
 }
 
-// Verify checks sig (signature file contents) against the policy and returns its header
-// Callers decide what an expired policy means
+// Verify checks sig (signature file contents) against the policy and returns its header.
+// Callers decide what an expired policy means.
 func Verify(pub ed25519.PublicKey, name string, policy []byte, sig []byte) (Header, error) {
 	if len(pub) != ed25519.PublicKeySize {
 		return Header{}, ErrBadSignature // ed25519.Verify would panic
@@ -245,7 +245,7 @@ func Verify(pub ed25519.PublicKey, name string, policy []byte, sig []byte) (Head
 	return h, nil
 }
 
-// ReadSig reads the signature file next to a policy, bounded
+// ReadSig reads the signature file next to a policy, bounded.
 func ReadSig(policyPath string) ([]byte, error) {
 	return boundedfile.Read(policyPath+SigSuffix, maxSig+1)
 }

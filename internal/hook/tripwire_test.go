@@ -21,7 +21,7 @@ import (
 	"cyberboar.dev/cyberboar/pkg/brand"
 )
 
-// sessionPolicy is the baseline's rules with the given spec.session
+// sessionPolicy is the baseline's rules with the given spec.session.
 func sessionPolicy(session string) []byte {
 	return []byte(`apiVersion: ` + brand.APIVersion + `
 kind: Policy
@@ -82,7 +82,7 @@ func TestTripwireLocksSession(t *testing.T) {
 }
 
 // A locked Codex session is denied with the JSON answer and exit 0, like
-// every Codex deny: PowerShell would turn exit 2 into a failed hook
+// every Codex deny: PowerShell would turn exit 2 into a failed hook.
 func TestTripwireLocksCodexSession(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("POSIX adapter fixtures")
@@ -115,7 +115,7 @@ func TestTripwireLocksCodexSession(t *testing.T) {
 	}
 }
 
-// Off unless the policy configures it: no lock, and no state needed
+// Off unless the policy configures it: no lock, and no state needed.
 func TestTripwireOffByDefault(t *testing.T) {
 	for _, session := range []string{"{}", "{briefing: {}}"} {
 		h := hookRig{t, sessionPolicy(session), ""}
@@ -164,7 +164,7 @@ func TestTripwireSettings(t *testing.T) {
 }
 
 // Only the policy's own denials count: asks, allowed calls and CyberBoar's
-// limits (an unclassified tool) are no sign of an agent probing the rules
+// limits (an unclassified tool) are no sign of an agent probing the rules.
 func TestTripwireCountsPolicyDenialsOnly(t *testing.T) {
 	h := hookRig{t, sessionPolicy("{tripwire: {maxDenials: 2}}"), t.TempDir()}
 	unclassified := `{"hook_event_name":"PreToolUse","session_id":"s","tool_name":"SomeNewTool","cwd":"/work/repo","tool_input":{}}`
@@ -181,7 +181,7 @@ func TestTripwireCountsPolicyDenialsOnly(t *testing.T) {
 	}
 }
 
-// The tripwire is fail-closed: without readable state, nothing runs
+// The tripwire is fail-closed: without readable state, nothing runs.
 func TestTripwireStateErrorsDeny(t *testing.T) {
 	h := hookRig{t, sessionPolicy("{tripwire: {}}"), ""}
 	assertDenied(t, h.run(bash("s", "ls")), hook.RuleTripwireState)
@@ -223,7 +223,7 @@ func TestTripwireStateErrorsDeny(t *testing.T) {
 	assertDenied(t, h.run(bash("s", "cat .env")), hook.RuleTripwireState)
 }
 
-// The agent can't reach the state to undo a lock
+// The agent can't reach the state to undo a lock.
 func TestStateDirIsProtected(t *testing.T) {
 	h := hookRig{t, sessionPolicy("{tripwire: {maxDenials: 1}}"), t.TempDir()}
 	r := h.run(bash("s", "rm -rf "+h.state))
@@ -239,16 +239,14 @@ func TestStateDirIsProtected(t *testing.T) {
 	assertDenied(t, h.run(read), engine.RuleSelf)
 }
 
-// Parallel tool calls must not lose denials
+// Parallel tool calls must not lose denials.
 func TestTripwireConcurrentCalls(t *testing.T) {
 	h := hookRig{t, sessionPolicy("{tripwire: {maxDenials: 10}}"), t.TempDir()}
 	var wg sync.WaitGroup
 	for range 10 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			h.run(bash("s", "cat .env"))
-		}()
+		})
 	}
 	wg.Wait()
 	assertDenied(t, h.run(bash("s", "ls")), tripwire.RuleLocked)

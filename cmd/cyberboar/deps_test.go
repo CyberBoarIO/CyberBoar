@@ -15,7 +15,7 @@ import (
 // ends in "test" (the test helpers). Test helpers are written for test runs,
 // not for an endpoint: linking one into the shipped command would put its code
 // on the path every tool call takes. Build constraints choose different files
-// for each GOOS, so the list is taken for each platform the binary ships on
+// for each GOOS, so the list is taken for each platform the binary ships on.
 func TestBinaryLinksNoTestCode(t *testing.T) {
 	if testing.Short() {
 		t.Skip("runs go list once per platform")
@@ -36,7 +36,7 @@ func TestBinaryLinksNoTestCode(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GOOS=%s: go list -deps: %v\n%s", goos, err, stderr.Bytes())
 		}
-		for _, dep := range strings.Fields(string(out)) {
+		for dep := range strings.FieldsSeq(string(out)) {
 			if testCode(module, dep) {
 				t.Errorf("GOOS=%s: the %s command links test code: %s", goos, brand.Name, dep)
 			}
@@ -45,7 +45,7 @@ func TestBinaryLinksNoTestCode(t *testing.T) {
 }
 
 // testCode reports whether an import path is test code that a shipped binary
-// must not link: the testing packages, httptest, or a helper of module
+// must not link: the testing packages, httptest, or a helper of module.
 func testCode(module, pkg string) bool {
 	if pkg == "testing" || strings.HasPrefix(pkg, "testing/") || pkg == "net/http/httptest" {
 		return true

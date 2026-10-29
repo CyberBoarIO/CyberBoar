@@ -20,11 +20,11 @@ import (
 	"cyberboar.dev/cyberboar/pkg/brand"
 )
 
-// MaxSize is the largest policy document Load accepts, in bytes
+// MaxSize is the largest policy document Load accepts, in bytes.
 const MaxSize = 1 << 20
 
-// MaxDepth is the deepest nesting of collections Load accepts
-// A valid policy nests about five levels deep
+// MaxDepth is the deepest nesting of collections Load accepts.
+// A valid policy nests about five levels deep.
 const MaxDepth = 64
 
 //go:embed schema/policy.v1.json
@@ -32,7 +32,7 @@ var schemaJSON []byte
 
 const schemaURL = "policy.v1.json"
 
-// compiledSchema compiles the embedded schema once
+// compiledSchema compiles the embedded schema once.
 var compiledSchema = sync.OnceValues(func() (*jsonschema.Schema, error) {
 	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(schemaJSON))
 	if err != nil {
@@ -45,7 +45,7 @@ var compiledSchema = sync.OnceValues(func() (*jsonschema.Schema, error) {
 	return c.Compile(schemaURL)
 })
 
-// Load parses and fully validates a policy document. Every failure is an *Error
+// Load parses and fully validates a policy document. Every failure is an *Error.
 func Load(data []byte) (p *Policy, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -160,11 +160,11 @@ func Load(data []byte) (p *Policy, err error) {
 }
 
 // tooDeep reports whether a token stream nests collections more than
-// MaxDepth levels deep
-// A flow collection is a level per bracket
+// MaxDepth levels deep.
+// A flow collection is a level per bracket.
 // A block collection is a level per indentation step, so the open block levels are a
 // stack of columns. Each sequence entry or "?" key opens a level of its own,
-// since "- - x" nests two sequences on one line
+// since "- - x" nests two sequences on one line.
 func tooDeep(tokens token.Tokens) bool {
 	var cols []int
 	flow, line := 0, 0
@@ -193,7 +193,7 @@ func tooDeep(tokens token.Tokens) bool {
 }
 
 // checkHeader dispatches on apiVersion and kind before schema validation, so a
-// policy for another version gets a precise error instead of schema noise
+// policy for another version gets a precise error instead of schema noise.
 func checkHeader(obj map[string]any) error {
 	v, ok := obj["apiVersion"].(string)
 	switch {
@@ -214,7 +214,7 @@ func checkHeader(obj map[string]any) error {
 }
 
 // rejectYAMLFeatures refuses YAML constructs that have no use in policy data:
-// anchors, aliases and merge keys (expansion bombs, hidden indirection) and tags
+// anchors, aliases and merge keys (expansion bombs, hidden indirection) and tags.
 func rejectYAMLFeatures(doc *ast.DocumentNode) error {
 	var found *Error
 	ast.Walk(visitorFunc(func(n ast.Node) bool {
@@ -245,7 +245,7 @@ func rejectYAMLFeatures(doc *ast.DocumentNode) error {
 }
 
 // rejectNonFinite refuses YAML's .inf and .nan. They are numbers in YAML,
-// but JSON has no way to write them, so the policy can't be read as JSON with them in it
+// but JSON has no way to write them, so the policy can't be read as JSON with them in it.
 func rejectNonFinite(doc *ast.DocumentNode) error {
 	var found *Error
 	ast.Walk(visitorFunc(func(n ast.Node) bool {
@@ -268,8 +268,8 @@ func rejectNonFinite(doc *ast.DocumentNode) error {
 
 // checkIntegers refuses a number written with a decimal point or an
 // exponent, such as 1.0. JSON Schema counts 1.0 as an integer, so the schema
-// lets it through, but the field it fills is a Go int
-// The schema has already allowed numbers only where it wants integers
+// lets it through, but the field it fills is a Go int.
+// The schema has already allowed numbers only where it wants integers.
 func checkIntegers(v any, path []string) error {
 	switch v := v.(type) {
 	case map[string]any:
@@ -292,11 +292,11 @@ func checkIntegers(v any, path []string) error {
 	return nil
 }
 
-// visitorFunc adapts a function to ast.Visitor
-// The function returns false to stop the walk below a node
+// visitorFunc adapts a function to ast.Visitor.
+// The function returns false to stop the walk below a node.
 type visitorFunc func(ast.Node) bool
 
-// Visit calls f on n and returns f to walk n's children, or nil to stop
+// Visit calls f on n and returns f to walk n's children, or nil to stop.
 func (f visitorFunc) Visit(n ast.Node) ast.Visitor {
 	if n == nil || !f(n) {
 		return nil
@@ -304,7 +304,7 @@ func (f visitorFunc) Visit(n ast.Node) ast.Visitor {
 	return f
 }
 
-// hasTripwire reports whether the document has a spec.session.tripwire block
+// hasTripwire reports whether the document has a spec.session.tripwire block.
 func hasTripwire(doc map[string]any) bool {
 	spec, _ := doc["spec"].(map[string]any)
 	session, _ := spec["session"].(map[string]any)

@@ -39,7 +39,7 @@ func TestOpencodeGlob(t *testing.T) {
 }
 
 // A rewritten glob matches the rewritten form of every name the glob matches
-// as written, including a Unicode character that becomes two underscores
+// as written, including a Unicode character that becomes two underscores.
 func TestOpencodeGlobCoversRewrittenNames(t *testing.T) {
 	rewrite := func(s string) string {
 		var b strings.Builder
@@ -110,7 +110,7 @@ func TestCopilotGlob(t *testing.T) {
 // A glob rewritten for Copilot matches the name Copilot makes of every name
 // the glob matches as written. copilotName follows Copilot CLI 1.0.97: other
 // ASCII punctuation becomes "-", and a part with Unicode is written as punycode,
-// here a stand-in with the part's ASCII characters first
+// here a stand-in with the part's ASCII characters first.
 func TestCopilotGlobCoversCopilotNames(t *testing.T) {
 	copilotName := func(s string) string {
 		var parts []string
@@ -179,7 +179,7 @@ func TestCodexGlob(t *testing.T) {
 
 // A glob rewritten for Codex matches Codex's form of every name the glob
 // matches as written. codexName is sanitize_responses_api_tool_name from
-// codex-rs 0.155: one "_" for each character outside [A-Za-z0-9_]
+// codex-rs 0.155: one "_" for each character outside [A-Za-z0-9_].
 func TestCodexGlobCoversCodexNames(t *testing.T) {
 	codexName := func(s string) string {
 		var b strings.Builder
@@ -229,7 +229,7 @@ func TestCodexHashed(t *testing.T) {
 }
 
 // Deny and ask patterns cover rewritten Unicode names, while allow rules
-// still require the spelling reported by the agent
+// still require the spelling reported by the agent.
 func TestMCPRewrittenUnicodeWildcards(t *testing.T) {
 	for _, tc := range []struct {
 		name, pattern, server, tool string
@@ -264,7 +264,7 @@ func TestMCPRewrittenUnicodeWildcards(t *testing.T) {
 	}
 }
 
-// Widening a punycode server pattern must not widen an ASCII tool pattern
+// Widening a punycode server pattern must not widen an ASCII tool pattern.
 func TestCopilotWildcardKeepsASCIIScope(t *testing.T) {
 	for _, server := range []string{"fs", "xn--ab-bja"} {
 		p := emptyPolicy(policy.DenyListed)
@@ -311,7 +311,7 @@ func TestGlobMatchesStart(t *testing.T) {
 	}
 }
 
-// globMatchesStart finds every name a pattern matches with some ending
+// globMatchesStart finds every name a pattern matches with some ending.
 func TestGlobMatchesStartCoversEndings(t *testing.T) {
 	patterns := []string{"ab*", "a?b", "[ab]c", "[^a]b*", `a\*`, "*b", "a*b*c", "abc", "?", "[a-b]?"}
 	alphabet := []string{"", "a", "b", "c", "*"}

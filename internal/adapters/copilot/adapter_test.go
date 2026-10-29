@@ -19,7 +19,7 @@ var update = flag.Bool("update", false, "rewrite golden files")
 const testdata = "testdata"
 
 // Every input captured from a real Copilot CLI run maps cleanly: known tool,
-// well-formed input
+// well-formed input.
 func TestCapturedInputs(t *testing.T) {
 	files, _ := filepath.Glob(filepath.Join(testdata, "captured-*.jsonl"))
 	if len(files) == 0 {
@@ -47,7 +47,7 @@ func TestCapturedInputs(t *testing.T) {
 }
 
 // view lists a directory and reads anything else, so the action depends on
-// what the path names on disk. A path that doesn't exist is read
+// what the path names on disk. A path that doesn't exist is read.
 func TestViewListsDirectories(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("the adapter's path resolution takes POSIX absolute paths")
@@ -81,7 +81,7 @@ func TestViewListsDirectories(t *testing.T) {
 }
 
 // Every tool a captured Copilot CLI offers the model is classified, so a new
-// tool shows up here before it reaches a user
+// tool shows up here before it reaches a user.
 func TestCapturedToolsClassified(t *testing.T) {
 	files, _ := filepath.Glob(filepath.Join(testdata, "tools-*.json"))
 	if len(files) == 0 {
@@ -155,7 +155,7 @@ func TestMCPSplits(t *testing.T) {
 	}
 }
 
-// Generated configuration is reviewed as diffs of golden files
+// Generated configuration is reviewed as diffs of golden files.
 func TestHooksFileGolden(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -200,7 +200,7 @@ func TestSessionStartOutput(t *testing.T) {
 }
 
 // Every input captured from VS Code's Local agent maps cleanly: known tool,
-// well-formed input. The tools denied on purpose (RuleUncheckedTool) count as known
+// well-formed input. The tools denied on purpose (RuleUncheckedTool) count as known.
 func TestCapturedVSCodeInputs(t *testing.T) {
 	files, _ := filepath.Glob(filepath.Join(testdata, "vscode-captured-*.jsonl"))
 	if len(files) == 0 {
@@ -231,7 +231,7 @@ func TestCapturedVSCodeInputs(t *testing.T) {
 
 // Every built-in tool a captured VS Code offers the model is classified, so
 // a new tool shows up here before it reaches a user. Extensions' tools are
-// denied as unclassified, and MCP tools read as MCP tools
+// denied as unclassified, and MCP tools read as MCP tools.
 func TestCapturedVSCodeToolsClassified(t *testing.T) {
 	files, _ := filepath.Glob(filepath.Join(testdata, "vscode-tools-*.json"))
 	if len(files) == 0 {
@@ -269,7 +269,7 @@ func TestCapturedVSCodeToolsClassified(t *testing.T) {
 	}
 }
 
-// VS Code's MCP names split at every "_" inside the longest prefix
+// VS Code's MCP names split at every "_" inside the longest prefix.
 func TestVSCodeMCPSplits(t *testing.T) {
 	for name, want := range map[string][]string{
 		"mcp_e2e_do_thing":              {"e2e/do_thing", "e2e_do/thing"},

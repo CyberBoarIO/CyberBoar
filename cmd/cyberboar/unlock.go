@@ -16,7 +16,7 @@ import (
 func runUnlock(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	stateDir := fs.String("state", "", "the hook's state directory (default: $XDG_STATE_HOME/"+brand.Name+")")
-	agent := fs.String("agent", "claude-code", "agent of the session: claude-code, codex, copilot-cli, cursor or opencode")
+	agent := fs.String("agent", "claude-code", "agent of the session: "+agentList())
 	session := fs.String("session", "", "session ID to unlock (as in the audit log)")
 	all := fs.Bool("all", false, "clear every session")
 	fs.Usage = func() {

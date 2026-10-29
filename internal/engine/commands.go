@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
@@ -14,23 +15,23 @@ import (
 	"cyberboar.dev/cyberboar/internal/policy/cmdpattern"
 )
 
-// Rule IDs of the verdicts the command check gives itself rather than from a policy rule
+// Rule IDs of the verdicts the command check gives itself rather than from a policy rule.
 const (
-	// RuleDenyInterpreters denies inline code when the policy sets denyInterpreters
+	// RuleDenyInterpreters denies inline code when the policy sets denyInterpreters.
 	RuleDenyInterpreters = "commands.denyInterpreters"
-	// RuleHiddenCode asks about a construct that evaluates a run-time value as code or as a name
+	// RuleHiddenCode asks about a construct that evaluates a run-time value as code or as a name.
 	RuleHiddenCode = "commands.hiddenCode"
-	// RuleNoCommand allows a command line that runs no commands
+	// RuleNoCommand allows a command line that runs no commands.
 	RuleNoCommand = "builtin.noCommand"
-	// RuleUnparseable denies a command line that isn't valid shell syntax
+	// RuleUnparseable denies a command line that isn't valid shell syntax.
 	RuleUnparseable = "error.unparseable"
-	// RuleCommandTooLarge denies a command line longer than shell.MaxBytes
+	// RuleCommandTooLarge denies a command line longer than shell.MaxBytes.
 	RuleCommandTooLarge = "error.commandTooLarge"
-	// RuleTooComplex denies commands that exceed nesting, command or expansion limits
+	// RuleTooComplex denies commands that exceed nesting, command or expansion limits.
 	RuleTooComplex = "error.tooComplex"
 )
 
-// level is how sure a match is
+// level is how sure a match is.
 type level int
 
 const (
@@ -39,20 +40,20 @@ const (
 	certain
 )
 
-// cmdRule is a compiled command rule
-// Its id is the rule ID verdicts report
+// cmdRule is a compiled command rule.
+// Its id is the rule ID verdicts report.
 type cmdRule struct {
 	id  string
 	pat *cmdpattern.Pattern
 }
 
-// cmdRules holds the compiled command rules by kind
+// cmdRules holds the compiled command rules by kind.
 type cmdRules struct {
 	deny, ask, allow []cmdRule
 }
 
-// compileCmdRules parses the command patterns of a policy
-// An error names the rule that does not parse
+// compileCmdRules parses the command patterns of a policy.
+// An error names the rule that does not parse.
 func compileCmdRules(r policy.Rules) (cmdRules, error) {
 	build := func(list string, pats []string) ([]cmdRule, error) {
 		out := make([]cmdRule, 0, len(pats))
@@ -78,8 +79,8 @@ func compileCmdRules(r policy.Rules) (cmdRules, error) {
 }
 
 // matchArgv matches pattern tokens against a prefix of argv. A Many element
-// stands for zero or more words, so the search branches
-// Any path through a run-time word is at best a possible match
+// stands for zero or more words, so the search branches.
+// Any path through a run-time word is at best a possible match.
 //
 // With skipOptions, as for deny and ask rules, options may stand before
 // every token but the first, each perhaps with its value in the next word,
@@ -87,7 +88,7 @@ func compileCmdRules(r policy.Rules) (cmdRules, error) {
 // Which options take a value differs between programs, so both readings are
 // tried. A rare false match, such as `aws --profile iam s3 ls` for `aws iam`,
 // only denies or asks. Allow rules, and ask rules exempting a command from
-// allow-listed posture, keep exact prefixes, so skipping never allows more
+// allow-listed posture, keep exact prefixes, so skipping never allows more.
 func matchArgv(toks []cmdpattern.Token, argv []shell.Elem, folded, skipOptions bool) level {
 	memo := map[[2]int]level{}
 	var rec func(ti, ai int) level
@@ -131,10 +132,10 @@ func matchArgv(toks []cmdpattern.Token, argv []shell.Elem, folded, skipOptions b
 	return rec(0, 0)
 }
 
-// isOption reports whether an argv word is an option ("-n", "--namespace=x")
+// isOption reports whether an argv word is an option ("-n", "--namespace=x").
 func isOption(w string) bool { return len(w) > 1 && w[0] == '-' }
 
-// matchCommand is the best match of a deny or ask rule's single-stage pattern over a command's layers
+// matchCommand is the best match of a deny or ask rule's single-stage pattern over a command's layers.
 func matchCommand(toks []cmdpattern.Token, c shell.Command) (level, []shell.Elem) {
 	best, which := noMatch, c.Layers[0]
 	for _, layer := range c.Layers {
@@ -148,13 +149,13 @@ func matchCommand(toks []cmdpattern.Token, c shell.Command) (level, []shell.Elem
 	return best, which
 }
 
-// matchRule finds the best match of a deny/ask pattern anywhere in the analysis
-// For a pipeline pattern, each stage must match a command fed by the previous one
+// matchRule finds the best match of a deny/ask pattern anywhere in the analysis.
+// For a pipeline pattern, each stage must match a command fed by the previous one.
 func matchRule(r cmdRule, an *shell.Analysis) (level, []shell.Elem) {
 	stages := r.pat.Stages
 	best, shown := noMatch, []shell.Elem(nil)
 	// first is the first stage's layer on the chain being followed, so the
-	// command shown is the one whose chain set best
+	// command shown is the one whose chain set best.
 	var chain func(stage, from int, sofar level, first []shell.Elem)
 	chain = func(stage, from int, sofar level, first []shell.Elem) {
 		if stage == len(stages) {
@@ -181,7 +182,7 @@ func matchRule(r cmdRule, an *shell.Analysis) (level, []shell.Elem) {
 	return best, shown
 }
 
-// render joins argv into the command line shown in a verdict's reason
+// render joins argv into the command line shown in a verdict's reason.
 func render(argv []shell.Elem) string {
 	parts := make([]string, len(argv))
 	for i, e := range argv {
@@ -190,7 +191,7 @@ func render(argv []shell.Elem) string {
 	return strings.Join(parts, " ")
 }
 
-// evalShell decides a shell command line
+// evalShell decides a shell command line.
 func (c *Compiled) evalShell(a Action) Verdict {
 	env, err := prepareFileEnv(a)
 	if err != nil {
@@ -217,14 +218,16 @@ func (c *Compiled) evalShell(a Action) Verdict {
 
 	// The order of precedence is a certain deny from a command rule, then one
 	// from a file rule, then inline code under denyInterpreters, then a
-	// command or path not on the allow list, then an ask, and last an allow
+	// command or path not on the allow list, then an ask, and last an allow.
 	var asks []Verdict
 	for _, r := range c.commands.deny {
 		switch l, argv := matchRule(r, an); l {
 		case certain:
 			return deny(r.id, fmt.Sprintf("the command `%s` is blocked by policy rule %s; do not attempt alternative ways to run it", render(argv), r.id))
 		case possible:
-			asks = append(asks, Verdict{Decision: Ask, Rule: r.id, Reason: fmt.Sprintf("the command `%s` might run something policy rule %s blocks (parts of it are only known at run time), so it needs confirmation", render(argv), r.id)})
+			reason := fmt.Sprintf("the command `%s` might run something policy rule %s blocks "+
+				"(parts of it are only known at run time), so it needs confirmation", render(argv), r.id)
+			asks = append(asks, Verdict{Decision: Ask, Rule: r.id, Reason: reason})
 		}
 	}
 	b := c.bind(env)
@@ -294,7 +297,9 @@ func (c *Compiled) evalShell(a Action) Verdict {
 		return deny(RuleDenyInterpreters, fmt.Sprintf("the command runs inline code (%s), which this policy blocks (denyInterpreters); do not attempt to run the code another way", what))
 	}
 	for _, what := range an.Hidden {
-		asks = append(asks, Verdict{Decision: Ask, Rule: RuleHiddenCode, Reason: fmt.Sprintf("the command evaluates %s, so the value it reads is only known at run time and may run commands; it needs confirmation", what)})
+		reason := fmt.Sprintf("the command evaluates %s, so the value it reads is only known at run time and may run commands; "+
+			"it needs confirmation", what)
+		asks = append(asks, Verdict{Decision: Ask, Rule: RuleHiddenCode, Reason: reason})
 	}
 	cmdsListed := c.allowListed(c.policy.Spec.Commands.Rules)
 	if cmdsListed {
@@ -325,16 +330,16 @@ func (c *Compiled) evalShell(a Action) Verdict {
 }
 
 // anywhereDeny checks a relative path in an unknown directory against the
-// deny rules anchored anywhere (**/...)
-// Whatever the directory is, the path's tail decides whether they match
+// deny rules anchored anywhere (**/...).
+// Whatever the directory is, the path's tail decides whether they match.
 func (b *boundRules) anywhereDeny(ref shell.FileRef) (Verdict, bool) {
 	if ref.Rel == "" {
 		return Verdict{}, false
 	}
 	// Only the components after the last ".." are certain
 	segs := strings.Split(path.Clean(ref.Rel), "/")
-	for i := len(segs) - 1; i >= 0; i-- {
-		if segs[i] == ".." {
+	for i, seg := range slices.Backward(segs) {
+		if seg == ".." {
 			segs = segs[i+1:]
 			break
 		}
@@ -364,9 +369,9 @@ func (b *boundRules) anywhereDeny(ref shell.FileRef) (Verdict, bool) {
 	return Verdict{}, false
 }
 
-// possibleFile is the verdict for a path only known at run time
+// possibleFile is the verdict for a path only known at run time.
 // It could be any file, so any deny or ask rule might match. The verdict
-// names the first rule that could, but the reason doesn't blame it alone
+// names the first rule that could, but the reason doesn't blame it alone.
 func possibleFile(b *boundRules, ref shell.FileRef, persistent bool) (Verdict, bool) {
 	var rule string
 	switch {
@@ -403,7 +408,7 @@ func possibleFile(b *boundRules, ref shell.FileRef, persistent bool) (Verdict, b
 		"including files the policy protects (rule %s among them), so it needs confirmation%s", shown, rule, variableHint(shown, persistent))}, true
 }
 
-// variableHint is the end of a reason about a word shown as written
+// variableHint is the end of a reason about a word shown as written.
 func variableHint(shown string, persistent bool) string {
 	if !strings.Contains(shown, "$") {
 		return ""
@@ -417,9 +422,9 @@ func variableHint(shown string, persistent bool) string {
 		"(f=path; cmd \"$f\", not after && or ||) and nothing else on the line could change it, so writing the path itself lets it be checked"
 }
 
-// unlisted returns the first command layer that no allow rule certainly matches
+// unlisted returns the first command layer that no allow rule certainly matches.
 // A certain match of a single-command ask rule counts as allowed,
-// since ask rules name commands that may run after confirmation
+// since ask rules name commands that may run after confirmation.
 func (c *Compiled) unlisted(an *shell.Analysis) ([]shell.Elem, bool) {
 	for _, cmd := range an.Commands {
 		for i, layer := range cmd.Layers {
@@ -445,7 +450,7 @@ func (c *Compiled) unlisted(an *shell.Analysis) ([]shell.Elem, bool) {
 }
 
 // allowName returns the first allow rule that certainly matches cmd by one
-// of its names (the first layer and its Aliases), or ""
+// of its names (the first layer and its Aliases), or "".
 func (c *Compiled) allowName(cmd shell.Command) string {
 	for _, layer := range cmd.Layers[:min(cmd.Aliases+1, len(cmd.Layers))] {
 		if id := c.allowRule(layer); id != "" {
@@ -455,7 +460,7 @@ func (c *Compiled) allowName(cmd shell.Command) string {
 	return ""
 }
 
-// allowRule returns the first allow rule that certainly matches argv, or ""
+// allowRule returns the first allow rule that certainly matches argv, or "".
 func (c *Compiled) allowRule(argv []shell.Elem) string {
 	for _, r := range c.commands.allow {
 		if matchArgv(r.pat.Stages[0], argv, false, false) == certain {
@@ -466,7 +471,7 @@ func (c *Compiled) allowRule(argv []shell.Elem) string {
 }
 
 // isUnknown reports whether layer is the shell analyzer's layer for a
-// command that could be anything, a single element that stands for any words
+// command that could be anything, a single element that stands for any words.
 func isUnknown(layer []shell.Elem) bool {
 	return len(layer) == 1 && layer[0].Kind == shell.Many && !layer[0].Glob && layer[0].Text == "*"
 }

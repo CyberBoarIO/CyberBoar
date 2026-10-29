@@ -14,7 +14,7 @@ import (
 // backticks or backslashes is read again as PowerShell and as bash, so the
 // words in code passed to pwsh -Command, bash -c and friends are returned
 // too. A command line that doesn't parse returns nothing, and is denied
-// elsewhere. The limits are Literals'
+// elsewhere. The limits are Literals'.
 func PowerShellLiterals(src string) (words []string, args string, err error) {
 	l := literals{vars: map[string]string{}}
 	l.readPS(src, 0)
@@ -74,7 +74,7 @@ func (l *literals) readPS(src string, depth int) {
 }
 
 // psFormatText is an expandable string's text without its expansions: its
-// format with each {N} left out and {{ and }} read as braces
+// format with each {N} left out and {{ and }} read as braces.
 func psFormatText(format string) string {
 	var b strings.Builder
 	for i := 0; i < len(format); i++ {

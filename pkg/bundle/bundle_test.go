@@ -185,7 +185,7 @@ func TestOversizedPolicy(t *testing.T) {
 }
 
 // A signature is held to the policy's rule: a link out of the directory is
-// never read, and the policy isn't served
+// never read, and the policy isn't served.
 func TestSignatureSymlinks(t *testing.T) {
 	dir := t.TempDir()
 	outside := filepath.Join(t.TempDir(), "secret.txt")

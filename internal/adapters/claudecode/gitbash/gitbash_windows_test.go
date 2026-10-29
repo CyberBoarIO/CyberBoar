@@ -11,7 +11,7 @@ import (
 	"cyberboar.dev/cyberboar/internal/adapters/claudecode/gitbash"
 )
 
-// The real Git for Windows: its mount table must read, with the root and /tmp known
+// The real Git for Windows: its mount table must read, with the root and /tmp known.
 func TestRealGitForWindows(t *testing.T) {
 	if _, err := exec.LookPath("git.exe"); err != nil {
 		t.Skip("no git.exe on PATH")

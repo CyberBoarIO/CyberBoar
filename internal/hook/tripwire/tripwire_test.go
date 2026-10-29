@@ -46,7 +46,7 @@ func TestLocksAtLimit(t *testing.T) {
 
 func TestWindow(t *testing.T) {
 	s, c := newStore(t)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		st, err := s.Record("codex", "s", "commands.deny[0]", 3, 10*time.Minute)
 		if err != nil {
 			t.Fatal(err)
@@ -67,7 +67,7 @@ func TestWindow(t *testing.T) {
 func TestWholeSessionByDefault(t *testing.T) {
 	s, c := newStore(t)
 	var st State
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		st, _ = s.Record("a", "s", "files.deny[0]", 3, 0)
 		c.advance(24 * time.Hour)
 	}
@@ -98,14 +98,12 @@ func TestStaysLockedAndUnlock(t *testing.T) {
 func TestConcurrentDenialsAllCount(t *testing.T) {
 	s, _ := newStore(t)
 	var wg sync.WaitGroup
-	for i := 0; i < 20; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 20 {
+		wg.Go(func() {
 			if _, err := s.Record("a", "s", "r", 100, 0); err != nil {
 				t.Error(err)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	if st, _ := s.Check("a", "s"); len(st.Denials) != 20 {
@@ -161,7 +159,7 @@ func TestBrokenStateIsAnError(t *testing.T) {
 	}
 }
 
-// Recording a shorter state leaves no trace of the longer one before it
+// Recording a shorter state leaves no trace of the longer one before it.
 func TestWriteReplacesLongerState(t *testing.T) {
 	s, c := newStore(t)
 	for range 3 {
@@ -181,7 +179,7 @@ func TestWriteReplacesLongerState(t *testing.T) {
 
 // A state file larger than maxState is refused even when it holds valid
 // JSON, and recording a denial leaves it as it is, so the session stays
-// refused. A file of exactly maxState bytes is read
+// refused. A file of exactly maxState bytes is read.
 func TestStateSizeLimit(t *testing.T) {
 	s, _ := newStore(t)
 	if _, err := s.Record("a", "s", "r", 3, 0); err != nil {

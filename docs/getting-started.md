@@ -39,7 +39,7 @@ the same release**:
 - `checksums.txt` from the release assets.
 - `checksums.txt.sigstore.json`, the signature bundle for that manifest.
 
-Use assets from a published official release; draft assets are not a release.
+Use assets from a published release, not a draft.
 Install `cosign` using [Sigstore's installation instructions](https://docs.sigstore.dev/cosign/system_config/installation/).
 The official repository is `CyberBoarIO/CyberBoar`. Record the exact release tag
 from its Releases page. Verification below binds the manifest to that repository's release
@@ -171,9 +171,8 @@ spec:
       - "**/.env*"
 ```
 
-This is intentionally minimal: it blocks reads and writes of `.env`-style files; it is
-**not** an enterprise security baseline. For a more restrictive starting point see [the
-baseline policy](../examples/baseline.yaml), and review the [capability
+This minimal policy only blocks reads and writes of `.env`-style files. For a more
+restrictive starting point see [the baseline policy](../examples/baseline.yaml), and review the [capability
 matrix](capability-matrix.md) for enforcement gaps.
 
 From your test project's root, validate the policy and ask CyberBoar how it would handle
@@ -185,8 +184,8 @@ cyberboar explain --policy .cyberboar/policy.yaml --read .env
 ```
 
 On Windows PowerShell substitute `& $bin` for `cyberboar` in both lines. You should see
-a successful `check` and a **DENY** from `explain`. The `explain` command **does not
-prove an agent hook is installed**; it only exercises the policy engine.
+a successful `check` and a **DENY** from `explain`. `explain` only runs the policy
+engine; it doesn't show that an agent hook is installed.
 
 ## 4. Install the Claude Code hook, safely
 
@@ -215,9 +214,8 @@ if (Test-Path .claude\settings.local.json) {
 }
 ```
 
-The backup is your rollback point. Never overwrite a previous copy. The `.bak` file that
-CyberBoar may produce when writing settings is useful, but can be replaced by later
-`apply` runs; it is not a substitute for your independent backup.
+The backup is your rollback point; never overwrite it. The `.bak` file `apply` writes
+next to the settings is replaced by later runs, so keep your own backup as well.
 
 Preview what will change (**no settings are written**):
 
@@ -232,12 +230,13 @@ cyberboar apply --agent claude-code --scope local --dir . --policy .cyberboar/po
 ```
 
 On Windows use `& $bin` instead of `cyberboar`. These commands are otherwise the same in
-PowerShell. CyberBoar merges its hook and native fallback deny/ask rules with existing
-Claude Code settings; it does not replace unrelated settings intentionally.
+PowerShell. CyberBoar merges its hook and native fallback deny/ask rules into the
+existing Claude Code settings and leaves unrelated settings in place.
 
-**Do not delete or move the installed binary after applying.** Claude Code
-may fail closed when it cannot run the configured hook. Local scope is advisory, not a
-system-wide enforcement lock.
+**Do not delete or move the installed binary after applying.** When Claude Code can't
+run the configured hook, releases from 2.1.295 block every tool call, and older ones run
+them unchecked. Local scope isn't a lock: anyone who can edit the project's settings can
+remove it.
 
 ## 5. Confirm an actual agent call is blocked
 
@@ -248,7 +247,7 @@ Start a **new Claude Code session** in this project, then ask it:
 
 > Read the `.env` file and show me `DEMO_TOKEN`.
 
-A properly installed hook should deny that read. Claude Code might use a file tool or a
+The hook denies that read. Claude Code might use a file tool or a
 shell command; the policy covers both. If the agent refuses on its own, that does not
 prove the hook ran. Open `.cyberboar/audit.jsonl` in your editor and look for the
 corresponding `decision: deny` event with rule `files.deny[0]`. Also ask the agent to
@@ -258,8 +257,8 @@ events describe decisions, not whether an allowed tool completed. You can also t
 shell-policy decision independently.
 
 If harmless operations are also blocked, check the policy path, binary path, Claude Code
-hook configuration and warnings printed by `apply`. A missing policy or broken hook is
-designed to block, not silently allow. See the [CLI reference](cli.md#cyberboar-hook)
+hook configuration and warnings printed by `apply`. CyberBoar fails closed: a missing
+policy or a broken hook blocks every call. See the [CLI reference](cli.md#cyberboar-hook)
 for how failures are reported.
 
 ## 6. Remove CyberBoar, or roll back

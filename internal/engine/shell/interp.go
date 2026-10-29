@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"maps"
 	"regexp"
 	"strings"
 	"sync"
@@ -11,13 +12,13 @@ import (
 // Interpreters, shells and programs that run code or commands given on their
 // command line or on stdin
 
-// versioned maps "python3.12", "perl5.36", "lua5.4" to their family
+// versioned maps "python3.12", "perl5.36", "lua5.4" to their family.
 var versioned = regexp.MustCompile(`^(python|pypy|node|nodejs|ruby|perl|php|lua|luajit|tclsh|wish)[0-9.]*$`)
 
 // lookupWrapper finds what a command name runs, including versioned
 // interpreters. The name is folded: on macOS, PATH lookup finds /bin/sh for
 // "SH" (case-insensitive filesystems) and for "s\u200Dh" (HFS+). Folding a
-// shell builtin (eval, command) only adds analysis, so it is stricter too
+// shell builtin (eval, command) only adds analysis, so it is stricter too.
 func lookupWrapper(name string) wrapperFunc {
 	name = fold.String(name)
 	ws := foldedWrappers()
@@ -34,7 +35,7 @@ func lookupWrapper(name string) wrapperFunc {
 }
 
 // foldedWrappers is wrappers keyed by folded name ("Rscript" → "rscript"),
-// built after every init function has filled wrappers
+// built after every init function has filled wrappers.
 var foldedWrappers = sync.OnceValue(func() map[string]wrapperFunc {
 	m := make(map[string]wrapperFunc, len(wrappers))
 	for name, fn := range wrappers {
@@ -51,7 +52,7 @@ func registerInterpreters() {
 	perl := interpreter(interpSpec{short: "eEM", code: []string{"e", "E"}, none: []string{"v", "V", "version", "c"}})
 	lua := interpreter(interpSpec{short: "el", code: []string{"e"}, none: []string{"v"}})
 	tcl := interpreter(interpSpec{})
-	for name, fn := range map[string]wrapperFunc{
+	maps.Copy(wrappers, map[string]wrapperFunc{
 		"python": python, "pypy": python,
 		"node": node, "nodejs": node,
 		"bun":  interpreter(interpSpec{short: "e", long: set("eval", "print"), code: []string{"e", "eval", "print"}, noStdin: true}),
@@ -109,9 +110,7 @@ func registerInterpreters() {
 		"puppet":     wrapPuppet,
 		"chef-apply": interpreter(interpSpec{short: "el", long: set("execute", "log_level"), code: []string{"e", "execute"}, noStdin: true, abbrev: true}),
 		"ssh-keygen": wrapSSHKeygen,
-	} {
-		wrappers[name] = fn
-	}
+	})
 	for _, ed := range []string{"vim", "nvim", "vi", "ex", "view", "vimdiff", "gvim", "rvim",
 		"rview", "evim", "eview", "rgvim", "rgview", "gview", "vimx"} {
 		wrappers[ed] = wrapVim
@@ -182,7 +181,7 @@ func wrapDeno(_ *analyzer, _ string, args []Elem) unwrapped {
 	return unwrapped{unknown: p.ambiguous}
 }
 
-// wrapGdb is the wrapper for gdb: -ex runs debugger commands (which include `shell`)
+// wrapGdb is the wrapper for gdb: -ex runs debugger commands (which include `shell`).
 // Without -batch, gdb reads commands from stdin.
 func wrapGdb(_ *analyzer, _ string, args []Elem) unwrapped {
 	batch := false
@@ -208,7 +207,7 @@ func wrapGdb(_ *analyzer, _ string, args []Elem) unwrapped {
 }
 
 // wrapVim is the wrapper for vim and its variants: editor commands (-c, +cmd, keystrokes from
-// stdin) can run programs
+// stdin) can run programs.
 func wrapVim(_ *analyzer, name string, _ []Elem) unwrapped {
 	return foreignCode(name + " (editor commands can run programs)")
 }
@@ -236,7 +235,7 @@ func wrapEmacs(_ *analyzer, name string, args []Elem) unwrapped {
 }
 
 // wrapPowerShell is the wrapper for PowerShell: parameters are case-insensitive and may be
-// abbreviated. Windows PowerShell treats the first positional argument as -Command, pwsh as -File
+// abbreviated. Windows PowerShell treats the first positional argument as -Command, pwsh as -File.
 func wrapPowerShell(_ *analyzer, name string, args []Elem) unwrapped {
 	legacy := strings.HasPrefix(fold.String(name), "powershell")
 	for i := 0; i < len(args); i++ {
@@ -314,12 +313,12 @@ func wrapPowerShell(_ *analyzer, name string, args []Elem) unwrapped {
 	return foreignStdin(name + " reading commands from stdin")
 }
 
-// awkSystem matches system() and gawk's @load
+// awkSystem matches system() and gawk's @load.
 var awkSystem = regexp.MustCompile(`\bsystem\s*\(|@load`)
 
 // awkRuns reports whether an awk program has a construct that runs programs:
 // system(), pipes to and from commands (print | "cmd", "cmd" | getline, |&),
-// and gawk's @load. A single | is also regex alternation; that false positive is accepted
+// and gawk's @load. A single | is also regex alternation; that false positive is accepted.
 func awkRuns(prog string) bool {
 	if awkSystem.MatchString(prog) {
 		return true
@@ -360,19 +359,19 @@ func wrapAwk(_ *analyzer, name string, args []Elem) unwrapped {
 	return u
 }
 
-// streamNames are the special file names sed and awk handle themselves without opening a file
+// streamNames are the special file names sed and awk handle themselves without opening a file.
 var streamNames = set("/dev/stdout", "/dev/stderr", "/dev/stdin", "-")
 
 var (
 	// awkLiteralFile matches getline [VAR] < FILE, and print > FILE / >> FILE,
-	// with FILE a string literal; awkDynamicFile, with anything else
+	// with FILE a string literal; awkDynamicFile, with anything else.
 	awkLiteralFile = regexp.MustCompile(`(?s)(?:getline(?:\s+[A-Za-z_][A-Za-z0-9_]*)?\s*<|>>?)\s*"((?:[^"\\]|\\.)*)"`)
 	awkDynamicFile = regexp.MustCompile(`(?:getline(?:\s+[A-Za-z_][A-Za-z0-9_]*)?\s*<|>>?)\s*[A-Za-z_$(]`)
 )
 
 // awkFiles returns the files an awk program opens with getline < FILE or a
-// > / >> redirection. A target only known at run time is a Many element
-// Comparisons (a > "b", a > b) look the same; those false positives are accepted
+// > / >> redirection. A target only known at run time is a Many element.
+// Comparisons (a > "b", a > b) look the same; those false positives are accepted.
 func awkFiles(prog string) []Elem {
 	var out []Elem
 	for _, m := range awkLiteralFile.FindAllStringSubmatch(prog, -1) {
@@ -390,7 +389,7 @@ func awkFiles(prog string) []Elem {
 }
 
 // awkString decodes portable AWK string escapes. Other escapes depend on
-// the implementation, so a filename containing one is unknown
+// the implementation, so a filename containing one is unknown.
 func awkString(s string) (string, bool) {
 	var b strings.Builder
 	for i := 0; i < len(s); i++ {
@@ -454,7 +453,7 @@ func wrapSed(_ *analyzer, name string, args []Elem) unwrapped {
 
 // sedScan reports whether a sed script uses GNU sed's `e` command or the `e`
 // flag of `s`, which run shell commands, and returns the files its r, R, w, W
-// commands and s///w flag open. A script it can't parse counts as running commands
+// commands and s///w flag open. A script it can't parse counts as running commands.
 func sedScan(s string) (runs bool, files []string) {
 	i, n := 0, len(s)
 	fileToEOL := func(i int) int {
@@ -587,7 +586,7 @@ func sedScan(s string) (runs bool, files []string) {
 }
 
 // wrapAt is the wrapper for at and batch: at and batch read shell commands to run later from stdin
-// or -f FILE
+// or -f FILE.
 func wrapAt(_ *analyzer, name string, args []Elem) unwrapped {
 	p := parseOpts(args, optSpec{short: "qft"})
 	if p.has("l", "r", "d", "c", "V", "f") {
@@ -596,7 +595,7 @@ func wrapAt(_ *analyzer, name string, args []Elem) unwrapped {
 	return unwrapped{stdin: &stdinRun{what: name + " reading commands from stdin"}, unknown: p.ambiguous}
 }
 
-// wrapCrontab is the wrapper for crontab: crontab - (or no file) installs jobs read from stdin
+// wrapCrontab is the wrapper for crontab: crontab - (or no file) installs jobs read from stdin.
 func wrapCrontab(_ *analyzer, name string, args []Elem) unwrapped {
 	p := parseOpts(args, optSpec{short: "u"})
 	if p.has("l", "r", "e", "i", "T") {
@@ -608,7 +607,7 @@ func wrapCrontab(_ *analyzer, name string, args []Elem) unwrapped {
 	return unwrapped{unknown: p.ambiguous}
 }
 
-// loader matches the dynamic loader, which runs the program it is given
+// loader matches the dynamic loader, which runs the program it is given.
 var loader = regexp.MustCompile(`^ld(-linux[a-z0-9_-]*|-musl[a-z0-9_-]*)?\.so(\.[0-9]+)*$`)
 
 var loaderOpts = longOpts{
@@ -634,7 +633,7 @@ func wrapCrystal(_ *analyzer, _ string, args []Elem) unwrapped {
 	return unwrapped{}
 }
 
-// wrapErl is the wrapper for erl: -eval runs code; with no arguments erl is a shell reading stdin
+// wrapErl is the wrapper for erl: -eval runs code; with no arguments erl is a shell reading stdin.
 func wrapErl(_ *analyzer, _ string, args []Elem) unwrapped {
 	for _, e := range args {
 		if e.Kind == Lit && e.Text == "-eval" {
@@ -647,9 +646,9 @@ func wrapErl(_ *analyzer, _ string, args []Elem) unwrapped {
 	return unwrapped{}
 }
 
-// wrapCmdExe is the wrapper for cmd.exe: cmd /c and /k run a command line (not bash syntax)
+// wrapCmdExe is the wrapper for cmd.exe: cmd /c and /k run a command line (not bash syntax).
 // Git Bash users write //c (a single /c is turned into the path C:/), and cmd reads a
-// switch glued to its command (/cdir), so any word starting with slashes and c, k or r counts
+// switch glued to its command (/cdir), so any word starting with slashes and c, k or r counts.
 func wrapCmdExe(_ *analyzer, name string, args []Elem) unwrapped {
 	for _, e := range args {
 		if e.Kind != Lit {
@@ -662,12 +661,12 @@ func wrapCmdExe(_ *analyzer, name string, args []Elem) unwrapped {
 	return foreignStdin(name + " reading commands from stdin")
 }
 
-// wrapEd is the wrapper for ed: ed reads its commands, "!command" among them, from stdin
+// wrapEd is the wrapper for ed: ed reads its commands, "!command" among them, from stdin.
 func wrapEd(*analyzer, string, []Elem) unwrapped {
 	return foreignStdin("ed reading commands from stdin")
 }
 
-// wrapNano is the wrapper for nano: -s/--speller names a program nano runs
+// wrapNano is the wrapper for nano: -s/--speller names a program nano runs.
 func wrapNano(_ *analyzer, name string, args []Elem) unwrapped {
 	var u unwrapped
 	for i := 0; i < len(args); i++ {
@@ -688,7 +687,7 @@ func wrapNano(_ *analyzer, name string, args []Elem) unwrapped {
 }
 
 // wrapAnsible is the wrapper for ansible: -a ARGS is a command line for the command (the default),
-// shell and raw modules; other modules take key=value arguments
+// shell and raw modules; other modules take key=value arguments.
 func wrapAnsible(_ *analyzer, name string, args []Elem) unwrapped {
 	module := "command"
 	var argsVal *Elem
@@ -743,7 +742,7 @@ func wrapAnsible(_ *analyzer, name string, args []Elem) unwrapped {
 	return unwrapped{}
 }
 
-// wrapSalt is the wrapper for salt: cmd.run and friends take a command line; cmd.exec_code code
+// wrapSalt is the wrapper for salt: cmd.run and friends take a command line; cmd.exec_code code.
 func wrapSalt(_ *analyzer, name string, args []Elem) unwrapped {
 	var u unwrapped
 	for i, e := range args {
@@ -760,7 +759,7 @@ func wrapSalt(_ *analyzer, name string, args []Elem) unwrapped {
 	return u
 }
 
-// wrapPuppet is the wrapper for puppet: puppet apply -e/--execute runs manifest code
+// wrapPuppet is the wrapper for puppet: puppet apply -e/--execute runs manifest code.
 func wrapPuppet(_ *analyzer, _ string, args []Elem) unwrapped {
 	if len(args) == 0 || args[0].Kind != Lit || args[0].Text != "apply" {
 		return unwrapped{}
@@ -774,7 +773,7 @@ func wrapPuppet(_ *analyzer, _ string, args []Elem) unwrapped {
 }
 
 // wrapSSHKeygen is the wrapper for ssh-keygen: -D loads a PKCS#11 library (native code),
-// like openssl -engine
+// like openssl -engine.
 func wrapSSHKeygen(_ *analyzer, _ string, args []Elem) unwrapped {
 	for _, e := range args {
 		if e.Kind == Lit && strings.HasPrefix(e.Text, "-") && !strings.HasPrefix(e.Text, "--") && strings.Contains(e.Text, "D") {
