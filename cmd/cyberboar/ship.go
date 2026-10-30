@@ -93,7 +93,7 @@ func runShip(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stder
 			fmt.Fprintf(stderr, "ship: %v (events stay in the audit log)\n", err)
 			return err
 		}
-		if _, err := renewIfDue(ctx, ep, client, stderr, "ship"); err != nil {
+		if err := renewIfDue(ctx, ep, client, stderr, "ship"); err != nil {
 			fmt.Fprintf(stderr, "ship: %v (events stay in the audit log)\n", err)
 			return err
 		}

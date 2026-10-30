@@ -15,8 +15,8 @@ import (
 // unclassified reports whether Actions blocks tool as unclassified.
 func unclassified(tool string) bool {
 	_, err := claudecode.Actions(&claudecode.Input{ToolName: tool, Cwd: "/work", ToolInput: json.RawMessage(`{}`)}, claudecode.Env{})
-	var e *adapters.Error
-	return errors.As(err, &e) && e.Rule == adapters.RuleUnclassifiedTool
+	e, ok := errors.AsType[*adapters.Error](err)
+	return ok && e.Rule == adapters.RuleUnclassifiedTool
 }
 
 // Every tool in a captured Claude Code tool list must be classified, so an

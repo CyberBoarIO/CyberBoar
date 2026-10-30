@@ -60,8 +60,8 @@ var englishPrinter = message.NewPrinter(language.English)
 
 // schemaError reduces a validation error tree to its first leaf, deterministically.
 func schemaError(err error) *Error {
-	var ve *jsonschema.ValidationError
-	if !errors.As(err, &ve) {
+	ve, ok := errors.AsType[*jsonschema.ValidationError](err)
+	if !ok {
 		return newError(CodeSchema, "", "%v", err)
 	}
 	var leaves []*jsonschema.ValidationError

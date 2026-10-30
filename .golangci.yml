@@ -2,8 +2,12 @@ version: "2"
 
 linters:
   default: standard
-  enable: [gosec, bodyclose, bidichk, nolintlint, depguard, godot, modernize]
+  enable: [gosec, bodyclose, bidichk, nolintlint, depguard, godot, modernize, unconvert, usetesting, forbidigo]
   settings:
+    forbidigo:
+      forbid:
+        - pattern: '^errors\.As$'
+          msg: "use errors.AsType, which needs no target variable"
     modernize:
       # a strings.Builder only pays off in long loops, and += reads better in short ones
       disable: [stringsbuilder]

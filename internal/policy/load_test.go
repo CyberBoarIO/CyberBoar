@@ -13,8 +13,7 @@ import (
 func TestTooLarge(t *testing.T) {
 	data := []byte("# " + strings.Repeat("x", MaxSize))
 	_, err := Load(data)
-	var perr *Error
-	if !errors.As(err, &perr) || perr.Code != CodeTooLarge {
+	if perr, ok := errors.AsType[*Error](err); !ok || perr.Code != CodeTooLarge {
 		t.Fatalf("want %s, got %v", CodeTooLarge, err)
 	}
 }
@@ -102,8 +101,7 @@ func TestSessionSettings(t *testing.T) {
 // An unsupported API version error names the supported version.
 func TestUnsupportedAPIVersionNamesSupportedVersion(t *testing.T) {
 	_, err := Load([]byte("apiVersion: " + brand.APIGroup + "/v2\nkind: Policy\nmetadata: {name: x}\nspec: {}\n"))
-	var perr *Error
-	if !errors.As(err, &perr) || perr.Code != CodeAPIVersion || !strings.Contains(err.Error(), brand.APIVersion) {
+	if perr, ok := errors.AsType[*Error](err); !ok || perr.Code != CodeAPIVersion || !strings.Contains(err.Error(), brand.APIVersion) {
 		t.Fatalf("want an apiVersion error naming %s, got %v", brand.APIVersion, err)
 	}
 }
@@ -121,8 +119,7 @@ func TestTooDeep(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := Load([]byte(head + body))
-			var perr *Error
-			if !errors.As(err, &perr) || perr.Code != CodeTooDeep {
+			if perr, ok := errors.AsType[*Error](err); !ok || perr.Code != CodeTooDeep {
 				t.Fatalf("want %s, got %.200v", CodeTooDeep, err)
 			}
 		})
@@ -138,8 +135,7 @@ func TestNotTooDeep(t *testing.T) {
 	head := "apiVersion: " + brand.APIVersion + "\nkind: Policy\nmetadata: {name: x}\n"
 	n := MaxDepth - 4
 	_, err := Load([]byte(head + comments.String() + "spec: {audit: {sink: " + strings.Repeat("[", n) + strings.Repeat("]", n) + "}}\n"))
-	var perr *Error
-	if !errors.As(err, &perr) || perr.Code != CodeSchema {
+	if perr, ok := errors.AsType[*Error](err); !ok || perr.Code != CodeSchema {
 		t.Fatalf("want %s, got %v", CodeSchema, err)
 	}
 }
@@ -153,8 +149,7 @@ func TestSchemaErrorOrder(t *testing.T) {
 	deny[2], deny[10] = `""`, `""`
 	_, err := Load([]byte("apiVersion: " + brand.APIVersion + "\nkind: Policy\nmetadata: {name: x}\n" +
 		"spec: {files: {deny: [" + strings.Join(deny, ", ") + "]}}\n"))
-	var perr *Error
-	if !errors.As(err, &perr) || perr.Path != "spec.files.deny[2]" {
+	if perr, ok := errors.AsType[*Error](err); !ok || perr.Path != "spec.files.deny[2]" {
 		t.Fatalf("want an error at spec.files.deny[2], got %v", err)
 	}
 }

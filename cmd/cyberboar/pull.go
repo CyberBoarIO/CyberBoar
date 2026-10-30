@@ -80,7 +80,7 @@ func runPull(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stder
 	loadInterval()
 	once := func(ctx context.Context) bool {
 		if ep != nil {
-			if _, err := renewIfDue(ctx, ep, client, stderr, "pull"); err != nil {
+			if err := renewIfDue(ctx, ep, client, stderr, "pull"); err != nil {
 				fail(err)
 				return false
 			}

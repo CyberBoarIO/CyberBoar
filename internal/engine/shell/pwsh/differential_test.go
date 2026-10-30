@@ -312,9 +312,9 @@ func compareResults(t *testing.T, inputs []string, results []pwshResult, label s
 	var same, refused, overLimit, bothRejected, overAccepted int
 	for i, in := range inputs {
 		sb, err := Parse(in)
-		var pe *Error
+		pe, isPE := errors.AsType[*Error](err)
 		switch {
-		case err != nil && !errors.As(err, &pe):
+		case err != nil && !isPE:
 			t.Errorf("%q: error of type %T: %v", in, err, err)
 		case !results[i].OK && err != nil:
 			bothRejected++

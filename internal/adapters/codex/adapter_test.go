@@ -73,8 +73,7 @@ func TestTranscriptCallArrivesLate(t *testing.T) {
 			call, err := lookupExecCall(in, "ls")
 			<-written
 			if !tc.found {
-				var ae *adapters.Error
-				if !errors.As(err, &ae) || ae.Rule != RuleCallNotFound {
+				if ae, ok := errors.AsType[*adapters.Error](err); !ok || ae.Rule != RuleCallNotFound {
 					t.Errorf("%s: call %+v, err %v; want %s", tc.name, call, err, RuleCallNotFound)
 				}
 				return
@@ -113,8 +112,7 @@ func TestTranscriptArgumentKeys(t *testing.T) {
 			"type": "function_call", "name": "exec_command", "arguments": args, "call_id": "c1"}})
 		os.WriteFile(path, append(line, '\n'), 0o600)
 		call, err := lookupExecCall(&Input{ToolUseID: "c1", TranscriptPath: &path}, "ls")
-		var ae *adapters.Error
-		if !errors.As(err, &ae) || ae.Rule != RuleCallNotFound {
+		if ae, ok := errors.AsType[*adapters.Error](err); !ok || ae.Rule != RuleCallNotFound {
 			t.Errorf("%s: call %+v, err %v; want %s", name, call, err, RuleCallNotFound)
 		}
 	}

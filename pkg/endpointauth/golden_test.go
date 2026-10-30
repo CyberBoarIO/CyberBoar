@@ -433,8 +433,7 @@ func TestGoldenRequests(t *testing.T) {
 			continue
 		}
 		want, _, _ := strings.Cut(strings.TrimPrefix(name, "reject-"), "-")
-		var e *Error
-		if !errors.As(err, &e) || e.Code != want {
+		if e, ok := errors.AsType[*Error](err); !ok || e.Code != want {
 			t.Errorf("%s: got %v, want code %q", name, err, want)
 		}
 	}

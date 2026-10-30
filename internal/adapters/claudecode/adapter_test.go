@@ -163,8 +163,11 @@ func TestPowerShellTool(t *testing.T) {
 	input := []byte(`{"hook_event_name":"PreToolUse","tool_name":"PowerShell","cwd":"/work/repo","tool_input":{"command":"Get-ChildItem"}}`)
 	for _, goos := range []string{"linux", "darwin"} {
 		call, err := parse(input, func(string) string { return "" }, goos, noGit)
-		var ae *adapters.Error
-		if err != nil || !errors.As(call.Err, &ae) || ae.Rule != adapters.RulePowerShell || !strings.Contains(ae.Msg, "Bash tool") || call.Notice == "" {
+		if err != nil {
+			t.Fatalf("%s: %v", goos, err)
+		}
+		ae, ok := errors.AsType[*adapters.Error](call.Err)
+		if !ok || ae.Rule != adapters.RulePowerShell || !strings.Contains(ae.Msg, "Bash tool") || call.Notice == "" {
 			t.Errorf("%s: call %+v, err %v", goos, call, err)
 		}
 	}

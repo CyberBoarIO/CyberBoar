@@ -20,8 +20,7 @@ func FuzzParsePowerShell(f *testing.F) {
 	f.Fuzz(func(t *testing.T, in string) {
 		sb, err := Parse(in)
 		if err != nil {
-			var pe *Error
-			if !errors.As(err, &pe) || !(errors.Is(err, limits.ErrUnparseable) || errors.Is(err, limits.ErrTooLarge) || errors.Is(err, limits.ErrTooComplex)) {
+			if _, ok := errors.AsType[*Error](err); !ok || !(errors.Is(err, limits.ErrUnparseable) || errors.Is(err, limits.ErrTooLarge) || errors.Is(err, limits.ErrTooComplex)) {
 				t.Fatalf("%q: error %T %v", in, err, err)
 			}
 			return

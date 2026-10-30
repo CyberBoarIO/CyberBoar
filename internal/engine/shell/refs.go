@@ -703,7 +703,7 @@ func (a *analyzer) expandGlob(pattern string, d dir, o globOpts) (matches []stri
 // ranges depend on the locale.
 func (a *analyzer) globMatcher(seg string, nocase bool) func(string) (bool, error) {
 	if a.powershell {
-		seg = strings.Replace(seg, "[!", "[^", -1)
+		seg = strings.ReplaceAll(seg, "[!", "[^")
 		if nocase {
 			seg = strings.ToLower(seg)
 		}

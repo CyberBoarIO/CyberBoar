@@ -330,9 +330,9 @@ func evaluate(ctx context.Context, stdin io.Reader, o Options, ev *audit.Event, 
 	compiled, name, hash, h, sigErr := loadPolicy(loaded)
 	*header = h
 	ev.PolicyName, ev.PolicyHash = name, hash
-	var expired *expiredError
+	expired, isExpired := errors.AsType[*expiredError](sigErr)
 	switch {
-	case errors.As(sigErr, &expired):
+	case isExpired:
 		return expiredVerdict(expired)
 	case sigErr != nil:
 		return deny(RuleSignature, fmt.Sprintf("the policy's signature can't be verified (%v), so every tool call is blocked", sigErr))
@@ -543,9 +543,9 @@ func Brief(o Options) []byte {
 		return out(UnsupportedReason(o.GOOS, o.Adapter.Name()) + ".\nTell the user before doing anything else.\n")
 	}
 	compiled, _, _, _, sigErr := loadPolicy(o)
-	var expired *expiredError
+	expired, isExpired := errors.AsType[*expiredError](sigErr)
 	switch {
-	case errors.As(sigErr, &expired):
+	case isExpired:
 		return out(briefing.NoPolicy(fmt.Sprintf("it expired at %s", expired.h.Expires.Format(sign.TimeFormat))))
 	case sigErr != nil:
 		return out(briefing.NoPolicy("its signature can't be verified"))

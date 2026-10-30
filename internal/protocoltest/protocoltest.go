@@ -625,8 +625,8 @@ func (c *Console) answer(w http.ResponseWriter, q *endpointauth.Request, status 
 
 // fail writes an error answer in the protocol's form.
 func (c *Console) fail(w http.ResponseWriter, err error) {
-	var e *endpointauth.Error
-	if !errors.As(err, &e) {
+	e, ok := errors.AsType[*endpointauth.Error](err)
+	if !ok {
 		e = &endpointauth.Error{Status: http.StatusInternalServerError, Code: "internal", Message: err.Error()}
 	}
 	c.mu.Lock()

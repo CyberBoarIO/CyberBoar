@@ -66,8 +66,7 @@ type Source struct {
 	Name         string // metadata.name, when the policy loaded
 	PolicySHA256 string // of the file's bytes
 	Data         []byte
-	Policy       *policy.Policy // nil when Err is set
-	Sig          string         // POLICY.sig contents, if any
+	Sig          string // POLICY.sig contents, if any
 	// Header is the signature's serial and expiry. It is verified when
 	// LoadDir had a key and read unchecked otherwise. It is zero when Sig
 	// isn't a signature file.
@@ -245,7 +244,7 @@ func loadFile(path string) Source {
 		s.Err = err
 		return s
 	}
-	s.Name, s.Policy = p.Metadata.Name, p
+	s.Name = p.Metadata.Name
 	return s
 }
 

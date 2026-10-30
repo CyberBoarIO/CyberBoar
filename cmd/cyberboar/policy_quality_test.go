@@ -38,6 +38,7 @@ func TestPolicyRegressionCommand(t *testing.T) {
 		"tests:\n  - name: x\n    action: {command: ls}\n    expect: allow\n    unexpected: true\n",
 		"tests:\n  - name: x\n    action: {command: ls, shell: fish}\n    expect: allow\n",
 		"tests:\n  - name: x\n    action: {read: a, shell: powershell}\n    expect: allow\n",
+		"tests:\n  - name: x\n    action: {read: a, shell: bash}\n    expect: allow\n",
 	} {
 		if err := os.WriteFile(tmp, []byte(src), 0o600); err != nil {
 			t.Fatal(err)
@@ -53,6 +54,14 @@ func TestPolicyRegressionCommand(t *testing.T) {
 	}
 	if code, out, _ := call(t, "", "test", "--policy", baseline, "--cases", tmp); code != 0 || !strings.Contains(out, "PASS ps") {
 		t.Errorf("PowerShell case: exit %d %q", code, out)
+	}
+	// bash may be named, as well as left out
+	sh := "tests:\n  - name: sh\n    action: {command: 'cat .env', shell: bash, cwd: /work/repo, home: /home/dev, workspace: /work/repo}\n    expect: deny\n"
+	if err := os.WriteFile(tmp, []byte(sh), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code, out, _ := call(t, "", "test", "--policy", baseline, "--cases", tmp); code != 0 || !strings.Contains(out, "PASS sh") {
+		t.Errorf("bash case: exit %d %q", code, out)
 	}
 	if code, _, _ := call(t, "", "test"); code != 2 {
 		t.Errorf("missing flags: exit %d", code)

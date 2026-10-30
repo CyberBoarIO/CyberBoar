@@ -7,6 +7,17 @@ protocol, audit schema and public Go packages under `pkg/`.
 
 ## [Unreleased]
 
+### Added
+
+- `explain --shell` and a policy test's `shell:` accept `bash`, the default, by name.
+
+### Changed
+
+- Errors from the packages under `pkg/` wrap their cause, so `errors.Is` and
+  `errors.As` reach it.
+- `bundle.Source` no longer has a `Policy` field, whose type was internal and so not
+  something the v1 compatibility promise could cover. Parse `Source.Data` instead.
+
 ### Fixed
 
 - A `cd` whose `..` leaves a symbolic link (`cd link/../other`) is followed as the

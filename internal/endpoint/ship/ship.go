@@ -271,8 +271,7 @@ func (s *shipper) send(ctx context.Context, b audit.Batch) error {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.client.Do(req)
 	if err != nil {
-		var ne net.Error
-		if errors.As(err, &ne) && ne.Timeout() {
+		if ne, ok := errors.AsType[net.Error](err); ok && ne.Timeout() {
 			return fmt.Errorf("sending to %s: timed out", s.sink)
 		}
 		return fmt.Errorf("sending to %s: %v", s.sink, err)
