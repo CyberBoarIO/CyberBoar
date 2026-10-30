@@ -98,9 +98,13 @@ func runShip(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stder
 			return err
 		}
 		res, err := ship.Once(ctx, o)
-		if res.Restarted {
-			fmt.Fprintf(stderr, "ship: %s was truncated or replaced since the last run, so it is shipped from its start. "+
-				"Any lines the old log got after the last run were not sent. Rotate the audit log only right after a ship run.\n", *auditPath)
+		switch {
+		case res.Restarted && res.OldLog != "":
+			fmt.Fprintf(stderr, "ship: %s was rotated since the last run; the rest of the old log, %s, was shipped first.\n", *auditPath, res.OldLog)
+		case res.Restarted:
+			fmt.Fprintf(stderr, "ship: %s was truncated or replaced since the last run, and the old log isn't next to it, so any lines it got "+
+				"after the last run were not sent; the console is told a log was lost. Rotate the audit log by renaming it, not by "+
+				"copying and truncating it, and keep the newest rotated file uncompressed until ship has run.\n", *auditPath)
 		}
 		if res.Sent > 0 || res.Skipped > 0 || err == nil && *every == 0 {
 			fmt.Fprintf(stdout, "shipped %d events in %d batches, skipped %d invalid lines\n", res.Sent, res.Batches, res.Skipped)

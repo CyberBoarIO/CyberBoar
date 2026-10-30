@@ -402,10 +402,11 @@ background process. Delivery is at least once; consumers must tolerate duplicate
 | `--ca FILE` | `CYBERBOAR_CA` | none | As for `enroll` |
 | `--insecure-skip-verify` | none | none | As for `enroll` |
 
-No arguments. When the audit log was truncated or replaced since the last run, `ship`
-sends the new log from its start and warns on stderr that any lines the old log got
-after the last run were not sent. Rotate the log only right after a `ship` run
-([deploy-mdm.md](deploy-mdm.md#rotate-the-audit-log)).
+No arguments. When the audit log was rotated since the last run, `ship` first sends the
+rest of the old log if it is still next to the new one (`audit.jsonl.1`), then the new
+log from its start. When the old log is gone, it warns on stderr that any lines the old
+log got after the last run were not sent, and the console is told through the batch's
+`stats.logsLost` ([deploy-mdm.md](deploy-mdm.md#rotate-the-audit-log)).
 
 ## `cyberboar pull`
 

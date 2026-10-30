@@ -60,10 +60,13 @@ type Result struct {
 	Skipped int // lines that aren't valid audit events and were passed over
 	Batches int // requests the console accepted, including an empty heartbeat
 	// Restarted is true when the log had been truncated or replaced since
-	// the last run, so this run shipped it from its start. Lines the old log
-	// got after the last run, if there were any, were not shipped, since the
-	// old log is out of reach.
+	// the last run, so this run shipped it from its start.
 	Restarted bool
+	// OldLog is the rotated log whose rest this run shipped first. When
+	// Restarted and OldLog is empty, the old log wasn't found: lines it got
+	// after the last run, if there were any, were not shipped, and the
+	// console is told so (audit.Stats.LogsLost).
+	OldLog string
 }
 
 // ErrBusy means another ship run holds the lock.
@@ -103,6 +106,7 @@ func Once(ctx context.Context, o Options) (Result, error) {
 		return res, err
 	}
 	off := st.Offset
+	s.stats = st.Stats
 
 	f, err := os.Open(auditPath)
 	if errors.Is(err, os.ErrNotExist) {
@@ -120,29 +124,37 @@ func Once(ctx context.Context, o Options) (Result, error) {
 		if err != nil {
 			return res, err
 		}
+		s.r = bufio.NewReaderSize(f, audit.MaxLineBytes+1)
 		if !same {
-			// The log was truncated or replaced (rotated). Its new contents
-			// are shipped from the start, and the restart is saved at once,
-			// so it is reported only once even when this run sends nothing
-			off, res.Restarted = 0, true
-			if err := saveOffset(s.offPath, auditPath, f, 0); err != nil {
-				return res, err
-			}
-		}
-		s.f, s.r = f, bufio.NewReaderSize(f, audit.MaxLineBytes+1)
-		for {
-			next, sent, err := s.batch(ctx, off, &res)
+			// The log was truncated or replaced (rotated). The rest of the
+			// old log is shipped first, if it is still next to the new one
+			res.Restarted = true
+			old, err := findOldLog(auditPath, st)
 			if err != nil {
 				return res, err
 			}
-			off = next
-			if !sent {
-				break
+			if old != nil {
+				defer old.Close()
+				res.OldLog = old.Name()
+				if err := s.shipFrom(ctx, old, off, &res); err != nil {
+					return res, err
+				}
+			} else {
+				s.stats.LogsLost++
 			}
+			// The new log is shipped from its start. The switch is saved at
+			// once, so a lost log is counted once even when this run sends nothing
+			s.f, off = f, 0
+			if err := s.save(0); err != nil {
+				return res, err
+			}
+		}
+		if err := s.shipFrom(ctx, f, off, &res); err != nil {
+			return res, err
 		}
 	}
 	if res.Batches == 0 {
-		if err := s.send(ctx, audit.Batch{Endpoint: s.ep, Events: []json.RawMessage{}}); err != nil {
+		if err := s.send(ctx, audit.Batch{Endpoint: s.ep, Events: []json.RawMessage{}, Stats: &s.stats}); err != nil {
 			return res, err
 		}
 		res.Batches++
@@ -158,8 +170,29 @@ type shipper struct {
 	ep        audit.Endpoint
 	auditPath string
 	offPath   string
-	f         *os.File      // the audit log
+	f         *os.File      // the audit log, or the old log while its rest is shipped
 	r         *bufio.Reader // reads f
+	stats     audit.Stats   // the totals saved with the offset
+}
+
+// shipFrom ships f's complete lines after off, batch by batch.
+func (s *shipper) shipFrom(ctx context.Context, f *os.File, off int64, res *Result) error {
+	s.f = f
+	for {
+		next, sent, err := s.batch(ctx, off, res)
+		if err != nil {
+			return err
+		}
+		off = next
+		if !sent {
+			return nil
+		}
+	}
+}
+
+// save saves off as the offset in s.f, with the totals.
+func (s *shipper) save(off int64) error {
+	return saveOffset(s.offPath, s.auditPath, s.f, off, s.stats)
 }
 
 // batch reads the complete lines that follow off in the log, up to one
@@ -181,15 +214,19 @@ func (s *shipper) batch(ctx context.Context, off int64, res *Result) (next int64
 	if err != nil {
 		return off, false, err
 	}
+	// The batch counts its own skipped lines, which the saved offset passes
+	stats := s.stats
+	stats.LinesSkipped += int64(skipped)
 	if len(events) > 0 {
-		if err := s.send(ctx, audit.Batch{Endpoint: s.ep, Events: events}); err != nil {
+		if err := s.send(ctx, audit.Batch{Endpoint: s.ep, Events: events, Stats: &stats}); err != nil {
 			return off, false, err
 		}
 		res.Sent += len(events)
 		res.Batches++
 	}
 	if next != off {
-		if err := saveOffset(s.offPath, s.auditPath, s.f, next); err != nil {
+		s.stats = stats
+		if err := s.save(next); err != nil {
 			return off, false, err
 		}
 	}

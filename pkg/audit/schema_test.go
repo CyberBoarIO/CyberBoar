@@ -160,7 +160,8 @@ func TestSchemaMarshalledLines(t *testing.T) {
 		{Time: now.Format(time.RFC3339), Decision: "deny"},
 		{Time: now.Add(123 * time.Millisecond).Format(time.RFC3339Nano), Agent: "codex", Version: "v1.0.0", Tool: "Bash", Decision: "ask",
 			Rule: "commands.ask", Reason: "r", PolicyName: "baseline", PolicyHash: strings.Repeat("0", 64), DurationMs: 0.5,
-			Actions: []audit.Action{{Tool: "shell", Command: "git push"}, {Tool: "mcp", Server: "github", MCPTool: "x"}}},
+			Actions: []audit.Action{{Tool: "shell", Command: "git push"}, {Tool: "shell", Command: "Get-ChildItem", Shell: "powershell"},
+				{Tool: "mcp", Server: "github", MCPTool: "x"}}},
 		{Time: now.Format(time.RFC3339), Decision: "deny", Actions: many},
 	} {
 		line, err := audit.Marshal(ev)

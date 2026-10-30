@@ -9,7 +9,18 @@ protocol, audit schema and public Go packages under `pkg/`.
 
 ### Added
 
+- Audit events: a shell action has `shell: powershell` when its command is read as
+  PowerShell. Codex names its shell tool `Bash` on Windows too, so `tool` alone can't
+  tell them apart.
 - `explain --shell` and a policy test's `shell:` accept `bash`, the default, by name.
+- Audit events have an `id`, a version 7 UUID, so a console can drop an event it
+  already stored when a batch is sent again.
+- `ship` finishes a rotated audit log: when the log was renamed (`audit.jsonl.1`) or
+  copied and truncated, it sends the rest of the old log first, found next to the new
+  one by how it starts. Before, lines the old log got after the last run were lost.
+- Protocol: event batches carry `stats`, running totals of logs lost to rotation (the
+  old log gone) and of invalid lines skipped, so a console can see lost events.
+  Consoles must accept the field; older endpoints don't send it.
 
 ### Changed
 
@@ -20,6 +31,9 @@ protocol, audit schema and public Go packages under `pkg/`.
 
 ### Fixed
 
+- Audit events: a Codex command the adapter refuses (another shell on Windows, a
+  terminal, another environment, a call missing from the transcript) is listed in
+  `actions`, which were empty before.
 - A `cd` whose `..` leaves a symbolic link (`cd link/../other`) is followed as the
   shell follows it, to the directory holding the link, and also as the kernel and
   `cd -P` follow it, to the target's parent.

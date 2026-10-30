@@ -657,6 +657,8 @@ func checkBatch(body []byte) (audit.Batch, error) {
 		return b, err
 	}
 	switch {
+	case b.Stats != nil && (!isCount(b.Stats.LogsLost) || !isCount(b.Stats.LinesSkipped)):
+		return b, errors.New("stats must be counts from 0 to 2^53-1")
 	case b.Events == nil:
 		return b, errors.New("events must be a list")
 	case len(b.Events) > maxBatchEvents:
@@ -669,6 +671,9 @@ func checkBatch(body []byte) (audit.Batch, error) {
 	}
 	return b, nil
 }
+
+// isCount reports whether n is a count any JSON parser reads exactly.
+func isCount(n int64) bool { return 0 <= n && n <= 1<<53-1 }
 
 // checkEndpoint applies docs/protocol's rules for an endpoint description.
 func checkEndpoint(e audit.Endpoint) error {

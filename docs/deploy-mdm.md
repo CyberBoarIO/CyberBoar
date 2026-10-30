@@ -331,17 +331,22 @@ every tool call and says why, to the agent and to the user.
 
 ### Rotate the audit log
 
-`ship` remembers how far it has sent the audit log. When it finds the log truncated or
-replaced, it sends the new log from its start and warns on stderr. Lines the old log got
-after the last `ship` run were never sent, and `ship` can't tell whether there were any,
-since the old log is out of its reach. Stop agent sessions that can append during the
-final upload and rotation, and coordinate with the shipping service. A successful upload
-alone does not prevent another hook from appending before the rename. Retain the old log
-until delivery is verified. With logrotate (`/etc/logrotate.d/cyberboar`), run `ship` in
-`prerotate`. If that run fails (the console can't be reached, or the `ship` service is
-in the middle of a round), logrotate leaves the log in place and tries again on its next
-run. On Linux the append-only attribute has to come off for the rotation and go back on
-the new log:
+`ship` remembers how far it has sent the audit log and recognizes the log by how it
+starts. When it finds the log rotated, it first sends the rest of the old log, which it
+looks for next to the new one: a file whose name starts with the log's
+(`audit.jsonl.1`, `audit.jsonl-20261030`) and that starts as the log did. Then it sends
+the new log from its start. If the old log is gone (deleted, already compressed, or the
+log was truncated in place without a copy), the lines it got after the last run can't
+be sent: `ship` warns on stderr and adds one to `stats.logsLost`, a total every batch
+carries, so the console sees it ([protocol](protocol/README.md#audit-events)).
+
+So rotate by renaming the log, keep the newest rotated file uncompressed until `ship`
+has run (logrotate's `delaycompress`), and avoid `copytruncate`: lines written between
+its copy and its truncation are lost. With logrotate (`/etc/logrotate.d/cyberboar`),
+running `ship` in `prerotate` also sends everything before the rename; if that run fails
+(the console can't be reached, or the `ship` service is in the middle of a round),
+logrotate leaves the log in place and tries again on its next run. On Linux the
+append-only attribute has to come off for the rotation and go back on the new log:
 
 ```
 /var/log/cyberboar/audit.jsonl {

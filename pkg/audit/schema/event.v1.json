@@ -2,11 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cyberboar.dev/schemas/audit/event/v1.json",
   "title": "Audit event",
-  "description": "One line of the audit log: one hook decision (package audit, Event). Field names never change; newer versions add fields, so unknown fields are allowed. Every line CyberBoar writes has time, agent, version, decision, rule, reason and durationMs; a console requires only time and decision (docs/protocol). A line is at most 65536 bytes, no object in it has the same key twice (even in different case), a key naming a field below is spelled exactly so, and it nests at most 32 levels; JSON Schema cannot express these (audit.CheckKeys).",
+  "description": "One line of the audit log: one hook decision (package audit, Event). Field names never change; newer versions add fields, so unknown fields are allowed. Every line CyberBoar writes has time, id, agent, version, decision, rule, reason and durationMs (older versions omit id); a console requires only time and decision (docs/protocol). A line is at most 65536 bytes, no object in it has the same key twice (even in different case), a key naming a field below is spelled exactly so, and it nests at most 32 levels; JSON Schema cannot express these (audit.CheckKeys).",
   "type": "object",
   "required": ["time", "decision"],
   "properties": {
     "time": {"type": "string", "format": "date-time", "description": "RFC 3339; CyberBoar writes UTC."},
+    "id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "description": "A lowercase UUID (version 7) unique to the event; a console drops an event whose id it already stored, since delivery is at least once."},
     "agent": {"type": "string", "description": "The agent that asked, such as claude-code or codex."},
     "version": {"type": "string", "description": "The version of the binary that decided."},
     "session": {"type": "string", "description": "The agent's session ID."},
@@ -37,6 +38,7 @@
       "properties": {
         "tool": {"type": "string", "description": "shell, read, write, list or mcp; more may be added."},
         "command": {"type": "string", "description": "The command line, for shell."},
+        "shell": {"type": "string", "description": "powershell when the command is read as PowerShell; absent for the POSIX shells. More values may be added."},
         "path": {"type": "string", "description": "The path, for read, write and list."},
         "mcpServer": {"type": "string"},
         "mcpTool": {"type": "string"}

@@ -219,15 +219,25 @@ func TestWindows(t *testing.T) {
 			}
 		})
 	}
-	for name, args := range map[string]map[string]any{
-		"cmd":                    {"cmd": "dir", "shell": `C:\Windows\System32\cmd.exe`},
-		"git bash":               {"cmd": "ls", "shell": `C:\Program Files\Git\bin\bash.exe`},
-		"drive-relative workdir": {"cmd": "dir", "workdir": `D:x`},
-		"rooted workdir":         {"cmd": "dir", "workdir": `\x`},
+	// A refused command stays in the actions for the audit log
+	for _, tc := range []struct {
+		name  string
+		args  map[string]any
+		shell string
+	}{
+		{"cmd", map[string]any{"cmd": "dir", "shell": `C:\Windows\System32\cmd.exe`}, ""},
+		{"git bash", map[string]any{"cmd": "ls", "shell": `C:\Program Files\Git\bin\bash.exe`}, ""},
+		{"drive-relative workdir", map[string]any{"cmd": "dir", "workdir": `D:x`}, engine.ShellPowerShell},
+		{"rooted workdir", map[string]any{"cmd": "dir", "workdir": `\x`}, engine.ShellPowerShell},
+		{"tty", map[string]any{"cmd": "dir", "tty": true}, engine.ShellPowerShell},
 	} {
-		t.Run(name, func(t *testing.T) {
-			if call, _ := run(t, args, ""); call.Err == nil {
-				t.Errorf("accepted: %+v", call.Actions)
+		t.Run(tc.name, func(t *testing.T) {
+			call, _ := run(t, tc.args, "")
+			if call.Err == nil {
+				t.Fatalf("accepted: %+v", call.Actions)
+			}
+			if len(call.Actions) != 1 || call.Actions[0].Command != tc.args["cmd"] || call.Actions[0].Shell != tc.shell {
+				t.Errorf("actions %+v", call.Actions)
 			}
 		})
 	}

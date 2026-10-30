@@ -62,7 +62,8 @@ type Call struct {
 	Session, ToolUseID, AgentID, AgentType, Mode, Cwd, Project, Tool string
 
 	// Actions are the engine actions to evaluate. When Err is set the call is
-	// denied with Err's rule instead (once a policy has loaded).
+	// denied with Err's rule instead (once a policy has loaded), and Actions
+	// holds what is known of the call for the audit log.
 	Actions []engine.Action
 	Err     error
 	// Notice, when set, is told to the user as well as the agent when the call
