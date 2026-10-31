@@ -74,6 +74,29 @@ cases:
   - {name: a literal path is not a wildcard, policy: secrets, action: {command: "Get-Content -LiteralPath '.env'"}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: a wildcard is expanded, policy: secrets, action: {command: 'Get-Content .e*'}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: wildcards ignore case, policy: secrets, action: {command: 'Get-Content .ENV*'}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: an unquoted star matches names that start with a dot, policy: secrets, action: {command: 'Get-Content *'}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: a quoted star matches names that start with a dot, policy: secrets, action: {command: "Get-Content '*'"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: a wildcard under ~ is matched in the home folder without case, policy: secrets, action: {command: 'Get-Content -Path ~\.ssh\I*'}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: Select-String over every file, policy: secrets, action: {command: 'Select-String KEY *'}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: a program matches a star as Windows does, policy: secrets, action: {command: 'findstr KEY *'}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: a program matches an unquoted wildcard without case, policy: secrets, action: {command: 'findstr KEY .ENV*'}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: a quoted star is a program's own business, policy: secrets, action: {command: "git log --grep '*'"}, expect: {decision: allow}}
+  - {name: a wildcard over clean files, policy: secrets, action: {command: 'Get-Content src\*.go'}, expect: {decision: allow}}
+  - {name: each element of an array is a program's own word, policy: secrets, action: {command: 'findstr KEY src\main.go,*'}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: PowerShell 7.6 passes a program ~ as the home folder, policy: secrets, action: {command: 'findstr KEY ~\.ssh\id_rsa'}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: a program's ~ with a forward slash, policy: secrets, action: {command: 'tar -cf x.tar ~/.ssh'}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: a program's ~ in an array, policy: secrets, action: {command: 'findstr KEY src\main.go,~\.ssh\id_rsa'}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: a program's ~ before a wildcard, policy: secrets, action: {command: 'findstr KEY ~\.ssh\*'}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: a quoted ~ is passed as written, policy: secrets, action: {command: "findstr KEY '~\\.ssh\\id_rsa'"}, expect: {decision: allow}}
+  - {name: a program run from under ~, policy: secrets, action: {command: '& ~\.ssh\id_rsa'}, expect: {decision: deny, rule: "files.deny[1]"}}
+  - {name: a program named in capitals is the same program, policy: secrets, action: {command: 'Git grep KEY'}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: robocopy writes the files it names into the destination, policy: secrets, action: {command: 'robocopy x .claude settings.json'}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: robocopy writes every file into the destination by default, policy: secrets, action: {command: 'ROBOCOPY.EXE x .claude /MIR'}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: robocopy /MOVE deletes from the source, policy: secrets, action: {command: 'robocopy .claude out /MOVE'}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: xcopy writes what it copies into the destination, policy: secrets, action: {command: 'xcopy src\settings.json .claude'}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: TAR in capitals extracts as tar does, policy: secrets, action: {command: 'TAR -xf x.tar -C .claude'}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: robocopy between clean directories, policy: secrets, action: {command: 'robocopy src out /E'}, expect: {decision: allow}}
+  - {name: xcopy of a file beside a guarded one, policy: secrets, action: {command: 'xcopy README.md .claude'}, expect: {decision: allow}}
   - {name: a root-relative path is on the working drive, policy: secrets, action: {command: 'Get-Content \ProgramData\secrets\token'}, expect: {decision: deny, rule: "files.deny[2]"}}
   - {name: a FileSystem provider path is read, policy: secrets, action: {command: 'Get-Content FileSystem::C:\ProgramData\secrets\token'}, expect: {decision: deny, rule: "files.deny[2]"}}
   - {name: a link is followed, policy: secrets, action: {command: 'Get-Content vault\token'}, expect: {decision: deny, rule: "files.deny[2]"}}

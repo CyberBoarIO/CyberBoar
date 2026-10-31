@@ -13,6 +13,8 @@ import (
 
 	"mvdan.cc/sh/v3/pattern"
 	"mvdan.cc/sh/v3/syntax"
+
+	"cyberboar.dev/cyberboar/internal/fold"
 )
 
 // FileRef is a path a command line may touch.
@@ -68,6 +70,23 @@ var printOnly = set("echo", "printf", "true", "false", ":", "sleep", "kill", "ex
 // namesOnly commands may touch a directory but not what's inside it.
 var namesOnly = set("cd", "pushd", "popd", "ls", "dir", "mkdir", "rmdir", "stat", "du", "df",
 	"realpath", "readlink", "basename", "dirname", "test", "[", "echo", "printf", "which", "type", "find")
+
+// foldNames returns layers with each command name folded (fold.String).
+func foldNames(layers [][]Elem) [][]Elem {
+	out := make([][]Elem, len(layers))
+	for i, l := range layers {
+		out[i] = l
+		if len(l) == 0 || l[0].Kind != Lit {
+			continue
+		}
+		if n := fold.String(l[0].Text); n != l[0].Text {
+			e := l[0]
+			e.Text = n
+			out[i] = append([]Elem{e}, l[1:]...)
+		}
+	}
+	return out
+}
 
 // innerName is the command a wrapper chain finally runs.
 func innerName(layers [][]Elem) (string, []Elem) {
@@ -131,6 +150,11 @@ func (a *analyzer) fileRefs(raw []Elem, u unwrapResult, d dir, glob globOpts) []
 			}
 		}
 	}
+	// Windows and macOS find a program whatever its case (RM runs rm), so the
+	// commands whose effects are modeled match folded; printOnly and namesOnly
+	// above, which check less, match only as written.
+	layers = foldNames(layers)
+	name, inner = innerName(layers)
 	if name == "git" {
 		// REF:path names committed content: git show HEAD:.env, cat-file -p :x.
 		for _, e := range inner[1:] {
@@ -182,6 +206,8 @@ func (a *analyzer) changes(raw []Elem, layers [][]Elem, d dir) (all bool, extra 
 		switch name {
 		case "cp", "mv", "ln", "install", "rsync", "scp":
 			extra = append(extra, a.copyDest(name, args, d)...)
+		case "xcopy", "robocopy":
+			extra = append(extra, a.winCopyDest(name, args, d)...)
 		case "tar", "bsdtar", "gtar":
 			if tarExtracts(args) {
 				all = true
@@ -342,6 +368,74 @@ func (a *analyzer) copyDest(name string, args []Elem, d dir) []FileRef {
 		out = append(out, mark(a.pathRef(strings.TrimSuffix(dest.Text, "/")+"/"+base, d)))
 	}
 	return out
+}
+
+// winCopyDest returns what Windows' copy programs write. robocopy SRC DEST
+// [FILE…] copies the files named (every file by default) into the directory
+// DEST, and with /MOV or /MOVE deletes them from SRC. xcopy SRC [DEST] copies
+// a file, or what a directory or wildcard holds, into DEST (by default the
+// working directory). An option is a word starting with one "/" and holding
+// no other separator; a Git Bash path such as /tmp counts as one.
+func (a *analyzer) winCopyDest(name string, args []Elem, d dir) []FileRef {
+	var ops []Elem
+	move := false
+	for _, e := range args {
+		if e.Kind == Lit && strings.HasPrefix(e.Text, "/") && !strings.ContainsAny(e.Text[1:], `/\`) {
+			opt := strings.ToUpper(e.Text)
+			move = move || opt == "/MOV" || opt == "/MOVE"
+			continue
+		}
+		ops = append(ops, e)
+	}
+	if len(ops) == 0 {
+		return nil
+	}
+	dest := Elem{Kind: Lit, Text: "."}
+	if len(ops) > 1 {
+		dest = ops[1]
+	}
+	if dest.Kind != Lit {
+		return nil // a run-time destination is already a path only known at run time
+	}
+	mark := func(r FileRef) FileRef {
+		r.Accessed, r.Contents, r.Modifies = true, true, true
+		return r
+	}
+	target := a.pathRef(dest.Text, d)
+	in := func(f string) FileRef { return mark(a.pathRef(strings.TrimRight(dest.Text, `/\`)+"/"+f, d)) }
+	plain := func(e Elem) bool { return e.Kind == Lit && !e.Glob && !strings.ContainsAny(e.Text, "*?") }
+	var out []FileRef
+	if name == "robocopy" {
+		if move && ops[0].Kind == Lit {
+			out = append(out, mark(a.pathRef(ops[0].Text, d)))
+		}
+		files := ops[min(2, len(ops)):]
+		if len(files) == 0 {
+			return append(out, mark(target))
+		}
+		for _, f := range files {
+			if plain(f) && a.baseName(f.Text) == f.Text {
+				out = append(out, in(f.Text))
+			} else {
+				out = append(out, mark(target))
+			}
+		}
+		return out
+	}
+	// xcopy names a file it copies into a directory after the file; else it
+	// writes the destination, or what a directory holds.
+	if src := ops[0]; plain(src) {
+		if s := a.pathRef(src.Text, d); s.Certain {
+			if info, err := a.fs.Stat(s.Path); err == nil && !info.IsDir() {
+				if info, err := a.fs.Stat(target.Path); target.Certain && err == nil && info.IsDir() {
+					if base := a.baseName(src.Text); base != "" {
+						return []FileRef{in(base)}
+					}
+				}
+			}
+		}
+	}
+	return []FileRef{mark(target)}
 }
 
 // baseName is the last name in a path word, "" for a word ending in a
@@ -601,10 +695,28 @@ func implicitCwd(name string, argv []Elem) bool {
 	case "php":
 		return hasAny(args, "-S") && !hasAny(args, "-t") // serves the working directory
 	case "git":
-		if len(args) == 0 || args[0].Kind != Lit || args[0].Text != "add" {
+		if len(args) == 0 || args[0].Kind != Lit {
 			return false
 		}
-		return hasAny(args[1:], "-A", "-u") || hasLong(args[1:], "all", "update", "no-ignore-removal")
+		switch args[0].Text {
+		case "add":
+			return hasAny(args[1:], "-A", "-u") || hasLong(args[1:], "all", "update", "no-ignore-removal")
+		case "grep":
+			// Searches the work tree, or with --no-index the directory, when
+			// given no path. ( and ) group patterns, so they aren't operands
+			p := parseOpts(args[1:], optSpec{short: "efABCm", permute: true, long: set("after-context",
+				"before-context", "context", "max-count", "threads", "max-depth")})
+			n := 0
+			for _, e := range p.rest {
+				if e.Kind != Lit || e.Text != "(" && e.Text != ")" {
+					n++
+				}
+			}
+			if !p.hasExact("e", "f") && n > 0 {
+				n-- // the first operand is the pattern
+			}
+			return n == 0
+		}
 	}
 	return false
 }

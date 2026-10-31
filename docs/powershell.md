@@ -3,7 +3,7 @@
 On native Windows, CyberBoar checks the PowerShell commands of **Claude Code's
 `PowerShell` tool** and of **Codex CLI**. It reads a checked subset of PowerShell and
 applies the same policy rules as for Bash. Anything outside that subset is treated as
-able to do anything, so it is checked strictly. Support is new in `v1.0.0-rc.3`; see
+able to do anything, so it is checked strictly. Support is new; see
 [Validation status](#validation-status).
 
 ## Where PowerShell is checked
@@ -22,7 +22,10 @@ rules; it does not make nested PowerShell checkable.
 ## What the analysis reads
 
 - **Programs** (`git`, `npm`, `.\build.ps1`) are read as in Bash: the name is matched
-  against command rules and every argument is checked as a possible path.
+  against command rules and every argument is checked as a possible path. On Windows
+  an unquoted wildcard is matched as the program matches it (`findstr KEY *` reads
+  `.env`), and an unquoted `~`, `~\…` or `~/…` is the home folder, as PowerShell 7.6
+  passes it.
 - **Common cmdlets** are bound by parameter, so the engine knows which values are paths
   and whether they are read, listed, written or deleted. They are the file cmdlets
   (`Get-Content`, `Set-Content`, `Add-Content`, `Get-ChildItem`, `Copy-Item`,

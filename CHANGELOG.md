@@ -61,6 +61,23 @@ protocol, audit schema and public Go packages under `pkg/`.
   variable and a drive path writes a file.
 - A glob that matches nothing is read as any other word, so an unquoted
   `file:///…/token.txt?x` is checked as the file curl opens.
+- `git grep` with no path searches the work tree (or, with `--no-index`, the
+  directory), as `grep -r` does, so `git grep KEY` no longer reads a denied `.env`.
+- On Windows and macOS a program named in other capitals is the program (`RM -rf
+  .claude`, `Git grep KEY`), as their filesystems find it; what it does is checked as
+  for the lower-case name.
+- `xcopy` and `robocopy` are checked as copies: the files they write in the
+  destination, and with `robocopy /MOVE` the source, so they can't replace a guarded
+  file.
+- PowerShell on Windows: an unquoted wildcard given to a program (`findstr KEY *`,
+  each element of `a,*`) is matched as the program matches it, without case and with
+  names that start with a dot. Before, it was taken as a name.
+- PowerShell on Windows: an unquoted `~`, `~\…` or `~/…` given to a program is the
+  home folder, as PowerShell 7.6 passes it, and a program run as `& ~\…` is in the
+  home folder. When older versions' reading, a folder named `~`, may be another file,
+  the command asks.
+- PowerShell: a wildcard path under `~` (`Get-Content ~\.ssh\I*`) is matched in the
+  home folder.
 
 ## [v1.0.0-rc.3] - 2026-10-28
 

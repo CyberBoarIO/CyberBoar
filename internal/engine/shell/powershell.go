@@ -1,6 +1,8 @@
 package shell
 
 import (
+	"errors"
+	"io/fs"
 	"maps"
 	"path"
 	"slices"
@@ -190,7 +192,7 @@ func (a *psAnalyzer) psCommand(c *pwsh.Command, piped pwsh.CommandBase, depth in
 	name, lit := a.psName(c)
 	args := c.Elements[1:]
 	if !lit {
-		argv := append([]Elem{{Kind: Many, Text: "*", Src: a.psSource(c.Elements[0])}}, a.psArgv(args, false)...)
+		argv := append([]Elem{{Kind: Many, Text: "*", Src: a.psSource(c.Elements[0])}}, a.psArgv(args, false, d)...)
 		id := a.addCommand([][]Elem{argv})
 		a.psGenericRefs(argv[1:], d, psRead, piped != nil)
 		return id, nil, nil
@@ -268,8 +270,9 @@ func (a *psAnalyzer) psResolve(name, invocation string) (string, bool) {
 
 // psArgv converts a command's arguments to argv elements, as written. For a
 // program, a value PowerShell may pass as more than one word, or as none
-// (an empty string, which Windows PowerShell drops), is Many.
-func (a *psAnalyzer) psArgv(args []pwsh.CommandElement, native bool) []Elem {
+// (an empty string, which Windows PowerShell drops), is Many. d is the
+// directory the command runs in.
+func (a *psAnalyzer) psArgv(args []pwsh.CommandElement, native bool, d dir) []Elem {
 	var out []Elem
 	for _, e := range args {
 		switch v := e.(type) {
@@ -289,7 +292,11 @@ func (a *psAnalyzer) psArgv(args []pwsh.CommandElement, native bool) []Elem {
 				out = append(out, Elem{Kind: One, Text: flag + ":*", Src: a.psSource(v)})
 			}
 		case pwsh.Expression:
-			for _, el := range a.psElems(v) {
+			elems := a.psElems
+			if native && a.windows {
+				elems = func(e pwsh.Expression) []Elem { return a.psWindowsNative(e, d) }
+			}
+			for _, el := range elems(v) {
 				if native && el.Kind == Lit && (el.Text == "" || strings.Contains(el.Text, `"`)) {
 					el = Elem{Kind: Many, Text: "*", Src: el.Text}
 				}
@@ -355,13 +362,77 @@ func psShape(format string) string {
 	return b.String()
 }
 
+// psWindowsNative converts one argument to a program on Windows as psElems
+// does, with what PowerShell does to a bare word: ~ (PowerShell 7.6 and later)
+// and a wildcard as psNativeTilde and nativeGlobs say. Each element of an
+// array is a word of its own.
+func (a *psAnalyzer) psWindowsNative(e pwsh.Expression, d dir) []Elem {
+	words := []pwsh.Expression{e}
+	if v, ok := e.(*pwsh.ArrayLiteral); ok {
+		words = v.Elements
+	}
+	var out []Elem
+	for _, w := range words {
+		s, ok := w.(*pwsh.StringConstant)
+		if !ok || s.Kind != pwsh.BareWord {
+			out = append(out, a.psElems(w)...)
+			continue
+		}
+		text, ok := a.psNativeTilde(s.Value, d)
+		switch {
+		case !ok:
+			out = append(out, Elem{Kind: One, Text: "*", Src: s.Value})
+		case psHasWildcard(text):
+			// PowerShell passes it on, and many programs expand it (findstr, Git's tools)
+			out = append(out, Elem{Kind: Many, Text: strings.ReplaceAll(text, `\`, "/"), Glob: true})
+		default:
+			out = append(out, Elem{Kind: Lit, Text: text})
+		}
+	}
+	return out
+}
+
+// psNativeTilde returns the word PowerShell passes to a program on Windows for
+// the bare word w. PowerShell 7.6 and later start ~, ~\… and ~/… in the home
+// folder; older versions pass them as written. It reports false when the two
+// can be different files: the home folder or working directory is unknown, or
+// the working directory has an entry named ~.
+func (a *psAnalyzer) psNativeTilde(w string, d dir) (string, bool) {
+	rest, ok := strings.CutPrefix(w, "~")
+	if !ok || rest != "" && rest[0] != '/' && rest[0] != '\\' {
+		return w, true
+	}
+	if a.home == "" || !d.known {
+		return "", false
+	}
+	if _, err := a.fs.Lstat(joinDir(d.path, "~")); !errors.Is(err, fs.ErrNotExist) {
+		return "", false
+	}
+	return a.psTilde(w)[0], true
+}
+
 func psHasWildcard(s string) bool { return strings.ContainsAny(s, "*?[") }
+
+// psGlobs is how PowerShell matches a wildcard: without case, and names that
+// start with a dot are names like any other.
+var psGlobs = globOpts{dotglob: true, nocaseglob: true}
+
+// nativeGlobs is how a program PowerShell runs sees a wildcard. On Windows
+// PowerShell passes it on and the program matches it as Windows does, as
+// psGlobs does; elsewhere PowerShell expands it as bash does.
+func (a *psAnalyzer) nativeGlobs() globOpts {
+	if a.windows {
+		return psGlobs
+	}
+	return globOpts{}
+}
 
 // psNative records a program, a script file or a function: its words are
 // read as bash's are for a program (fileRefs), and the wrappers it is
-// (npx, cmd /c) are followed. id is the command to record it in.
+// (npx, cmd /c) are followed. id is the command to record it in. A path to
+// it starting with ~ is in the home folder, as PowerShell resolves it.
 func (a *psAnalyzer) psNative(id int, c *pwsh.Command, name string, d dir, depth int) error {
-	raw := append([]Elem{{Kind: Lit, Text: name}}, a.psArgv(c.Elements[1:], true)...)
+	raw := append([]Elem{{Kind: Lit, Text: a.psTilde(name)[0]}}, a.psArgv(c.Elements[1:], true, d)...)
 	return a.psProgram(id, raw, d, depth)
 }
 
@@ -372,10 +443,10 @@ func (a *psAnalyzer) psProgram(id int, raw []Elem, d dir, depth int) error {
 		return err
 	}
 	a.cmds[id].Layers = append(a.cmds[id].Layers, u.layers...)
-	a.files = append(a.files, a.fileRefs(raw, u, d, globOpts{})...)
+	a.files = append(a.files, a.fileRefs(raw, u, d, a.nativeGlobs())...)
 	d = a.innerDir(u, d)
 	for _, e := range u.files {
-		a.wordRefs(e, d, globOpts{}, false, func(r FileRef) {
+		a.wordRefs(e, d, a.nativeGlobs(), false, func(r FileRef) {
 			r.Accessed, r.Contents = true, true
 			a.files = append(a.files, r)
 		})
@@ -420,7 +491,7 @@ func (a *psAnalyzer) psGenericRefs(args []Elem, d dir, use psUse, piped bool) {
 			}
 			a.fail(a.psEnvWord(e.Text, use))
 		}
-		a.wordRefs(e, d, globOpts{dotglob: true, nocaseglob: true}, use == psPrint, add)
+		a.wordRefs(e, d, psGlobs, use == psPrint, add)
 	}
 	if piped && use != psPrint {
 		add(FileRef{Display: "paths read from the pipeline"})
@@ -524,7 +595,7 @@ func (a *psAnalyzer) value(c *psCmdlet, b psBound, name string) ([]Elem, bool) {
 func (a *psAnalyzer) psCmdletCall(c *pwsh.Command, canon string, piped pwsh.CommandBase, depth int, d dir) (int, []int, error) {
 	args := c.Elements[1:]
 	written := fold.String(c.Elements[0].(*pwsh.StringConstant).Value)
-	argv := a.psArgv(args, false)
+	argv := a.psArgv(args, false, d)
 	layers := [][]Elem{append([]Elem{{Kind: Lit, Text: c.Elements[0].(*pwsh.StringConstant).Value}}, argv...)}
 	if written != fold.String(canon) {
 		layers = append(layers, append([]Elem{{Kind: Lit, Text: canon}}, argv...))
@@ -826,7 +897,7 @@ func (a *psAnalyzer) psEmitsText(el pwsh.CommandBase) bool {
 func (a *psAnalyzer) psPathWord(e Elem, d dir, wildcard bool, use psUse) {
 	add := a.psAdder(use)
 	if e.Kind != Lit {
-		a.wordRefs(e, d, globOpts{}, false, add)
+		a.wordRefs(e, d, psGlobs, false, add) // an unquoted wildcard is matched as a quoted one is
 		return
 	}
 	a.fail(a.psEnvWord(e.Text, use))
@@ -846,11 +917,12 @@ func (a *psAnalyzer) psPathWord(e Elem, d dir, wildcard bool, use psUse) {
 		return
 	}
 	if wildcard && psHasWildcard(w) {
-		pattern := w
-		if a.windows {
-			pattern = strings.ReplaceAll(pattern, `\`, "/")
+		for _, pattern := range a.psTilde(w) { // ~ is the home folder before the wildcard is matched
+			if a.windows {
+				pattern = strings.ReplaceAll(pattern, `\`, "/")
+			}
+			a.wordRefs(Elem{Kind: Many, Text: pattern, Glob: true}, d, psGlobs, false, add)
 		}
-		a.wordRefs(Elem{Kind: Many, Text: pattern, Glob: true}, d, globOpts{dotglob: true, nocaseglob: true}, false, add)
 		return
 	}
 	for _, c := range a.psTilde(w) {

@@ -250,6 +250,11 @@ cases:
   - {name: recursive grep without a path reads the cwd, policy: secrets, action: {command: "grep -rn KEY"}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: ripgrep without a path reads the cwd, policy: secrets, action: {command: "rg KEY"}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: ripgrep with a clean path, policy: secrets, action: {command: "rg KEY src/"}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: git grep without a path reads the work tree, policy: secrets, action: {command: "git grep KEY"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: git grep --no-index without a path reads the cwd, policy: secrets, action: {command: "git grep --no-index -n -e KEY"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: git grep with grouped patterns and no path, policy: secrets, action: {command: "git grep \\( -e A --or -e B \\)"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: git grep with options taking values and no path, policy: secrets, action: {command: "git grep -C 3 --max-depth 2 KEY"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: git grep with a clean path, policy: secrets, action: {command: "git grep -e KEY -- src"}, expect: {decision: allow, rule: posture.deny-listed}}
   - {name: git add dot, policy: secrets, action: {command: "git add ."}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: git add -A, policy: secrets, action: {command: "git add -A"}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: git add a file, policy: secrets, action: {command: "git add src/main.go"}, expect: {decision: allow, rule: posture.deny-listed}}
