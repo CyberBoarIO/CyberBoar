@@ -87,7 +87,7 @@ certificate verification is disabled; use `--ca` for a private CA or self-signed
 
 Deliver the binary, `policy.pub` and, if you pin it, `console.pub` as a package (Intune:
 a Win32 app or a macOS PKG; Fleet: a custom package). Each version of the binary goes in
-a directory of its own named after it (`VERSION` above, such as `1.0.0-rc.1`), never
+a directory of its own named after it (`VERSION` above, such as `1.0.0`), never
 over another, so that an upgrade can switch to it in one step ("Upgrade the binary"
 below). Verify the package's release signature and expected version before running its
 binary. Then run this as root. It creates the audit log so developers can append to it
@@ -96,9 +96,9 @@ but not read other developers' lines, truncate or replace it:
 ```sh
 # Linux (macOS: use the macOS paths above, and `chflags uappnd` instead of `chattr +a`)
 install -d -m 0755 -o root /usr/local/lib/cyberboar
-mkdir -m 0755 /usr/local/lib/cyberboar/1.0.0-rc.1   # stop if this version already exists
-install -m 0755 -o root cyberboar /usr/local/lib/cyberboar/1.0.0-rc.1/cyberboar
-ln -s /usr/local/lib/cyberboar/1.0.0-rc.1/cyberboar /usr/local/bin/cyberboar
+mkdir -m 0755 /usr/local/lib/cyberboar/1.0.0   # stop if this version already exists
+install -m 0755 -o root cyberboar /usr/local/lib/cyberboar/1.0.0/cyberboar
+ln -s /usr/local/lib/cyberboar/1.0.0/cyberboar /usr/local/bin/cyberboar
 install -d -m 0755 -o root /etc/cyberboar /var/log/cyberboar
 install -m 0644 -o root policy.pub console.pub /etc/cyberboar/
 touch /var/log/cyberboar/audit.jsonl
@@ -132,7 +132,7 @@ As root (macOS and Linux):
 #!/bin/sh
 set -eu
 server=https://console.example.com
-exe=/usr/local/lib/cyberboar/1.0.0-rc.1/cyberboar
+exe=/usr/local/lib/cyberboar/1.0.0/cyberboar
 state=/var/lib/cyberboar           # macOS: "/Library/Application Support/CyberBoar/state"
 conf=/etc/cyberboar                # macOS: "/Library/Application Support/CyberBoar"
 # Fleet replaces $FLEET_SECRET_… before the script runs; with Intune, the token is in the script.
@@ -146,7 +146,7 @@ printf '%s' "$FLEET_SECRET_CYBERBOAR_ENROLL_TOKEN" |
 As SYSTEM (Windows):
 
 ```powershell
-$exe = "C:\Program Files\CyberBoar\1.0.0-rc.1\cyberboar.exe"
+$exe = "C:\Program Files\CyberBoar\1.0.0\cyberboar.exe"
 $conf = "C:\ProgramData\CyberBoar"
 # Fleet replaces $FLEET_SECRET_… before the script runs; with Intune, put the token here.
 "$FLEET_SECRET_CYBERBOAR_ENROLL_TOKEN" | & $exe enroll --server https://console.example.com --state "$conf\state" --console-key "$conf\console.pub" --token-file -
@@ -298,7 +298,7 @@ version floor:
 ```sh
 #!/bin/sh
 set -eu
-new=1.0.0-rc.2
+new=1.0.1
 dir=/usr/local/lib/cyberboar
 conf=/etc/cyberboar
 install -d -m 0755 -o root "$dir"
@@ -331,14 +331,19 @@ every tool call and says why, to the agent and to the user.
 
 ### Rotate the audit log
 
-`ship` remembers how far it has sent the audit log and recognizes the log by how it
-starts. When it finds the log rotated, it first sends the rest of the old log, which it
-looks for next to the new one: a file whose name starts with the log's
-(`audit.jsonl.1`, `audit.jsonl-20261030`) and that starts as the log did. Then it sends
-the new log from its start. If the old log is gone (deleted, already compressed, or the
-log was truncated in place without a copy), the lines it got after the last run can't
-be sent: `ship` warns on stderr and adds one to `stats.logsLost`, a total every batch
-carries, so the console sees it ([protocol](protocol/README.md#audit-events)).
+`ship` remembers how far it has sent the audit log, and recognizes the log by its file
+(which a rename keeps) and by how it starts. When it finds the log rotated, it first
+sends the rest of the old log, which it looks for next to the new one: a file whose name
+starts with the log's (`audit.jsonl.1`, `audit.jsonl-20261030`) that is the old log's
+file or starts as the log did. If the log was rotated more than once since the last run,
+it then sends, oldest first, the other files there written since the old log's last
+line. Then it sends the new log from its start. A log it can't send (the old log gone
+or truncated in place without a copy, a log compressed before `ship` ran) has lost the
+lines it got after the last run: `ship` warns on stderr and adds one to
+`stats.logsLost`, a total every batch carries, so the console sees it
+([protocol](protocol/README.md#audit-events)). A log rotated in and out may be sent
+again when files next to it were written within seconds of each other; the console
+drops the events it already has by their `id`.
 
 So rotate by renaming the log, keep the newest rotated file uncompressed until `ship`
 has run (logrotate's `delaycompress`), and avoid `copytruncate`: lines written between

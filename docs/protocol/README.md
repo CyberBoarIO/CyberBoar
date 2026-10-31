@@ -172,7 +172,7 @@ certificate (there is none yet). `Content-Type: application/json`; anything else
 `415`. Body, at most 4 KiB:
 
 ```json
-{"token":"cyberboar_enroll_…","endpoint":{"id":"3f1c6a52-…","hostname":"dev-laptop-17","version":"v1.0.0-rc.1"},
+{"token":"cyberboar_enroll_…","endpoint":{"id":"3f1c6a52-…","hostname":"dev-laptop-17","version":"v1.0.0"},
  "publicKey":"MFkw…"}
 ```
 
@@ -418,10 +418,11 @@ What tells a console it has every event:
 - **Loss on the endpoint:** `stats` holds running totals for the audit log the
   endpoint ships, since it began shipping it, and every batch carries them, heartbeats
   included. A batch lost or sent twice doesn't throw them off, and a console flags an
-  endpoint whose totals rise. `logsLost` counts the times the log was replaced
-  (rotated, truncated or deleted) before it had been shipped to its end, and the old log
-  wasn't found next to the new one to finish it: lines it got after the batch before,
-  if there were any, never reached the console. `linesSkipped` counts lines that
+  endpoint whose totals rise. `logsLost` counts the logs replaced (rotated, truncated
+  or deleted) before they had been shipped to their end that the endpoint couldn't
+  finish, the old log not found next to the new one or compressed: lines they got after
+  the batch before, if there were any, never reached the console
+  ([rotation](../deploy-mdm.md#rotate-the-audit-log)). `linesSkipped` counts lines that
   weren't valid audit events, which only damage or a hand edit makes. A total that
   falls means the endpoint's shipping state was reset, not that anything came back.
 

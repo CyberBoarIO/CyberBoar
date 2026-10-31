@@ -403,10 +403,11 @@ background process. Delivery is at least once; consumers must tolerate duplicate
 | `--insecure-skip-verify` | none | none | As for `enroll` |
 
 No arguments. When the audit log was rotated since the last run, `ship` first sends the
-rest of the old log if it is still next to the new one (`audit.jsonl.1`), then the new
-log from its start. When the old log is gone, it warns on stderr that any lines the old
-log got after the last run were not sent, and the console is told through the batch's
-`stats.logsLost` ([deploy-mdm.md](deploy-mdm.md#rotate-the-audit-log)).
+rest of the old log if it is still next to the new one (`audit.jsonl.1`), then any logs
+rotated in and out since, then the new log from its start. When a log is gone or
+compressed, it warns on stderr that any lines that log got after the last run were not
+sent, and the console is told through the batch's `stats.logsLost`
+([deploy-mdm.md](deploy-mdm.md#rotate-the-audit-log)).
 
 ## `cyberboar pull`
 
@@ -825,5 +826,5 @@ cyberboar dev (policy cyberboar.dev/v1)
 A release binary prints its installed version in place of `dev`. Without one, the
 binary prints the module version Go recorded when it was built: the tag for
 `go install cyberboar.dev/cyberboar/cmd/cyberboar@VERSION`, or a pseudo-version such as
-`v1.0.0-rc.1.0.20261017113155-6b7a4d9d9640` for a build in a git checkout.
+`v1.0.1-0.20261105113155-6b7a4d9d9640` for a build in a git checkout.
 `--version` produces the same response.
