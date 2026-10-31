@@ -109,7 +109,10 @@ Write command names without paths.
 Unquoted wildcards in a command pattern match an argument; quoted shell text matches
 literally. YAML quoting and shell quoting are separate. Patterns cannot contain
 assignments, redirections, `;`, `&&` or command substitution. Allow rules require exact
-prefixes; they do not skip options as deny/ask rules do.
+prefixes; they do not skip options as deny/ask rules do. In a deny or ask rule, an
+option may also come after operands, as most programs take it (`git push origin main
+--force` matches `git push --force`), and short options run together match however
+they are split or ordered (`rm -rf` matches `rm -r -f` and `rm -fr`).
 
 `spec.commands.denyInterpreters` defaults to `true`. Inline foreign code such as `python
 -c`, `node -e` and unresolved shell code is denied. Literal nested shell commands can be
@@ -183,7 +186,7 @@ briefing hook should be installed.
 
 | Field | Default | Meaning |
 |---|---|---|
-| `spec.minimumVersion` | No floor | Minimum release version, such as `1.0.0-rc.1`. An older or unversioned development binary denies all calls. |
+| `spec.minimumVersion` | No floor | Minimum release version, such as `1.0.0`. An older or unversioned development binary denies all calls. |
 | `spec.audit.sink` | Unset | Expected enrolled console events URL. Does not create a log or start shipping. |
 | `spec.sync.shipEvery` | One run | Interval for `ship --policy FILE`; `0s` or at least `1s`. |
 | `spec.sync.pullEvery` | One run | Interval for `pull` reading the signed installed policy; `0s` or at least `10s`. |

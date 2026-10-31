@@ -38,7 +38,9 @@ rules; it does not make nested PowerShell checkable.
   name given to `-OutVariable` and the like is checked as a variable written:
   `env:X` sets an environment variable, a drive path writes a file.
 - **Aliases** (`ls`, `cat`, `gc`, `rm`, `iex`) resolve to their cmdlets. A policy
-  allow rule for an alias or its cmdlet allows both. `explain` on Linux or macOS reads
+  allow rule for an alias or its cmdlet allows both. A rule names a cmdlet's
+  parameters in full, and matches them however the call abbreviates them (`ri -rec`
+  and `-Recurse:$true` match `Remove-Item -Recurse`). `explain` on Linux or macOS reads
   `ls` and `cat` as the programs, as pwsh does there.
 - **Windows paths** go through the same checks as Claude Code's Windows paths: drives,
   trailing dots, streams, junctions and 8.3 names. UNC and device paths are denied.

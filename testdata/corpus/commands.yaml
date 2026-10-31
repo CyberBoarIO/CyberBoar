@@ -25,6 +25,7 @@ policies:
             - "kubectl delete"         # [1]
             - "curl | sh"              # [2]
             - "git push --force"       # [3]
+            - "rm -rf"                 # [4]
           ask:
             - "git push"               # [0]
             - "npm publish"            # [1]
@@ -178,6 +179,14 @@ cases:
   - {name: short option and its value, policy: infra, action: {command: "kubectl -n prod delete pod web"}, expect: {decision: deny, rule: "commands.deny[1]"}}
   - {name: long option and its value, policy: infra, action: {command: "kubectl --namespace prod --context live delete pod web"}, expect: {decision: deny, rule: "commands.deny[1]"}}
   - {name: options before a later pattern word, policy: infra, action: {command: "git push -u --force origin main"}, expect: {decision: deny, rule: "commands.deny[3]"}}
+  - {name: short options split up, policy: infra, action: {command: "rm -r -f build"}, expect: {decision: deny, rule: "commands.deny[4]"}}
+  - {name: short options in another order, policy: infra, action: {command: "rm -fr build"}, expect: {decision: deny, rule: "commands.deny[4]"}}
+  - {name: short options among others in any case, policy: infra, action: {command: "rm -v -Rf build"}, expect: {decision: deny, rule: "commands.deny[4]"}}
+  - {name: short options after an operand still match, policy: infra, action: {command: "rm build -rf"}, expect: {decision: deny, rule: "commands.deny[4]"}}
+  - {name: some of the short options, policy: infra, action: {command: "rm -r build"}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: a long option is not short options, policy: infra, action: {command: "rm --rf build"}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: an option after operands, policy: infra, action: {command: "git push origin main --force"}, expect: {decision: deny, rule: "commands.deny[3]"}}
+  - {name: an operand after -- is not an option, policy: infra, action: {command: "rm -- -rf"}, expect: {decision: allow, rule: posture.deny-listed}}
   - {name: options before an ask rule's word, policy: infra, action: {command: "npm --registry https://npm.example publish"}, expect: {decision: ask, rule: "commands.ask[1]"}}
   - {name: options before another subcommand, policy: infra, action: {command: "terraform -chdir=infra plan"}, expect: {decision: allow, rule: posture.deny-listed}}
   - {name: a word after a subcommand is no option, policy: infra, action: {command: "git commit -m push"}, expect: {decision: allow, rule: posture.deny-listed}}

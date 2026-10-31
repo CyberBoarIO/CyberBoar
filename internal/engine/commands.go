@@ -89,6 +89,12 @@ func compileCmdRules(r policy.Rules) (cmdRules, error) {
 // tried. A rare false match, such as `aws --profile iam s3 ls` for `aws iam`,
 // only denies or asks. Allow rules, and ask rules exempting a command from
 // allow-listed posture, keep exact prefixes, so skipping never allows more.
+//
+// With skipOptions, short options run together in a token (-rf) also match
+// the same letters in a run of such words, however they are split and in any
+// order (rm -r -f, rm -fr, rm -Rvf when folded). A token that is an option
+// may also come after operands, as most programs take options anywhere
+// before -- (git push origin main --force).
 func matchArgv(toks []cmdpattern.Token, argv []shell.Elem, folded, skipOptions bool) level {
 	memo := map[[2]int]level{}
 	var rec func(ti, ai int) level
@@ -109,11 +115,26 @@ func matchArgv(toks []cmdpattern.Token, argv []shell.Elem, folded, skipOptions b
 			if toks[ti].Match(e.Text, folded) {
 				l = rec(ti+1, ai+1)
 			}
-			if skipOptions && ti > 0 && isOption(e.Text) {
+			if want, ok := toks[ti].Flags(); skipOptions && ti > 0 && ok {
+				for end := ai; end < len(argv) && l < certain; end++ {
+					if _, ok := cmdpattern.ShortFlags(argv[end].Text); argv[end].Kind != shell.Lit || !ok {
+						break
+					}
+					if hasFlags(argv[ai:end+1], want, folded) {
+						l = max(l, rec(ti+1, end+1))
+					}
+				}
+			}
+			switch {
+			case e.Text == "--" && toks[ti].Option():
+				// what follows is operands, which no option matches
+			case skipOptions && ti > 0 && isOption(e.Text):
 				l = max(l, rec(ti, ai+1))
 				if !strings.Contains(e.Text, "=") && ai+2 <= len(argv) {
 					l = max(l, rec(ti, ai+2))
 				}
+			case skipOptions && ti > 0 && toks[ti].Option() && e.Text != "--":
+				l = max(l, rec(ti, ai+1)) // an operand before the option
 			}
 		case shell.One:
 			if toks[ti].MayMatch(e.Text, folded) {
@@ -130,6 +151,26 @@ func matchArgv(toks []cmdpattern.Token, argv []shell.Elem, folded, skipOptions b
 		return l
 	}
 	return rec(0, 0)
+}
+
+// hasFlags reports whether words, each short options run together, hold
+// every letter of want; with folded, in any case.
+func hasFlags(words []shell.Elem, want string, folded bool) bool {
+	var have strings.Builder
+	for _, w := range words {
+		f, _ := cmdpattern.ShortFlags(w.Text)
+		have.WriteString(f)
+	}
+	h := have.String()
+	if folded {
+		h, want = strings.ToLower(h), strings.ToLower(want)
+	}
+	for _, c := range want {
+		if !strings.ContainsRune(h, c) {
+			return false
+		}
+	}
+	return true
 }
 
 // isOption reports whether an argv word is an option ("-n", "--namespace=x").

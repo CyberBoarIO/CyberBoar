@@ -17,7 +17,10 @@ protocol, audit schema and public Go packages under `pkg/`.
   already stored when a batch is sent again.
 - `ship` finishes a rotated audit log: when the log was renamed (`audit.jsonl.1`) or
   copied and truncated, it sends the rest of the old log first, found next to the new
-  one by how it starts. Before, lines the old log got after the last run were lost.
+  one by its file or by how it starts, then any logs rotated in and out since (the log
+  rotated more than once between runs), then the new log. Before, lines the old log got
+  after the last run were lost. A compressed log, which `ship` can't read, is counted
+  lost.
 - Protocol: event batches carry `stats`, running totals of logs lost to rotation (the
   old log gone) and of invalid lines skipped, so a console can see lost events.
   Consoles must accept the field; older endpoints don't send it.
@@ -28,6 +31,9 @@ protocol, audit schema and public Go packages under `pkg/`.
   `errors.As` reach it.
 - `bundle.Source` no longer has a `Policy` field, whose type was internal and so not
   something the v1 compatibility promise could cover. Parse `Source.Data` instead.
+- A release binary reports its version as its tag does (`v1.0.0`), as one built with
+  `go install` does; release binaries reported it without the `v`. A policy's
+  `minimumVersion` accepts either.
 
 ### Fixed
 
@@ -78,6 +84,11 @@ protocol, audit schema and public Go packages under `pkg/`.
   the command asks.
 - PowerShell: a wildcard path under `~` (`Get-Content ~\.ssh\I*`) is matched in the
   home folder.
+- Deny and ask rules match an option after operands (`git push origin main --force`
+  for `git push --force`), and short options however they are split or ordered
+  (`rm -r -f` and `rm -fr` for `rm -rf`).
+- PowerShell: command rules match a cmdlet's parameters however the call abbreviates
+  them, so `ri -rec` and `-Recurse:$true` match `Remove-Item -Recurse`.
 
 ## [v1.0.0-rc.3] - 2026-10-28
 

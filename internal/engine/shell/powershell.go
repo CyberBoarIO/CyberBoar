@@ -576,6 +576,39 @@ func psBind(c *psCmdlet, args []pwsh.CommandElement) (b psBound, ok bool) {
 	return b, true
 }
 
+// psNamedArgv is a bound cmdlet's argv with each parameter by its full name,
+// as the binder read it (-r is -Recurse, -Recurse:$true is -Recurse), so a
+// command rule matches however the call spells it. A switch set to $false is
+// left out, since the call doesn't use it.
+func (a *psAnalyzer) psNamedArgv(spec *psCmdlet, args []pwsh.CommandElement, d dir) []Elem {
+	var out []Elem
+	for _, e := range args {
+		v, ok := e.(*pwsh.CommandParameter)
+		var p *psParam
+		if ok && v.Name != "-" {
+			p = spec.param(v.Name)
+		}
+		if p == nil {
+			out = append(out, a.psArgv([]pwsh.CommandElement{e}, false, d)...)
+			continue
+		}
+		if p.isSwitch && psFalse(v.Argument) {
+			continue
+		}
+		out = append(out, Elem{Kind: Lit, Text: "-" + p.name})
+		if v.Argument != nil && !p.isSwitch {
+			out = append(out, a.psElems(v.Argument)...)
+		}
+	}
+	return out
+}
+
+// psFalse reports a switch's value written as $false.
+func psFalse(e pwsh.Expression) bool {
+	v, ok := e.(*pwsh.Variable)
+	return ok && fold.String(v.Path) == "false" // not $env:false, a variable of that name
+}
+
 // value returns the words bound to the parameter called name.
 func (a *psAnalyzer) value(c *psCmdlet, b psBound, name string) ([]Elem, bool) {
 	vals, ok := b.values[c.params[fold.String(name)]]
@@ -596,19 +629,24 @@ func (a *psAnalyzer) psCmdletCall(c *pwsh.Command, canon string, piped pwsh.Comm
 	args := c.Elements[1:]
 	written := fold.String(c.Elements[0].(*pwsh.StringConstant).Value)
 	argv := a.psArgv(args, false, d)
-	layers := [][]Elem{append([]Elem{{Kind: Lit, Text: c.Elements[0].(*pwsh.StringConstant).Value}}, argv...)}
-	if written != fold.String(canon) {
-		layers = append(layers, append([]Elem{{Kind: Lit, Text: canon}}, argv...))
-	}
-	id := a.addCommand(layers)
-	if _, legacy := psLegacyAliases[written]; !legacy {
-		a.cmds[id].Aliases = len(layers) - 1
-	}
 	spec, known := psCmdlets[fold.String(canon)]
 	var b psBound
 	bound := false
 	if known && spec.params != nil {
 		b, bound = psBind(spec, args)
+	}
+	layers := [][]Elem{append([]Elem{{Kind: Lit, Text: c.Elements[0].(*pwsh.StringConstant).Value}}, argv...)}
+	if written != fold.String(canon) {
+		layers = append(layers, append([]Elem{{Kind: Lit, Text: canon}}, argv...))
+	}
+	if bound {
+		if named := a.psNamedArgv(spec, args, d); !slices.Equal(named, argv) {
+			layers = append(layers, append([]Elem{{Kind: Lit, Text: canon}}, named...))
+		}
+	}
+	id := a.addCommand(layers)
+	if _, legacy := psLegacyAliases[written]; !legacy {
+		a.cmds[id].Aliases = len(layers) - 1
 	}
 	varSpec, vars := spec, b
 	if !bound {

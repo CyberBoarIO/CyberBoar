@@ -137,6 +137,11 @@ cases:
   - {name: git.exe is git, policy: secrets, action: {command: 'git.exe push'}, expect: {decision: deny, rule: "commands.deny[0]"}}
   - {name: a quoted program path is the program, policy: secrets, action: {command: "& 'C:\\Program Files\\Git\\cmd\\git.exe' push"}, expect: {decision: deny, rule: "commands.deny[0]"}}
   - {name: a cmdlet rule matches the alias, policy: secrets, action: {command: 'rm -Recurse build'}, expect: {decision: deny, rule: "commands.deny[1]"}}
+  - {name: a cmdlet rule matches an abbreviated parameter, policy: secrets, action: {command: 'ri -rec build'}, expect: {decision: deny, rule: "commands.deny[1]"}}
+  - {name: a cmdlet rule matches a parameter in another case, policy: secrets, action: {command: 'Remove-Item -r build'}, expect: {decision: deny, rule: "commands.deny[1]"}}
+  - {name: a cmdlet rule matches a switch set to true, policy: secrets, action: {command: 'Remove-Item build -Recurse:$true'}, expect: {decision: deny, rule: "commands.deny[1]"}}
+  - {name: a switch set to false is not used, policy: secrets, action: {command: 'Remove-Item build -Recurse:$false'}, expect: {decision: allow}}
+  - {name: a cmdlet allow rule allows a parameter alias, policy: allowlisted, action: {command: 'gci -s src'}, expect: {decision: allow}}
   - {name: an ask rule asks, policy: secrets, action: {command: "git commit -m 'x'"}, expect: {decision: ask, rule: "commands.ask[0]"}}
   - {name: Start-Process runs the program, policy: secrets, action: {command: "Start-Process git -ArgumentList 'push origin'"}, expect: {decision: deny, rule: "commands.deny[0]"}}
   - {name: a command only known at run time may match a deny rule, policy: secrets, action: {command: '& $tool push'}, expect: {decision: ask, rule: "commands.deny[0]"}}
