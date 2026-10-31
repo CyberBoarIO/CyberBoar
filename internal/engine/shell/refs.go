@@ -124,9 +124,18 @@ func (a *analyzer) fileRefs(raw []Elem, u unwrapResult, d dir, glob globOpts) []
 		r.Contents = contents && !printing
 		refs = append(refs, r)
 	}
+	// Under a wrapper (sudo grep, xargs tr) raw's words don't line up with the
+	// command's, so all of them are checked
+	var skip map[int]bool
+	if len(layers) == 1 {
+		skip = unopened(layers[0])
+	}
 	for i, e := range raw {
 		if i == 0 && (e.Kind != Lit || !strings.Contains(e.Text, "/") && !(a.windows && strings.Contains(e.Text, `\`))) {
 			continue // the command name, unless it is a path
+		}
+		if skip[i] {
+			continue
 		}
 		a.wordRefs(e, d, glob, printing, add)
 	}
@@ -719,6 +728,142 @@ func implicitCwd(name string, argv []Elem) bool {
 		}
 	}
 	return false
+}
+
+// unopened returns the indices in argv of words its command never opens,
+// though they may look like paths: grep's pattern (grep -v /), tr's sets and
+// the delimiters of cut, awk and sort (cut -d/).
+func unopened(argv []Elem) map[int]bool {
+	if len(argv) == 0 || argv[0].Kind != Lit {
+		return nil
+	}
+	name, args, base := fold.String(argv[0].Text), argv[1:], 1
+	if name == "git" && len(args) > 0 && args[0].Kind == Lit && args[0].Text == "grep" {
+		name, args, base = "git grep", args[1:], 2
+	}
+	var idx []int
+	switch name {
+	case "grep", "egrep", "fgrep", "zgrep", "git grep":
+		idx = patternWords(args, "ABCmdD", set("after-context", "before-context", "context", "max-count",
+			"include", "exclude", "exclude-dir", "exclude-from", "devices", "directories", "label", "binary-files",
+			"threads", "max-depth"))
+	case "rg", "ripgrep", "ag", "ack", "ack-grep", "pt", "ugrep":
+		idx = patternWords(args, "gtTABCmjMEr", set("glob", "type", "type-not", "after-context", "before-context",
+			"context", "max-count", "threads", "max-columns", "encoding", "replace", "max-depth", "ignore-file"))
+	case "tr":
+		for i := range args { // tr reads only its standard input
+			idx = append(idx, i)
+		}
+	case "cut":
+		idx = optionValue(args, 'd', "delimiter")
+	case "awk", "gawk", "mawk", "nawk":
+		idx = optionValue(args, 'F', "field-separator")
+	case "sort":
+		idx = optionValue(args, 't', "field-separator")
+	}
+	if len(idx) == 0 {
+		return nil
+	}
+	out := make(map[int]bool, len(idx))
+	for _, i := range idx {
+		if i < len(args) && args[i].Kind == Lit {
+			out[base+i] = true
+		}
+	}
+	return out
+}
+
+// patternWords returns the indices of a search command's patterns: the values
+// of -e and --regexp, or else its first operand. valueShort and valueLong are
+// the options besides -e and -f that take a value. A word only known at run
+// time before the first operand may be an option that names the pattern, so
+// then the first operand isn't one.
+func patternWords(args []Elem, valueShort string, valueLong map[string]bool) []int {
+	var pats, ops []int
+	explicit, unsure := false, false
+	for i := 0; i < len(args); i++ {
+		t := args[i].Text
+		switch {
+		case args[i].Kind != Lit:
+			unsure = unsure || len(ops) == 0
+			ops = append(ops, i)
+		case t == "--":
+			for j := i + 1; j < len(args); j++ {
+				ops = append(ops, j)
+			}
+			i = len(args)
+		case strings.HasPrefix(t, "--"):
+			name, _, attached := strings.Cut(t[2:], "=")
+			switch {
+			case name == "regexp" || name == "file":
+				explicit = true
+				if name == "regexp" {
+					pats = append(pats, i, i+1) // the option and, when it isn't attached, its value
+				}
+				if !attached {
+					i++
+				}
+			case valueLong[name] && !attached:
+				i++
+			}
+		case len(t) > 1 && t[0] == '-':
+			for j := 1; j < len(t); j++ {
+				c := t[j]
+				if c != 'e' && c != 'f' && strings.IndexByte(valueShort, c) < 0 {
+					continue
+				}
+				explicit = explicit || c == 'e' || c == 'f'
+				if c == 'e' {
+					pats = append(pats, i, i+1)
+				}
+				if j == len(t)-1 {
+					i++ // its value is the next word
+				} else if c == 'e' {
+					pats = pats[:len(pats)-1] // attached: only this word
+				}
+				break
+			}
+		default:
+			ops = append(ops, i)
+		}
+	}
+	if !explicit && !unsure && len(ops) > 0 {
+		pats = append(pats, ops[0])
+	}
+	return pats
+}
+
+// optionValue returns the indices of the words holding the value of option
+// -short or --long: -d/ or -d / (also in a cluster, -sd/), --delimiter=/ or
+// --delimiter /.
+func optionValue(args []Elem, short byte, long string) []int {
+	var out []int
+	for i := 0; i < len(args); i++ {
+		t := args[i].Text
+		switch {
+		case args[i].Kind != Lit || t == "--":
+			if t == "--" {
+				return out
+			}
+		case strings.HasPrefix(t, "--"):
+			if name, _, attached := strings.Cut(t[2:], "="); name == long {
+				out = append(out, i)
+				if !attached {
+					out = append(out, i+1)
+					i++
+				}
+			}
+		case len(t) > 1 && t[0] == '-':
+			if j := strings.IndexByte(t[1:], short); j >= 0 {
+				out = append(out, i)
+				if j+2 == len(t) {
+					out = append(out, i+1)
+					i++
+				}
+			}
+		}
+	}
+	return out
 }
 
 // operands counts the paths after a search command's pattern.

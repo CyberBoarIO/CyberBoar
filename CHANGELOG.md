@@ -89,6 +89,10 @@ protocol, audit schema and public Go packages under `pkg/`.
   (`rm -r -f` and `rm -fr` for `rm -rf`).
 - PowerShell: command rules match a cmdlet's parameters however the call abbreviates
   them, so `ri -rec` and `-Recurse:$true` match `Remove-Item -Recurse`.
+- Words a command never opens aren't checked as paths: grep's and ripgrep's pattern,
+  tr's sets, and the field delimiters of cut, awk and sort. `grep -v /` and `cut -d/`
+  were denied as reading the root directory, and `grep .env README.md` as reading
+  `.env`.
 
 ## [v1.0.0-rc.3] - 2026-10-28
 
