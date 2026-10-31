@@ -215,6 +215,8 @@ cases:
   - {name: the hook's settings are guarded on Windows, policy: none, action: {tool: write, path: 'C:/Users/dev/repo/.CLAUDE/settings.local.json.', guarded: ['C:\Users\dev\repo\.claude\settings.local.json']}, expect: {decision: deny, rule: builtin.guarded}}
   - {name: a guarded file may be read on Windows, policy: none, action: {tool: read, path: '.claude\settings.local.json', guarded: ['C:\Users\dev\repo\.claude\settings.local.json']}, expect: {decision: allow}}
   - {name: removing a directory holding a guarded file is denied on Windows, policy: none, action: {tool: shell, command: 'rm -rf /c/users/dev/REPO/.claude', guarded: ['C:\Users\dev\repo\.claude\settings.local.json']}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: a program named in capitals is the same program on Windows, policy: none, action: {tool: shell, command: 'RM -rf .claude', guarded: ['C:\Users\dev\repo\.claude\settings.local.json']}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: xcopy from Git Bash writes into the destination, policy: none, action: {tool: shell, command: 'xcopy src .claude', guarded: ['C:\Users\dev\repo\.claude\settings.local.json']}, expect: {decision: deny, rule: builtin.guarded}}
   - {name: a guarded path that isn't a Windows path is an invalid action, policy: none, action: {tool: read, path: README.md, guarded: ['\\server\share\settings.json']}, expect: {decision: deny, rule: error.invalidAction}}
 
   # --- Allow-listed posture -------------------------------------------------------

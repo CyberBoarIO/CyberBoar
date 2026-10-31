@@ -233,8 +233,7 @@ func TestRejectedRequests(t *testing.T) {
 			t.Errorf("%s: accepted", name)
 			continue
 		}
-		var ae *Error
-		if !errors.As(err, &ae) || ae.Status != http.StatusUnauthorized {
+		if ae, ok := errors.AsType[*Error](err); !ok || ae.Status != http.StatusUnauthorized {
 			t.Errorf("%s: error %v is not a 401 *Error", name, err)
 		}
 	}
@@ -245,8 +244,8 @@ func TestRejectedRequests(t *testing.T) {
 			t.Errorf("at %v: %v", now.Sub(testNow), err)
 		}
 	}
-	var ae *Error
-	if _, err := ParseRequest(fresh(), testNow.Add(time.Hour)); !errors.As(err, &ae) || ae.Code != CodeStale {
+	_, err := ParseRequest(fresh(), testNow.Add(time.Hour))
+	if ae, ok := errors.AsType[*Error](err); !ok || ae.Code != CodeStale {
 		t.Errorf("an old request: %v, want code %s", err, CodeStale)
 	}
 
@@ -259,7 +258,8 @@ func TestRejectedRequests(t *testing.T) {
 	if _, err := ParseRequest(fresh(), q.NonceExpires()); err != nil {
 		t.Errorf("at NonceExpires: %v", err)
 	}
-	if _, err := ParseRequest(fresh(), q.NonceExpires().Add(time.Nanosecond)); !errors.As(err, &ae) || ae.Code != CodeStale {
+	_, err = ParseRequest(fresh(), q.NonceExpires().Add(time.Nanosecond))
+	if ae, ok := errors.AsType[*Error](err); !ok || ae.Code != CodeStale {
 		t.Errorf("after NonceExpires: %v, want code %s", err, CodeStale)
 	}
 }
@@ -273,8 +273,8 @@ func mustKey(k *ecdsa.PrivateKey, err error) *ecdsa.PrivateKey {
 
 func TestUnsigned(t *testing.T) {
 	r := httptest.NewRequest("GET", "/api/v1/bundles", nil)
-	var ae *Error
-	if _, err := ParseRequest(r, testNow); !errors.As(err, &ae) || ae.Code != CodeUnauthenticated || !strings.Contains(err.Error(), "enroll") {
+	_, err := ParseRequest(r, testNow)
+	if ae, ok := errors.AsType[*Error](err); !ok || ae.Code != CodeUnauthenticated || !strings.Contains(err.Error(), "enroll") {
 		t.Fatalf("got %v", err)
 	}
 }

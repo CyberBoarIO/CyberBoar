@@ -98,6 +98,9 @@ cases:
   # The shell: a directory that holds a guarded file
   - {name: removing the settings directory is denied, policy: none, action: {tool: shell, command: "rm -rf .claude"}, expect: {decision: deny, rule: builtin.guarded}}
   - {name: removing the user config directory is denied, policy: none, action: {tool: shell, command: "rm -rf ~/.claude"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: a program named in capitals is the same program (macOS), policy: none, action: {tool: shell, command: "RM -rf .claude"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: a copy named in capitals, policy: none, action: {tool: shell, command: "CP -r x/ .claude"}, expect: {decision: deny, rule: builtin.guarded}}
+  - {name: echo in capitals checks its words as paths, policy: none, action: {tool: shell, command: "ECHO hello"}, expect: {decision: allow}}
   - {name: removing the project is denied, policy: none, action: {tool: shell, command: "cd .. && rm -r repo"}, expect: {decision: deny, rule: builtin.guarded}}
   - {name: moving the settings directory is denied, policy: none, action: {tool: shell, command: "mv .claude .claude.bak"}, expect: {decision: deny, rule: builtin.guarded}}
   - {name: copying a settings directory over it is denied, policy: none, action: {tool: shell, command: "cp -r evil/.claude ."}, expect: {decision: deny, rule: builtin.guarded}}

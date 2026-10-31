@@ -60,10 +60,19 @@ type Result struct {
 	Skipped int // lines that aren't valid audit events and were passed over
 	Batches int // requests the console accepted, including an empty heartbeat
 	// Restarted is true when the log had been truncated or replaced since
-	// the last run, so this run shipped it from its start. Lines the old log
-	// got after the last run, if there were any, were not shipped, since the
-	// old log is out of reach.
+	// the last run, so this run shipped it from its start.
 	Restarted bool
+	// OldLog is the rotated log whose rest this run shipped first. When
+	// Restarted and OldLog is empty, the old log wasn't found.
+	OldLog string
+	// Between are the logs rotated in and out since the last run (the log
+	// was rotated more than once), shipped whole after OldLog, oldest first.
+	Between []string
+	// Lost counts the logs this run found it couldn't ship: the old log when
+	// it wasn't found, and compressed logs in between. Lines they got after
+	// the last run, if there were any, were not shipped, and the console is
+	// told so (audit.Stats.LogsLost).
+	Lost int
 }
 
 // ErrBusy means another ship run holds the lock.
@@ -103,6 +112,7 @@ func Once(ctx context.Context, o Options) (Result, error) {
 		return res, err
 	}
 	off := st.Offset
+	s.stats = st.Stats
 
 	f, err := os.Open(auditPath)
 	if errors.Is(err, os.ErrNotExist) {
@@ -116,33 +126,41 @@ func Once(ctx context.Context, o Options) (Result, error) {
 		if err != nil {
 			return res, err
 		}
-		same, err := sameLog(f, fi.Size(), st)
+		id, err := fileID(f)
 		if err != nil {
 			return res, err
 		}
+		same, err := sameLog(f, fi.Size(), id, st)
+		if err != nil {
+			return res, err
+		}
+		s.r = bufio.NewReaderSize(f, audit.MaxLineBytes+1)
 		if !same {
-			// The log was truncated or replaced (rotated). Its new contents
-			// are shipped from the start, and the restart is saved at once,
-			// so it is reported only once even when this run sends nothing
-			off, res.Restarted = 0, true
-			if err := saveOffset(s.offPath, auditPath, f, 0); err != nil {
+			res.Restarted = true
+			if err := s.finishRotated(ctx, st, id, &res); err != nil {
+				return res, err
+			}
+			// The new log is shipped from its start. The switch is saved at
+			// once, so a lost log is counted once even when this run sends nothing
+			off = 0
+			if err := s.switchTo(f, id); err != nil {
 				return res, err
 			}
 		}
-		s.f, s.r = f, bufio.NewReaderSize(f, audit.MaxLineBytes+1)
-		for {
-			next, sent, err := s.batch(ctx, off, &res)
-			if err != nil {
+		end, err := s.shipFrom(ctx, f, id, off, &res)
+		if err != nil {
+			return res, err
+		}
+		// The log's file ID is saved even when nothing was read from it, so
+		// the log is found after a rename before anything was sent from it
+		if st.File != id && s.saved != id {
+			if err := s.save(end); err != nil {
 				return res, err
-			}
-			off = next
-			if !sent {
-				break
 			}
 		}
 	}
 	if res.Batches == 0 {
-		if err := s.send(ctx, audit.Batch{Endpoint: s.ep, Events: []json.RawMessage{}}); err != nil {
+		if err := s.send(ctx, audit.Batch{Endpoint: s.ep, Events: []json.RawMessage{}, Stats: &s.stats}); err != nil {
 			return res, err
 		}
 		res.Batches++
@@ -158,8 +176,99 @@ type shipper struct {
 	ep        audit.Endpoint
 	auditPath string
 	offPath   string
-	f         *os.File      // the audit log
+	f         *os.File      // the audit log, or a rotated log while its rest is shipped
+	id        string        // f's file ID
+	saved     string        // the file ID this run last saved an offset in
 	r         *bufio.Reader // reads f
+	stats     audit.Stats   // the totals saved with the offset
+}
+
+// finishRotated ships what the logs rotated away since the last run got
+// after it: the rest of the old log st points into, if it is still next to
+// the new one (whose file ID is current), then any logs rotated in and out
+// since, whole. The ones it can't ship are counted lost.
+func (s *shipper) finishRotated(ctx context.Context, st offsetState, current string, res *Result) error {
+	sibs, err := siblings(s.auditPath, current)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		for _, sib := range sibs {
+			sib.f.Close()
+		}
+	}()
+	old, found, err := findOldLog(sibs, st)
+	if err != nil {
+		return err
+	}
+	// Logs written since the old log's last line, or without it since the
+	// last saved offset, came after it
+	var since time.Time
+	if found {
+		since = old.mod
+	} else if fi, err := os.Stat(s.offPath); err == nil {
+		since = fi.ModTime()
+	}
+	var between []rotated
+	unreadable := 0
+	if !since.IsZero() {
+		between, unreadable = rotatedSince(sibs, old.id, since)
+	}
+	res.Lost = unreadable
+	if !found {
+		// A compressed log may be the old one: count it once
+		res.Lost = max(1, unreadable)
+	}
+	s.stats.LogsLost += int64(res.Lost)
+	if found {
+		res.OldLog = old.f.Name()
+		if _, err := s.shipFrom(ctx, old.f, old.id, st.Offset, res); err != nil {
+			return err
+		}
+	}
+	for _, b := range between {
+		// Each switch is saved at once, so a failed run resumes in this log
+		// and a lost log is counted once
+		if err := s.switchTo(b.f, b.id); err != nil {
+			return err
+		}
+		res.Between = append(res.Between, b.f.Name())
+		if _, err := s.shipFrom(ctx, b.f, b.id, 0, res); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// switchTo saves the start of f, whose file ID is id, as the offset.
+func (s *shipper) switchTo(f *os.File, id string) error {
+	s.f, s.id = f, id
+	return s.save(0)
+}
+
+// shipFrom ships f's complete lines after off, batch by batch, and returns
+// the offset after the last one.
+func (s *shipper) shipFrom(ctx context.Context, f *os.File, id string, off int64, res *Result) (int64, error) {
+	s.f, s.id = f, id
+	for {
+		next, sent, err := s.batch(ctx, off, res)
+		if err != nil {
+			return off, err
+		}
+		off = next
+		if !sent {
+			return off, nil
+		}
+	}
+}
+
+// save saves off as the offset in s.f, with the totals.
+func (s *shipper) save(off int64) error {
+	if err := saveOffset(s.offPath, s.auditPath, s.f, s.id, off, s.stats); err != nil {
+		return err
+	}
+	s.saved = s.id
+	return nil
 }
 
 // batch reads the complete lines that follow off in the log, up to one
@@ -181,15 +290,19 @@ func (s *shipper) batch(ctx context.Context, off int64, res *Result) (next int64
 	if err != nil {
 		return off, false, err
 	}
+	// The batch counts its own skipped lines, which the saved offset passes
+	stats := s.stats
+	stats.LinesSkipped += int64(skipped)
 	if len(events) > 0 {
-		if err := s.send(ctx, audit.Batch{Endpoint: s.ep, Events: events}); err != nil {
+		if err := s.send(ctx, audit.Batch{Endpoint: s.ep, Events: events, Stats: &stats}); err != nil {
 			return off, false, err
 		}
 		res.Sent += len(events)
 		res.Batches++
 	}
 	if next != off {
-		if err := saveOffset(s.offPath, s.auditPath, s.f, next); err != nil {
+		s.stats = stats
+		if err := s.save(next); err != nil {
 			return off, false, err
 		}
 	}
@@ -271,8 +384,7 @@ func (s *shipper) send(ctx context.Context, b audit.Batch) error {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.client.Do(req)
 	if err != nil {
-		var ne net.Error
-		if errors.As(err, &ne) && ne.Timeout() {
+		if ne, ok := errors.AsType[net.Error](err); ok && ne.Timeout() {
 			return fmt.Errorf("sending to %s: timed out", s.sink)
 		}
 		return fmt.Errorf("sending to %s: %v", s.sink, err)

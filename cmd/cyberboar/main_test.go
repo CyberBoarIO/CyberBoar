@@ -217,6 +217,13 @@ func TestExplainCommand(t *testing.T) {
 	if code, _, _ := call(t, "", "explain", "--policy", baseline, "--shell", "powershell", "--read", "a"); code != 2 {
 		t.Errorf("--shell with --read: exit %d", code)
 	}
+	// bash may be named, as well as left out
+	if code, out, _ := call(t, "", "explain", "--policy", baseline, "--shell", "bash", "--command", "cat .env"); code != 0 || !strings.HasPrefix(out, "DENY  (files.deny[0])") {
+		t.Errorf("--shell bash: exit %d\n%s", code, out)
+	}
+	if code, _, errOut := call(t, "", "explain", "--policy", baseline, "--shell", "fish", "--command", "ls"); code != 2 || !strings.Contains(errOut, "bash or powershell") {
+		t.Errorf("--shell fish: exit %d\n%s", code, errOut)
+	}
 }
 
 func TestExplainVerboseAliases(t *testing.T) {

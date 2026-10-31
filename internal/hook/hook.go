@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"slices"
 	"time"
+	"uuid"
 
 	"cyberboar.dev/cyberboar/internal/adapters"
 	"cyberboar.dev/cyberboar/internal/adapters/claudecode"
@@ -227,7 +228,7 @@ func Run(ctx context.Context, stdin io.Reader, o Options) Result {
 	}
 	if o.AuditPath != "" {
 		ev := oc.ev
-		ev.Time = start.UTC().Format(time.RFC3339Nano)
+		ev.Time, ev.ID = start.UTC().Format(time.RFC3339Nano), uuid.NewV7().String()
 		// A reason can quote a command. Bound redaction and the append together
 		// even if the decision deadline has already passed
 		ev.Decision, ev.Rule, ev.Reason = string(v.Decision), v.Rule, v.Reason
@@ -330,9 +331,9 @@ func evaluate(ctx context.Context, stdin io.Reader, o Options, ev *audit.Event, 
 	compiled, name, hash, h, sigErr := loadPolicy(loaded)
 	*header = h
 	ev.PolicyName, ev.PolicyHash = name, hash
-	var expired *expiredError
+	expired, isExpired := errors.AsType[*expiredError](sigErr)
 	switch {
-	case errors.As(sigErr, &expired):
+	case isExpired:
 		return expiredVerdict(expired)
 	case sigErr != nil:
 		return deny(RuleSignature, fmt.Sprintf("the policy's signature can't be verified (%v), so every tool call is blocked", sigErr))
@@ -409,7 +410,7 @@ func decide(ctx context.Context, compiled *engine.Compiled, call *adapters.Call,
 		for _, a := range call.Actions {
 			// Each field is redacted before it is truncated, so no part of a secret is left at the cut
 			ev.Actions = append(ev.Actions, audit.Action{Tool: string(a.Tool), Command: audit.Truncate(engine.RedactCommand(ctx, a.Command, a.Shell)),
-				Path: audit.Truncate(engine.Redact(ctx, a.Path)), Server: engine.Redact(ctx, a.MCP.Server), MCPTool: engine.Redact(ctx, a.MCP.Tool)})
+				Shell: a.Shell, Path: audit.Truncate(engine.Redact(ctx, a.Path)), Server: engine.Redact(ctx, a.MCP.Server), MCPTool: engine.Redact(ctx, a.MCP.Tool)})
 		}
 	}
 	if call.Err != nil {
@@ -543,9 +544,9 @@ func Brief(o Options) []byte {
 		return out(UnsupportedReason(o.GOOS, o.Adapter.Name()) + ".\nTell the user before doing anything else.\n")
 	}
 	compiled, _, _, _, sigErr := loadPolicy(o)
-	var expired *expiredError
+	expired, isExpired := errors.AsType[*expiredError](sigErr)
 	switch {
-	case errors.As(sigErr, &expired):
+	case isExpired:
 		return out(briefing.NoPolicy(fmt.Sprintf("it expired at %s", expired.h.Expires.Format(sign.TimeFormat))))
 	case sigErr != nil:
 		return out(briefing.NoPolicy("its signature can't be verified"))

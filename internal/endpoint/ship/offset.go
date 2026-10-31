@@ -9,8 +9,12 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
+	"time"
 
 	"cyberboar.dev/cyberboar/internal/atomicfile"
+	"cyberboar.dev/cyberboar/pkg/audit"
 )
 
 // offsetFile is where the shipped offset of one audit log is kept.
@@ -20,12 +24,19 @@ func offsetFile(stateDir, auditPath string) string {
 }
 
 type offsetState struct {
-	Path   string `json:"path"`
+	Path string `json:"path"`
+	// File identifies the file Offset is in (fileID), so the log is found
+	// after a rename even when nothing was read from it. It is empty in state
+	// saved before ship recorded it.
+	File   string `json:"file,omitempty"`
 	Offset int64  `json:"offset"`
 	// Head is the SHA-256 of the log's first min(Offset, headBytes) bytes,
 	// so a log replaced by one that has already grown past Offset is still
 	// recognized as new.
 	Head string `json:"head"`
+	// Stats are the running totals every batch carries. They are saved with
+	// the offset, so the lines behind it are counted exactly once.
+	Stats audit.Stats `json:"stats"`
 }
 
 // loadOffset reads the saved offset of auditPath. A missing file means
@@ -41,7 +52,7 @@ func loadOffset(path, auditPath string) (offsetState, error) {
 		return offsetState{}, err
 	}
 	var st offsetState
-	if err := json.Unmarshal(data, &st); err != nil || st.Path != auditPath || st.Offset < 0 {
+	if err := json.Unmarshal(data, &st); err != nil || st.Path != auditPath || st.Offset < 0 || st.Stats.LogsLost < 0 || st.Stats.LinesSkipped < 0 {
 		return offsetState{}, fmt.Errorf("%s is corrupt; remove it to ship the audit log from the start", path)
 	}
 	sum, err := hex.DecodeString(st.Head)
@@ -64,10 +75,10 @@ func head(f *os.File, off int64) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// sameLog reports whether f is still the log st.Offset points into, which
-// means it is at least that long and starts as it did.
-func sameLog(f *os.File, size int64, st offsetState) (bool, error) {
-	if size < st.Offset {
+// sameLog reports whether f, whose file ID is id, is still the log st.Offset
+// points into: the same file, at least that long, starting as it did.
+func sameLog(f *os.File, size int64, id string, st offsetState) (bool, error) {
+	if st.File != "" && id != "" && id != st.File || size < st.Offset {
 		return false, nil
 	}
 	if st.Offset == 0 {
@@ -78,11 +89,119 @@ func sameLog(f *os.File, size int64, st offsetState) (bool, error) {
 }
 
 // saveOffset replaces the offset file atomically.
-func saveOffset(path, auditPath string, f *os.File, off int64) error {
+func saveOffset(path, auditPath string, f *os.File, id string, off int64, stats audit.Stats) error {
 	h, err := head(f, off)
 	if err != nil {
 		return err
 	}
-	data, _ := json.Marshal(offsetState{Path: auditPath, Offset: off, Head: h})
+	data, _ := json.Marshal(offsetState{Path: auditPath, File: id, Offset: off, Head: h, Stats: stats})
 	return atomicfile.Write(path, append(data, '\n'), 0o600)
+}
+
+// rotated is a file next to the audit log whose name starts with the log's
+// (audit.jsonl.1, audit.jsonl-20261030): a log rotated away, or its copy.
+type rotated struct {
+	f   *os.File
+	id  string
+	mod time.Time
+}
+
+// siblings opens the files rotated away from auditPath, other than the file
+// whose ID is current. The caller closes them.
+func siblings(auditPath, current string) ([]rotated, error) {
+	dir, base := filepath.Split(auditPath)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	var out []rotated
+	for _, e := range entries {
+		if e.Name() == base || !strings.HasPrefix(e.Name(), base) || !e.Type().IsRegular() {
+			continue
+		}
+		f, err := os.Open(filepath.Join(dir, e.Name()))
+		if err != nil {
+			continue
+		}
+		id, err := fileID(f)
+		fi, serr := f.Stat()
+		if err != nil || serr != nil || id != "" && id == current {
+			f.Close()
+			continue
+		}
+		out = append(out, rotated{f: f, id: id, mod: fi.ModTime()})
+	}
+	return out, nil
+}
+
+// findOldLog returns the sibling that st points into, after that log was
+// rotated away: the same file (st.File), or one that starts as the log did,
+// as copytruncate's copy does. Either is at least st.Offset long and not
+// compressed, since a deleted log's file ID may be reused at once. ok is
+// false when there is none, as when the old log was deleted, compressed or
+// truncated in place.
+func findOldLog(sibs []rotated, st offsetState) (old rotated, ok bool, err error) {
+	is := func(s rotated, id string) (bool, error) {
+		fi, err := s.f.Stat()
+		if err != nil {
+			return false, err
+		}
+		same, err := sameLog(s.f, fi.Size(), id, st)
+		return same && !compressed(s.f), err
+	}
+	for _, s := range sibs {
+		if st.File == "" || s.id != st.File {
+			continue
+		}
+		if same, err := is(s, s.id); err != nil || same {
+			return s, same, err
+		}
+	}
+	if st.Offset == 0 {
+		return rotated{}, false, nil // nothing was shipped from it, so no copy can be told from another log
+	}
+	for _, s := range sibs {
+		if same, err := is(s, ""); err != nil || same {
+			return s, same, err
+		}
+	}
+	return rotated{}, false, nil
+}
+
+// rotationSlack is how much older than the old log a log rotated in after
+// it may look, as when a line reached the old log just after it was renamed.
+// An older log within it is sent again, which the console's event IDs make
+// harmless, rather than a newer one being missed.
+const rotationSlack = 2 * time.Second
+
+// rotatedSince returns, oldest first, the siblings other than old written
+// since since: the logs rotated in and out between two runs, as when the log
+// was rotated twice. unreadable counts the compressed ones, whose lines can't
+// be sent.
+func rotatedSince(sibs []rotated, old string, since time.Time) (logs []rotated, unreadable int) {
+	for _, s := range sibs {
+		if s.id != "" && s.id == old || s.mod.Before(since.Add(-rotationSlack)) {
+			continue
+		}
+		if compressed(s.f) {
+			unreadable++
+			continue
+		}
+		logs = append(logs, s)
+	}
+	slices.SortStableFunc(logs, func(a, b rotated) int { return a.mod.Compare(b.mod) })
+	return logs, unreadable
+}
+
+// compressed reports a file that starts as gzip, bzip2, xz or zstd data does.
+func compressed(f *os.File) bool {
+	var b [6]byte
+	n, _ := f.ReadAt(b[:], 0)
+	p := b[:n]
+	for _, magic := range []string{"\x1f\x8b", "BZh", "\xfd7zXZ\x00", "\x28\xb5\x2f\xfd"} {
+		if strings.HasPrefix(string(p), magic) {
+			return true
+		}
+	}
+	return false
 }

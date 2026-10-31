@@ -99,11 +99,12 @@ configured log denies the call. `spec.audit.sink` alone does not enable logging.
 | Event field | Use |
 |---|---|
 | `time`, `agent`, `version` | Identify source and time. |
+| `id` | A unique ID (UUID version 7) per event, for dropping copies of an event sent twice. |
 | `session`, `toolUseId` | Correlate calls when supplied. |
 | `decision`, `rule`, `reason` | Inspect the decision and responsible rule. |
-| `tool` | The agent's own name for the tool. Codex calls its shell tool `Bash`, PowerShell on Windows included. |
+| `tool` | The agent's own name for the tool. Codex calls its shell tool `Bash`, PowerShell on Windows included; the action's `shell` tells them apart. |
 | `policyName`, `policySha256` | Identify the policy used. |
-| `actions` | Inspect inferred file, shell or MCP actions. Empty when the call is refused before it is understood (an `error.*` or `adapter.*` rule). |
+| `actions` | Inspect inferred file, shell or MCP actions. A shell action has `shell: powershell` when its command is read as PowerShell. A Codex command the adapter refuses (an `adapter.*` rule) is still listed; other calls refused before they are understood have none. |
 | `actionsOmitted` | Detect a size-bounded, incomplete action list. |
 | `durationMs` | Observe decision latency. |
 
@@ -127,10 +128,11 @@ Use a token file, stdin (`--token-file -`) or `CYBERBOAR_ENROLL_TOKEN`; there is
 token-value flag. Protect the state directory for the account running these commands.
 Endpoint identity and policy-signing keys are separate.
 
-`ship` retains its cursor and retries unacknowledged batches. Delivery is at least once.
-Services stay silent on empty rounds; a one-shot run prints its summary. Coordinate
-rotation with the shipping service and perform a
-successful final upload first; see [audit rotation](deploy-mdm.md#rotate-the-audit-log).
+`ship` retains its cursor and retries unacknowledged batches. Delivery is at least once;
+each event's `id` lets the console drop a copy it already stored. Every batch, the empty
+heartbeat included, carries running totals of logs lost to rotation and invalid lines
+skipped. Services stay silent on empty rounds; a one-shot run prints its summary. Rotate
+by renaming, not `copytruncate`; see [audit rotation](deploy-mdm.md#rotate-the-audit-log).
 
 For ownership, service definitions, key storage, upgrades and recovery, follow [MDM
 deployment](deploy-mdm.md).

@@ -70,8 +70,7 @@ func TestToolInputObject(t *testing.T) {
 				}
 				return
 			}
-			var invalid *adapters.Error
-			if !errors.As(err, &invalid) || invalid.Rule != adapters.RuleInvalidInput || invalid.Msg != tc.want {
+			if invalid, ok := errors.AsType[*adapters.Error](err); !ok || invalid.Rule != adapters.RuleInvalidInput || invalid.Msg != tc.want {
 				t.Fatalf("got %v, want invalid input: %s", err, tc.want)
 			}
 		})

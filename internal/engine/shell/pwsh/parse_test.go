@@ -46,8 +46,8 @@ func TestRefused(t *testing.T) {
 		"ls \x00", // NUL
 	} {
 		_, err := Parse(in)
-		var pe *Error
-		if !errors.As(err, &pe) || !pe.Refused || !errors.Is(err, limits.ErrUnparseable) {
+		pe, ok := errors.AsType[*Error](err)
+		if !ok || !pe.Refused || !errors.Is(err, limits.ErrUnparseable) {
 			t.Errorf("%q: want a refusal wrapping ErrUnparseable, got %v", in, err)
 		}
 	}
@@ -67,8 +67,8 @@ func TestSyntaxErrors(t *testing.T) {
 		"from x", "define x", "var x", "\xff", "ls \xc3",
 	} {
 		_, err := Parse(in)
-		var pe *Error
-		if !errors.As(err, &pe) || pe.Refused || !errors.Is(err, limits.ErrUnparseable) {
+		pe, ok := errors.AsType[*Error](err)
+		if !ok || pe.Refused || !errors.Is(err, limits.ErrUnparseable) {
 			t.Errorf("%q: want a syntax error wrapping ErrUnparseable, got %v", in, err)
 		}
 	}
@@ -91,8 +91,7 @@ func TestLimits(t *testing.T) {
 		"pipeline":        {strings.Repeat("ls|", limits.MaxCommands) + "ls", limits.ErrTooComplex},
 	} {
 		_, err := Parse(tc.in)
-		var pe *Error
-		if !errors.As(err, &pe) || !errors.Is(err, tc.want) {
+		if _, ok := errors.AsType[*Error](err); !ok || !errors.Is(err, tc.want) {
 			t.Errorf("%s: want %v, got %v", name, tc.want, err)
 		}
 	}
@@ -106,8 +105,8 @@ func TestLimits(t *testing.T) {
 
 func TestErrorOffset(t *testing.T) {
 	_, err := Parse("ls; é; $x ?? 1")
-	var pe *Error
-	if !errors.As(err, &pe) || pe.Offset != 10 {
+	pe, ok := errors.AsType[*Error](err)
+	if !ok || pe.Offset != 10 {
 		t.Fatalf("got %v, want the offset of ?? in UTF-16 units (10)", err)
 	}
 	if !strings.Contains(err.Error(), "offset 10") || !strings.Contains(err.Error(), "not analyzed") {

@@ -101,8 +101,7 @@ func TestGoldenRequests(t *testing.T) {
 			continue
 		}
 		want, _, _ := strings.Cut(strings.TrimPrefix(name, "reject-"), "-")
-		var e *endpointauth.Error
-		if !errors.As(err, &e) || e.Code != want {
+		if e, ok := errors.AsType[*endpointauth.Error](err); !ok || e.Code != want {
 			t.Errorf("%s: got %v, want code %q", name, err, want)
 		}
 	}
@@ -178,8 +177,7 @@ func TestConcurrentEndpointUpdates(t *testing.T) {
 				r.TLS = &tls.ConnectionState{PeerCertificates: []*x509.Certificate{cert}}
 				_, ep, err := c.authenticate(r, nil, false)
 				if mode == "authenticate-revoke" && err != nil {
-					var refusal *endpointauth.Error
-					if errors.As(err, &refusal) && refusal.Code == endpointauth.CodeRevoked {
+					if refusal, ok := errors.AsType[*endpointauth.Error](err); ok && refusal.Code == endpointauth.CodeRevoked {
 						continue
 					}
 				}

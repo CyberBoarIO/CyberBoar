@@ -216,6 +216,7 @@ type Env struct {
 
 // Actions maps a hook input to the engine actions to evaluate.
 // No actions and no error means the tool touches nothing CyberBoar governs.
+// Actions returned with an error are for the audit log only.
 func Actions(in *Input, env Env) ([]engine.Action, error) {
 	base := engine.Action{Cwd: in.Cwd, Home: env.Home, Workspaces: []string{in.Cwd}}
 	if env.Windows {
@@ -284,7 +285,7 @@ func Actions(in *Input, env Env) ([]engine.Action, error) {
 		}
 		actions, err := shellActions(in, cmd, base, env)
 		if err != nil {
-			return nil, err
+			return actions, err
 		}
 		out = append(out, actions...)
 	}
@@ -323,29 +324,39 @@ func Actions(in *Input, env Env) ([]engine.Action, error) {
 // can't check there.
 const RuleWindowsShell = "adapter.windowsShell"
 
+// shellActions returns the actions of a shell call. A call it refuses still
+// returns the command as it came, for the audit log.
 func shellActions(in *Input, cmd string, base engine.Action, env Env) ([]engine.Action, error) {
+	a := base
+	a.Tool, a.Command, a.CDPath = engine.ToolShell, cmd, env.CDPath
+	if env.Windows {
+		// Codex starts the user's profile unless the model asks for no login
+		// shell. It is the user's own configuration and agents may not write
+		// it (PowerShellDirs), so its names are taken as PowerShell's own
+		a.Shell = engine.ShellPowerShell
+	}
+	refused := func(err error) ([]engine.Action, error) { return []engine.Action{a}, err }
 	call, err := lookupExecCall(in, cmd)
 	if err != nil {
-		return nil, err
+		return refused(err)
 	}
 	if call.Cmd != cmd {
-		return nil, callError("the command in the transcript differs from the hook input")
+		return refused(callError("the command in the transcript differs from the hook input"))
 	}
 	if call.EnvironmentID != nil && *call.EnvironmentID != "" {
-		return nil, &adapters.Error{Rule: RuleRemoteEnvironment, Msg: "the command runs in another environment, whose files the policy can't check, so it is blocked"}
+		return refused(&adapters.Error{Rule: RuleRemoteEnvironment, Msg: "the command runs in another environment, whose files the policy can't check, so it is blocked"})
 	}
 	if call.Tty != nil && *call.Tty {
-		return nil, &adapters.Error{Rule: RuleInteractiveSession, Msg: "the command asks for a terminal (tty), and what is typed into it later (write_stdin) never reaches the hook, " +
-			"so it is blocked; run the command without tty and give it its input as arguments or files"}
+		return refused(&adapters.Error{Rule: RuleInteractiveSession, Msg: "the command asks for a terminal (tty), and what is typed into it later (write_stdin) never reaches the hook, " +
+			"so it is blocked; run the command without tty and give it its input as arguments or files"})
 	}
 	cwd := base.Cwd
 	if call.Workdir != nil && *call.Workdir != "" {
 		if cwd, err = joinDir(env.Windows, base.Cwd, *call.Workdir); err != nil {
-			return nil, err
+			return refused(err)
 		}
 	}
-	a := base
-	a.Tool, a.Cwd, a.CDPath = engine.ToolShell, cwd, env.CDPath
+	a.Cwd = cwd
 	switch {
 	case !env.Windows:
 		shell := env.Shell
@@ -354,17 +365,13 @@ func shellActions(in *Input, cmd string, base engine.Action, env Env) ([]engine.
 		}
 		a.Command = adapters.ShellCommand(shell, cmd)
 	case call.Shell != nil && *call.Shell != "" && !isPowerShell(*call.Shell):
-		return nil, &adapters.Error{Rule: RuleWindowsShell, Msg: fmt.Sprintf("on native Windows %s checks Codex commands in PowerShell only, "+
-			"and this one runs in %s, so it is blocked; run it without `shell`, in PowerShell", brand.DisplayName, *call.Shell)}
-	default:
-		// Codex starts the user's profile unless the model asks for no login
-		// shell. It is the user's own configuration and agents may not write
-		// it (PowerShellDirs), so its names are taken as PowerShell's own
-		a.Command, a.Shell = cmd, engine.ShellPowerShell
+		a.Shell = ""
+		return refused(&adapters.Error{Rule: RuleWindowsShell, Msg: fmt.Sprintf("on native Windows %s checks Codex commands in PowerShell only, "+
+			"and this one runs in %s, so it is blocked; run it without `shell`, in PowerShell", brand.DisplayName, *call.Shell)})
 	}
 	writes, err := shellPatchActions(cmd, base, cwd, env.Windows)
 	if err != nil {
-		return nil, err
+		return refused(err)
 	}
 	return append([]engine.Action{a}, writes...), nil
 }

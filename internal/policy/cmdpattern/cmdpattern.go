@@ -150,6 +150,34 @@ func (t Token) Match(word string, folded bool) bool {
 	return globMatch(t.glob, word, folded)
 }
 
+// Option reports a literal token that is an option (-f, --force).
+func (t Token) Option() bool {
+	return !t.meta && len(t.glob) > 1 && t.glob[0] == '-'
+}
+
+// Flags returns the letters of a literal token that is short options run
+// together, such as -rf, and false for any other token.
+func (t Token) Flags() (string, bool) {
+	if t.meta {
+		return "", false
+	}
+	return ShortFlags(unquote(t.glob))
+}
+
+// ShortFlags returns the letters of a word that is short options run
+// together (-rf), and false for any other word.
+func ShortFlags(w string) (string, bool) {
+	if len(w) < 2 || w[0] != '-' || w[1] == '-' {
+		return "", false
+	}
+	for i := 1; i < len(w); i++ {
+		if c := w[i] | 0x20; c < 'a' || c > 'z' {
+			return "", false
+		}
+	}
+	return w[1:], true
+}
+
 // MayMatch reports whether some word of the given shape could match. A shape
 // is a glob over the possible values of a word only known at run time: "*"
 // for a variable, "*.go" for an unquoted glob. With folded, a match after

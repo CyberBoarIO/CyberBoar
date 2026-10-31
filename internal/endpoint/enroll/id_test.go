@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"uuid"
 
 	"cyberboar.dev/cyberboar/pkg/endpointauth"
 )
@@ -34,14 +35,12 @@ func TestEndpointIDIsStableAndNeverReplaced(t *testing.T) {
 	}
 }
 
-func TestNewUUIDIsVersion4(t *testing.T) {
-	seen := map[string]bool{}
+// The standard library's UUIDs are what the protocol calls a valid endpoint ID.
+func TestNewEndpointIDIsValid(t *testing.T) {
 	for range 100 {
-		id := newUUID()
-		if !endpointauth.ValidEndpointID(id) || seen[id] {
-			t.Fatalf("bad or repeated UUID %q", id)
+		if id := uuid.NewV4().String(); !endpointauth.ValidEndpointID(id) {
+			t.Fatalf("invalid endpoint ID %q", id)
 		}
-		seen[id] = true
 	}
 }
 

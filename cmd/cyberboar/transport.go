@@ -50,14 +50,14 @@ func enrolledClient(stateDir string, t *httpsclient.TLS, now func() time.Time) (
 // renewIfDue renews the client certificate when half its lifetime has
 // passed. Only an expired certificate is an error. A renewal that fails
 // while the certificate still works is retried on the next run.
-func renewIfDue(ctx context.Context, ep *enroll.Endpoint, client *http.Client, stderr io.Writer, cmd string) (bool, error) {
-	renewed, err := ep.RenewIfDue(ctx, client)
+func renewIfDue(ctx context.Context, ep *enroll.Endpoint, client *http.Client, stderr io.Writer, cmd string) error {
+	_, err := ep.RenewIfDue(ctx, client)
 	if errors.Is(err, enroll.ErrExpired) {
-		return false, err
+		return err
 	}
 	if err != nil {
 		fmt.Fprintf(stderr, "%s: %v (the current certificate is valid until %s; retrying next run)\n", cmd, err,
 			ep.Certificate().Leaf.NotAfter.UTC().Format(time.RFC3339))
 	}
-	return renewed, nil
+	return nil
 }

@@ -107,8 +107,8 @@ func checkLoad(t *testing.T, want Expect, err error) {
 		}
 		return
 	}
-	var perr *policy.Error
-	if !errors.As(err, &perr) {
+	perr, ok := errors.AsType[*policy.Error](err)
+	if !ok {
 		t.Fatalf("want load error %q, got: %v", want.LoadError, err)
 	}
 	t.Log(perr)

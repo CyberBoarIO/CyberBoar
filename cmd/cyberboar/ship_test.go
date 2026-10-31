@@ -146,11 +146,20 @@ func TestShipWarnsAboutRotation(t *testing.T) {
 	}
 	// Every line the hook writes starts with its own timestamp
 	os.WriteFile(auditLog, []byte(fmt.Sprintf(`{"time":%q,"agent":"claude-code","decision":"deny","rule":"r","reason":"x","durationMs":1}`+"\n", time.Now().UTC().Format(time.RFC3339Nano))), 0o600)
-	if errs := ship(); !strings.Contains(errs, "truncated or replaced") || !strings.Contains(errs, "right after a ship run") {
-		t.Errorf("no warning after a rotation: %q", errs)
+	if errs := ship(); !strings.Contains(errs, "rotated since the last run") || !strings.Contains(errs, auditLog+".1, was shipped first") {
+		t.Errorf("no note after a rotation: %q", errs)
 	}
 	if errs := ship(); strings.Contains(errs, "rotate") {
 		t.Errorf("warned twice for one rotation: %q", errs)
+	}
+	// Without the old log, the warning says what was lost and how to rotate
+	appendLine(t, auditLog)
+	if err := os.Remove(auditLog); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(auditLog, []byte(fmt.Sprintf(`{"time":%q,"agent":"claude-code","decision":"deny","rule":"r","reason":"x","durationMs":1}`+"\n", time.Now().UTC().Format(time.RFC3339Nano))), 0o600)
+	if errs := ship(); !strings.Contains(errs, "truncated or replaced") || !strings.Contains(errs, "by renaming it") {
+		t.Errorf("no warning after the old log was lost: %q", errs)
 	}
 }
 

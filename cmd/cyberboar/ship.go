@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -93,14 +94,25 @@ func runShip(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stder
 			fmt.Fprintf(stderr, "ship: %v (events stay in the audit log)\n", err)
 			return err
 		}
-		if _, err := renewIfDue(ctx, ep, client, stderr, "ship"); err != nil {
+		if err := renewIfDue(ctx, ep, client, stderr, "ship"); err != nil {
 			fmt.Fprintf(stderr, "ship: %v (events stay in the audit log)\n", err)
 			return err
 		}
 		res, err := ship.Once(ctx, o)
-		if res.Restarted {
-			fmt.Fprintf(stderr, "ship: %s was truncated or replaced since the last run, so it is shipped from its start. "+
-				"Any lines the old log got after the last run were not sent. Rotate the audit log only right after a ship run.\n", *auditPath)
+		if res.Restarted && res.OldLog != "" {
+			fmt.Fprintf(stderr, "ship: %s was rotated since the last run; the rest of the old log, %s, was shipped first.\n", *auditPath, res.OldLog)
+		}
+		if len(res.Between) > 0 {
+			fmt.Fprintf(stderr, "ship: %s was rotated more than once since the last run; %s was shipped too.\n", *auditPath, strings.Join(res.Between, ", "))
+		}
+		switch {
+		case res.Lost > 0 && res.OldLog != "":
+			fmt.Fprintf(stderr, "ship: %d of the logs rotated since the last run are compressed, so the lines they got after it were not sent; "+
+				"the console is told. Keep rotated logs uncompressed until ship has run.\n", res.Lost)
+		case res.Lost > 0:
+			fmt.Fprintf(stderr, "ship: %s was truncated or replaced since the last run, and the old log isn't next to it, so any lines it got "+
+				"after the last run were not sent; the console is told a log was lost. Rotate the audit log by renaming it, not by "+
+				"copying and truncating it, and keep rotated logs uncompressed until ship has run.\n", *auditPath)
 		}
 		if res.Sent > 0 || res.Skipped > 0 || err == nil && *every == 0 {
 			fmt.Fprintf(stdout, "shipped %d events in %d batches, skipped %d invalid lines\n", res.Sent, res.Batches, res.Skipped)

@@ -13,6 +13,8 @@ import (
 
 	"mvdan.cc/sh/v3/pattern"
 	"mvdan.cc/sh/v3/syntax"
+
+	"cyberboar.dev/cyberboar/internal/fold"
 )
 
 // FileRef is a path a command line may touch.
@@ -69,6 +71,23 @@ var printOnly = set("echo", "printf", "true", "false", ":", "sleep", "kill", "ex
 var namesOnly = set("cd", "pushd", "popd", "ls", "dir", "mkdir", "rmdir", "stat", "du", "df",
 	"realpath", "readlink", "basename", "dirname", "test", "[", "echo", "printf", "which", "type", "find")
 
+// foldNames returns layers with each command name folded (fold.String).
+func foldNames(layers [][]Elem) [][]Elem {
+	out := make([][]Elem, len(layers))
+	for i, l := range layers {
+		out[i] = l
+		if len(l) == 0 || l[0].Kind != Lit {
+			continue
+		}
+		if n := fold.String(l[0].Text); n != l[0].Text {
+			e := l[0]
+			e.Text = n
+			out[i] = append([]Elem{e}, l[1:]...)
+		}
+	}
+	return out
+}
+
 // innerName is the command a wrapper chain finally runs.
 func innerName(layers [][]Elem) (string, []Elem) {
 	for _, l := range slices.Backward(layers) {
@@ -105,9 +124,18 @@ func (a *analyzer) fileRefs(raw []Elem, u unwrapResult, d dir, glob globOpts) []
 		r.Contents = contents && !printing
 		refs = append(refs, r)
 	}
+	// Under a wrapper (sudo grep, xargs tr) raw's words don't line up with the
+	// command's, so all of them are checked
+	var skip map[int]bool
+	if len(layers) == 1 {
+		skip = unopened(layers[0])
+	}
 	for i, e := range raw {
 		if i == 0 && (e.Kind != Lit || !strings.Contains(e.Text, "/") && !(a.windows && strings.Contains(e.Text, `\`))) {
 			continue // the command name, unless it is a path
+		}
+		if skip[i] {
+			continue
 		}
 		a.wordRefs(e, d, glob, printing, add)
 	}
@@ -131,6 +159,11 @@ func (a *analyzer) fileRefs(raw []Elem, u unwrapResult, d dir, glob globOpts) []
 			}
 		}
 	}
+	// Windows and macOS find a program whatever its case (RM runs rm), so the
+	// commands whose effects are modeled match folded; printOnly and namesOnly
+	// above, which check less, match only as written.
+	layers = foldNames(layers)
+	name, inner = innerName(layers)
 	if name == "git" {
 		// REF:path names committed content: git show HEAD:.env, cat-file -p :x.
 		for _, e := range inner[1:] {
@@ -182,6 +215,8 @@ func (a *analyzer) changes(raw []Elem, layers [][]Elem, d dir) (all bool, extra 
 		switch name {
 		case "cp", "mv", "ln", "install", "rsync", "scp":
 			extra = append(extra, a.copyDest(name, args, d)...)
+		case "xcopy", "robocopy":
+			extra = append(extra, a.winCopyDest(name, args, d)...)
 		case "tar", "bsdtar", "gtar":
 			if tarExtracts(args) {
 				all = true
@@ -342,6 +377,74 @@ func (a *analyzer) copyDest(name string, args []Elem, d dir) []FileRef {
 		out = append(out, mark(a.pathRef(strings.TrimSuffix(dest.Text, "/")+"/"+base, d)))
 	}
 	return out
+}
+
+// winCopyDest returns what Windows' copy programs write. robocopy SRC DEST
+// [FILE…] copies the files named (every file by default) into the directory
+// DEST, and with /MOV or /MOVE deletes them from SRC. xcopy SRC [DEST] copies
+// a file, or what a directory or wildcard holds, into DEST (by default the
+// working directory). An option is a word starting with one "/" and holding
+// no other separator; a Git Bash path such as /tmp counts as one.
+func (a *analyzer) winCopyDest(name string, args []Elem, d dir) []FileRef {
+	var ops []Elem
+	move := false
+	for _, e := range args {
+		if e.Kind == Lit && strings.HasPrefix(e.Text, "/") && !strings.ContainsAny(e.Text[1:], `/\`) {
+			opt := strings.ToUpper(e.Text)
+			move = move || opt == "/MOV" || opt == "/MOVE"
+			continue
+		}
+		ops = append(ops, e)
+	}
+	if len(ops) == 0 {
+		return nil
+	}
+	dest := Elem{Kind: Lit, Text: "."}
+	if len(ops) > 1 {
+		dest = ops[1]
+	}
+	if dest.Kind != Lit {
+		return nil // a run-time destination is already a path only known at run time
+	}
+	mark := func(r FileRef) FileRef {
+		r.Accessed, r.Contents, r.Modifies = true, true, true
+		return r
+	}
+	target := a.pathRef(dest.Text, d)
+	in := func(f string) FileRef { return mark(a.pathRef(strings.TrimRight(dest.Text, `/\`)+"/"+f, d)) }
+	plain := func(e Elem) bool { return e.Kind == Lit && !e.Glob && !strings.ContainsAny(e.Text, "*?") }
+	var out []FileRef
+	if name == "robocopy" {
+		if move && ops[0].Kind == Lit {
+			out = append(out, mark(a.pathRef(ops[0].Text, d)))
+		}
+		files := ops[min(2, len(ops)):]
+		if len(files) == 0 {
+			return append(out, mark(target))
+		}
+		for _, f := range files {
+			if plain(f) && a.baseName(f.Text) == f.Text {
+				out = append(out, in(f.Text))
+			} else {
+				out = append(out, mark(target))
+			}
+		}
+		return out
+	}
+	// xcopy names a file it copies into a directory after the file; else it
+	// writes the destination, or what a directory holds.
+	if src := ops[0]; plain(src) {
+		if s := a.pathRef(src.Text, d); s.Certain {
+			if info, err := a.fs.Stat(s.Path); err == nil && !info.IsDir() {
+				if info, err := a.fs.Stat(target.Path); target.Certain && err == nil && info.IsDir() {
+					if base := a.baseName(src.Text); base != "" {
+						return []FileRef{in(base)}
+					}
+				}
+			}
+		}
+	}
+	return []FileRef{mark(target)}
 }
 
 // baseName is the last name in a path word, "" for a word ending in a
@@ -601,12 +704,166 @@ func implicitCwd(name string, argv []Elem) bool {
 	case "php":
 		return hasAny(args, "-S") && !hasAny(args, "-t") // serves the working directory
 	case "git":
-		if len(args) == 0 || args[0].Kind != Lit || args[0].Text != "add" {
+		if len(args) == 0 || args[0].Kind != Lit {
 			return false
 		}
-		return hasAny(args[1:], "-A", "-u") || hasLong(args[1:], "all", "update", "no-ignore-removal")
+		switch args[0].Text {
+		case "add":
+			return hasAny(args[1:], "-A", "-u") || hasLong(args[1:], "all", "update", "no-ignore-removal")
+		case "grep":
+			// Searches the work tree, or with --no-index the directory, when
+			// given no path. ( and ) group patterns, so they aren't operands
+			p := parseOpts(args[1:], optSpec{short: "efABCm", permute: true, long: set("after-context",
+				"before-context", "context", "max-count", "threads", "max-depth")})
+			n := 0
+			for _, e := range p.rest {
+				if e.Kind != Lit || e.Text != "(" && e.Text != ")" {
+					n++
+				}
+			}
+			if !p.hasExact("e", "f") && n > 0 {
+				n-- // the first operand is the pattern
+			}
+			return n == 0
+		}
 	}
 	return false
+}
+
+// unopened returns the indices in argv of words its command never opens,
+// though they may look like paths: grep's pattern (grep -v /), tr's sets and
+// the delimiters of cut, awk and sort (cut -d/).
+func unopened(argv []Elem) map[int]bool {
+	if len(argv) == 0 || argv[0].Kind != Lit {
+		return nil
+	}
+	name, args, base := fold.String(argv[0].Text), argv[1:], 1
+	if name == "git" && len(args) > 0 && args[0].Kind == Lit && args[0].Text == "grep" {
+		name, args, base = "git grep", args[1:], 2
+	}
+	var idx []int
+	switch name {
+	case "grep", "egrep", "fgrep", "zgrep", "git grep":
+		idx = patternWords(args, "ABCmdD", set("after-context", "before-context", "context", "max-count",
+			"include", "exclude", "exclude-dir", "exclude-from", "devices", "directories", "label", "binary-files",
+			"threads", "max-depth"))
+	case "rg", "ripgrep", "ag", "ack", "ack-grep", "pt", "ugrep":
+		idx = patternWords(args, "gtTABCmjMEr", set("glob", "type", "type-not", "after-context", "before-context",
+			"context", "max-count", "threads", "max-columns", "encoding", "replace", "max-depth", "ignore-file"))
+	case "tr":
+		for i := range args { // tr reads only its standard input
+			idx = append(idx, i)
+		}
+	case "cut":
+		idx = optionValue(args, 'd', "delimiter")
+	case "awk", "gawk", "mawk", "nawk":
+		idx = optionValue(args, 'F', "field-separator")
+	case "sort":
+		idx = optionValue(args, 't', "field-separator")
+	}
+	if len(idx) == 0 {
+		return nil
+	}
+	out := make(map[int]bool, len(idx))
+	for _, i := range idx {
+		if i < len(args) && args[i].Kind == Lit {
+			out[base+i] = true
+		}
+	}
+	return out
+}
+
+// patternWords returns the indices of a search command's patterns: the values
+// of -e and --regexp, or else its first operand. valueShort and valueLong are
+// the options besides -e and -f that take a value. A word only known at run
+// time before the first operand may be an option that names the pattern, so
+// then the first operand isn't one.
+func patternWords(args []Elem, valueShort string, valueLong map[string]bool) []int {
+	var pats, ops []int
+	explicit, unsure := false, false
+	for i := 0; i < len(args); i++ {
+		t := args[i].Text
+		switch {
+		case args[i].Kind != Lit:
+			unsure = unsure || len(ops) == 0
+			ops = append(ops, i)
+		case t == "--":
+			for j := i + 1; j < len(args); j++ {
+				ops = append(ops, j)
+			}
+			i = len(args)
+		case strings.HasPrefix(t, "--"):
+			name, _, attached := strings.Cut(t[2:], "=")
+			switch {
+			case name == "regexp" || name == "file":
+				explicit = true
+				if name == "regexp" {
+					pats = append(pats, i, i+1) // the option and, when it isn't attached, its value
+				}
+				if !attached {
+					i++
+				}
+			case valueLong[name] && !attached:
+				i++
+			}
+		case len(t) > 1 && t[0] == '-':
+			for j := 1; j < len(t); j++ {
+				c := t[j]
+				if c != 'e' && c != 'f' && strings.IndexByte(valueShort, c) < 0 {
+					continue
+				}
+				explicit = explicit || c == 'e' || c == 'f'
+				if c == 'e' {
+					pats = append(pats, i, i+1)
+				}
+				if j == len(t)-1 {
+					i++ // its value is the next word
+				} else if c == 'e' {
+					pats = pats[:len(pats)-1] // attached: only this word
+				}
+				break
+			}
+		default:
+			ops = append(ops, i)
+		}
+	}
+	if !explicit && !unsure && len(ops) > 0 {
+		pats = append(pats, ops[0])
+	}
+	return pats
+}
+
+// optionValue returns the indices of the words holding the value of option
+// -short or --long: -d/ or -d / (also in a cluster, -sd/), --delimiter=/ or
+// --delimiter /.
+func optionValue(args []Elem, short byte, long string) []int {
+	var out []int
+	for i := 0; i < len(args); i++ {
+		t := args[i].Text
+		switch {
+		case args[i].Kind != Lit || t == "--":
+			if t == "--" {
+				return out
+			}
+		case strings.HasPrefix(t, "--"):
+			if name, _, attached := strings.Cut(t[2:], "="); name == long {
+				out = append(out, i)
+				if !attached {
+					out = append(out, i+1)
+					i++
+				}
+			}
+		case len(t) > 1 && t[0] == '-':
+			if j := strings.IndexByte(t[1:], short); j >= 0 {
+				out = append(out, i)
+				if j+2 == len(t) {
+					out = append(out, i+1)
+					i++
+				}
+			}
+		}
+	}
+	return out
 }
 
 // operands counts the paths after a search command's pattern.
@@ -703,7 +960,7 @@ func (a *analyzer) expandGlob(pattern string, d dir, o globOpts) (matches []stri
 // ranges depend on the locale.
 func (a *analyzer) globMatcher(seg string, nocase bool) func(string) (bool, error) {
 	if a.powershell {
-		seg = strings.Replace(seg, "[!", "[^", -1)
+		seg = strings.ReplaceAll(seg, "[!", "[^")
 		if nocase {
 			seg = strings.ToLower(seg)
 		}

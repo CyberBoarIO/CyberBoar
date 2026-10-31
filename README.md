@@ -1,5 +1,13 @@
 # CyberBoar
 
+[![Quality checks](https://github.com/CyberBoarIO/CyberBoar/actions/workflows/quality-checks.yml/badge.svg?branch=main)](https://github.com/CyberBoarIO/CyberBoar/actions/workflows/quality-checks.yml)
+[![Release](https://img.shields.io/github/v/release/CyberBoarIO/CyberBoar?include_prereleases&sort=semver)](https://github.com/CyberBoarIO/CyberBoar/releases)
+[![Go Reference](https://pkg.go.dev/badge/cyberboar.dev/cyberboar.svg)](https://pkg.go.dev/cyberboar.dev/cyberboar)
+[![Go version](https://img.shields.io/github/go-mod/go-version/CyberBoarIO/CyberBoar)](go.mod)
+[![License: AGPL-3.0](https://img.shields.io/github/license/CyberBoarIO/CyberBoar)](LICENSE)\
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15692/badge)](https://www.bestpractices.dev/en/projects/15692/passing)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/CyberBoarIO/CyberBoar/badge)](https://scorecard.dev/viewer/?uri=github.com/CyberBoarIO/CyberBoar)
+
 **Define what coding agents can do. See what they try.**
 
 [Documentation](https://cyberboar.dev/docs/)

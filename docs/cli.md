@@ -274,7 +274,7 @@ matches `.env`.
 |---|---|---|---|
 | `--policy FILE` | `CYBERBOAR_POLICY` | none | The policy. Required |
 | `--command LINE` | none | none | A shell command line |
-| `--shell NAME` | none | `""` (bash) | The language of `--command`: empty for bash, or `powershell` ([PowerShell support](powershell.md)) |
+| `--shell NAME` | none | `""` (bash) | The language of `--command`: `bash` (the default, also when empty) or `powershell` ([PowerShell support](powershell.md)) |
 | `--read PATH` | none | none | A path the agent reads |
 | `--write PATH` | none | none | A path the agent writes |
 | `--list PATH` | none | none | A path whose names the agent lists |
@@ -402,9 +402,11 @@ background process. Delivery is at least once; consumers must tolerate duplicate
 | `--ca FILE` | `CYBERBOAR_CA` | none | As for `enroll` |
 | `--insecure-skip-verify` | none | none | As for `enroll` |
 
-No arguments. When the audit log was truncated or replaced since the last run, `ship`
-sends the new log from its start and warns on stderr that any lines the old log got
-after the last run were not sent. Rotate the log only right after a `ship` run
+No arguments. When the audit log was rotated since the last run, `ship` first sends the
+rest of the old log if it is still next to the new one (`audit.jsonl.1`), then any logs
+rotated in and out since, then the new log from its start. When a log is gone or
+compressed, it warns on stderr that any lines that log got after the last run were not
+sent, and the console is told through the batch's `stats.logsLost`
 ([deploy-mdm.md](deploy-mdm.md#rotate-the-audit-log)).
 
 ## `cyberboar pull`
@@ -824,5 +826,5 @@ cyberboar dev (policy cyberboar.dev/v1)
 A release binary prints its installed version in place of `dev`. Without one, the
 binary prints the module version Go recorded when it was built: the tag for
 `go install cyberboar.dev/cyberboar/cmd/cyberboar@VERSION`, or a pseudo-version such as
-`v1.0.0-rc.1.0.20261017113155-6b7a4d9d9640` for a build in a git checkout.
+`v1.0.1-0.20261105113155-6b7a4d9d9640` for a build in a git checkout.
 `--version` produces the same response.

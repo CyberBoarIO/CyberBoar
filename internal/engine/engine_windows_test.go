@@ -125,3 +125,16 @@ func TestWindowsCaseAndTrailingDots(t *testing.T) {
 		}
 	}
 }
+
+// A wildcard matches as Windows matches it, unquoted or not, for cmdlets and
+// for the programs PowerShell passes it to: .env like any name, and without case.
+func TestWindowsPowerShellWildcards(t *testing.T) {
+	c, home, repo := windowsFixture(t)
+	for _, cmd := range []string{"gc *", "gc '*'", "Get-Content -Path .\\*", "sls KEY *", "gc .E*", "findstr KEY *", "cmd /c type *"} {
+		v := engine.Evaluate(context.Background(), c, engine.Action{Tool: engine.ToolShell, Command: cmd, Shell: engine.ShellPowerShell,
+			Cwd: repo, Home: home, Workspaces: []string{repo}, Platform: engine.PlatformWindows})
+		if v.Decision != engine.Deny {
+			t.Errorf("%s: %+v", cmd, v)
+		}
+	}
+}

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"cyberboar.dev/cyberboar/internal/adapters"
 	"cyberboar.dev/cyberboar/internal/adapters/claudecode"
@@ -142,6 +143,21 @@ func TestAuditEvent(t *testing.T) {
 		ev.Tool != "Bash" || ev.Project != "/work/repo" || ev.PolicyName != "baseline" || len(ev.PolicyHash) != 64 ||
 		ev.Version != "v-test" || len(ev.Actions) != 1 || ev.Actions[0].Command != "cat .env" || ev.Time == "" {
 		t.Errorf("unexpected audit event: %+v", ev)
+	}
+	// Every event has its own ID, a lowercase version 7 UUID
+	hook.Run(context.Background(), strings.NewReader(in), hook.Options{Adapter: cc, StateDir: t.TempDir(),
+		PolicyPath: policyFile(t, baselinePolicy(t), nil), Getenv: env, AuditPath: log, Version: "v-test"})
+	var second audit.Event
+	if !sc.Scan() || json.Unmarshal(sc.Bytes(), &second) != nil {
+		t.Fatal("no second audit line")
+	}
+	for _, id := range []string{ev.ID, second.ID} {
+		if u, err := uuid.Parse(id); err != nil || u.String() != id || id[14] != '7' {
+			t.Errorf("event ID %q is not a lowercase version 7 UUID", id)
+		}
+	}
+	if ev.ID == second.ID {
+		t.Errorf("two events share the ID %s", ev.ID)
 	}
 }
 
@@ -381,7 +397,8 @@ func TestPowerShellPointsToBash(t *testing.T) {
 	if err == nil {
 		err = json.Unmarshal(data, &ev)
 	}
-	if err != nil || ev.Rule != adapters.RulePowerShell || len(ev.Actions) != 1 || !strings.Contains(ev.Actions[0].Command, "Get-ChildItem") {
+	if err != nil || ev.Rule != adapters.RulePowerShell || len(ev.Actions) != 1 || !strings.Contains(ev.Actions[0].Command, "Get-ChildItem") ||
+		ev.Actions[0].Shell != engine.ShellPowerShell {
 		t.Errorf("audit event %+v (%v)", ev, err)
 	}
 

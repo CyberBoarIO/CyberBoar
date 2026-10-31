@@ -25,7 +25,7 @@ func runExplain(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, st
 	wd, _ := os.Getwd()
 	policyPath := fs.String("policy", h.getenv(envName("policy")), "policy file (env "+envName("policy")+")")
 	shellCmd := fs.String("command", "", "a shell command line")
-	shellName := fs.String("shell", "", `the language of --command: "" (bash) or "powershell"`)
+	shellName := fs.String("shell", "", `the language of --command: "bash" (or "") or "powershell"`)
 	read := fs.String("read", "", "a path the agent reads")
 	write := fs.String("write", "", "a path the agent writes")
 	list := fs.String("list", "", "a path whose names the agent lists")
@@ -92,7 +92,12 @@ func runExplain(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, st
 		fmt.Fprintln(stderr, "explain: --shell goes with --command")
 		return 2
 	}
-	a.Shell = *shellName
+	shell, err := shellLanguage(*shellName)
+	if err != nil {
+		fmt.Fprintf(stderr, "explain: --shell: %v\n", err)
+		return 2
+	}
+	a.Shell = shell
 	_, c, err := loadPolicy(*policyPath)
 	if err != nil {
 		fmt.Fprintf(stderr, "explain: %v\n", err)

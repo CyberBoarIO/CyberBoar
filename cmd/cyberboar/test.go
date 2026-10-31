@@ -34,7 +34,7 @@ type policyTestAction struct {
 	Write     string `json:"write,omitempty"`
 	List      string `json:"list,omitempty"`
 	Command   string `json:"command,omitempty"`
-	Shell     string `json:"shell,omitempty"` // the language of command: "" (bash) or "powershell"
+	Shell     string `json:"shell,omitempty"` // the language of command (shellLanguage)
 	MCP       string `json:"mcp,omitempty"`
 	Cwd       string `json:"cwd,omitempty"`
 	Home      string `json:"home,omitempty"`
@@ -124,7 +124,8 @@ func runTest(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stder
 		case c.Action.List != "":
 			a.Tool, a.Path = engine.ToolList, c.Action.List
 		case c.Action.Command != "":
-			a.Tool, a.Command, a.Shell = engine.ToolShell, c.Action.Command, c.Action.Shell
+			a.Tool, a.Command = engine.ToolShell, c.Action.Command
+			a.Shell, _ = shellLanguage(c.Action.Shell) // checkPolicyCase checked it
 		case c.Action.MCP != "":
 			a.Tool = engine.ToolMCP
 			a.MCP.Server, a.MCP.Tool, _ = strings.Cut(c.Action.MCP, "/")
@@ -146,6 +147,18 @@ func runTest(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stder
 	return 0
 }
 
+// shellLanguage returns engine.Action.Shell for the language a policy test
+// or explain --shell names: bash, given as "" or "bash", or powershell.
+func shellLanguage(name string) (string, error) {
+	switch name {
+	case "", "bash":
+		return "", nil
+	case engine.ShellPowerShell:
+		return name, nil
+	}
+	return "", fmt.Errorf("unknown shell %q: use bash or powershell", name)
+}
+
 func checkPolicyCase(c policyCase) error {
 	if strings.TrimSpace(c.Name) == "" || len(c.Name) > 200 || strings.ContainsAny(c.Name, "\r\n") {
 		return fmt.Errorf("name must be nonempty, one line and at most 200 characters")
@@ -164,11 +177,11 @@ func checkPolicyCase(c policyCase) error {
 	if n != 1 {
 		return fmt.Errorf("action must specify exactly one of read, write, list, command, mcp")
 	}
-	switch {
-	case c.Action.Shell != "" && c.Action.Command == "":
+	if c.Action.Shell != "" && c.Action.Command == "" {
 		return fmt.Errorf("shell goes with command")
-	case c.Action.Shell != "" && c.Action.Shell != engine.ShellPowerShell:
-		return fmt.Errorf("shell must be empty (bash) or powershell")
+	}
+	if _, err := shellLanguage(c.Action.Shell); err != nil {
+		return fmt.Errorf("shell: %w", err)
 	}
 	if c.Action.MCP != "" {
 		server, tool, ok := strings.Cut(c.Action.MCP, "/")

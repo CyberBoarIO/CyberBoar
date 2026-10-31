@@ -15,8 +15,12 @@ const matrixDoc = "../../docs/capability-matrix.md"
 const matrixHeader = `# Capability matrix
 
 Coverage for tool calls that reach each adapter. File checks through shell commands
-are best effort; CyberBoar is not an OS sandbox. See [Agent setup](agents.md) for
-installation and [Security model](security-model.md) for shared limitations.
+are best effort on the command's arguments: what a launched program opens itself is not
+seen, and CyberBoar is not an OS sandbox. See [Agent setup](agents.md) for installation
+and [Security model](security-model.md) for shared limitations.
+
+The table compares the agents at a glance. Each agent's section below it holds what
+the table leaves out: tool names, versions, guarded paths and known gaps.
 
 This reference is generated from ` + "`" + `internal/adapters/matrix_data_test.go` + "`" + ` with
 ` + "`" + `go test ./internal/adapters -update` + "`" + `; edit the source rather than this page.
@@ -39,8 +43,10 @@ func TestMatrixDocUpToDate(t *testing.T) {
 		t.Errorf("%s is out of date (run go test ./internal/adapters -update): %v", matrixDoc, err)
 	}
 	for _, c := range Matrix {
-		if strings.TrimSpace(c.ClaudeCode) == "" || strings.TrimSpace(c.Codex) == "" || strings.TrimSpace(c.Copilot) == "" || strings.TrimSpace(c.Cursor) == "" || strings.TrimSpace(c.Opencode) == "" {
-			t.Errorf("row %q has an empty cell", c.What)
+		for i, x := range c.Cells {
+			if strings.TrimSpace(x.Short) == "" {
+				t.Errorf("row %q has an empty cell for %s", c.What, Agents[i].Name)
+			}
 		}
 	}
 }

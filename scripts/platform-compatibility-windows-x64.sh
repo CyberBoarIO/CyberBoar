@@ -30,8 +30,8 @@ go test -count=1 -run 'TestCorpus/^windows' ./internal/engine/
 go test -count=1 -v ./internal/endpoint/enroll/
 # The endpoint key in CNG: the software provider, and the TPM when the runner has one
 go test -count=1 -v ./internal/endpoint/keystore/
-# ship's lock is the Windows one (LockFileEx)
-go test -count=1 -v -run 'Lock|TestInvalidAcknowledgmentKeepsEvents' ./internal/endpoint/ship/
+# ship's lock is the Windows one (LockFileEx), and it follows a rotated log by its NTFS file ID
+go test -count=1 -v -run 'Lock|TestInvalidAcknowledgmentKeepsEvents|Rotated|Replaced|Truncated|Compressed|FileID|Lost' ./internal/endpoint/ship/
 go test -count=1 -v ./internal/endpoint/strictjson/
 # Policy installation uses the same kernel locking guarantees
 go test -count=1 -v ./internal/endpoint/pull/ ./internal/boundedfile/ ./pkg/sign/

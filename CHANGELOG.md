@@ -7,8 +7,39 @@ protocol, audit schema and public Go packages under `pkg/`.
 
 ## [Unreleased]
 
+### Added
+
+- Audit events: a shell action has `shell: powershell` when its command is read as
+  PowerShell. Codex names its shell tool `Bash` on Windows too, so `tool` alone can't
+  tell them apart.
+- `explain --shell` and a policy test's `shell:` accept `bash`, the default, by name.
+- Audit events have an `id`, a version 7 UUID, so a console can drop an event it
+  already stored when a batch is sent again.
+- `ship` finishes a rotated audit log: when the log was renamed (`audit.jsonl.1`) or
+  copied and truncated, it sends the rest of the old log first, found next to the new
+  one by its file or by how it starts, then any logs rotated in and out since (the log
+  rotated more than once between runs), then the new log. Before, lines the old log got
+  after the last run were lost. A compressed log, which `ship` can't read, is counted
+  lost.
+- Protocol: event batches carry `stats`, running totals of logs lost to rotation (the
+  old log gone) and of invalid lines skipped, so a console can see lost events.
+  Consoles must accept the field; older endpoints don't send it.
+
+### Changed
+
+- Errors from the packages under `pkg/` wrap their cause, so `errors.Is` and
+  `errors.As` reach it.
+- `bundle.Source` no longer has a `Policy` field, whose type was internal and so not
+  something the v1 compatibility promise could cover. Parse `Source.Data` instead.
+- A release binary reports its version as its tag does (`v1.0.0`), as one built with
+  `go install` does; release binaries reported it without the `v`. A policy's
+  `minimumVersion` accepts either.
+
 ### Fixed
 
+- Audit events: a Codex command the adapter refuses (another shell on Windows, a
+  terminal, another environment, a call missing from the transcript) is listed in
+  `actions`, which were empty before.
 - A `cd` whose `..` leaves a symbolic link (`cd link/../other`) is followed as the
   shell follows it, to the directory holding the link, and also as the kernel and
   `cd -P` follow it, to the target's parent.
@@ -36,6 +67,32 @@ protocol, audit schema and public Go packages under `pkg/`.
   variable and a drive path writes a file.
 - A glob that matches nothing is read as any other word, so an unquoted
   `file:///…/token.txt?x` is checked as the file curl opens.
+- `git grep` with no path searches the work tree (or, with `--no-index`, the
+  directory), as `grep -r` does, so `git grep KEY` no longer reads a denied `.env`.
+- On Windows and macOS a program named in other capitals is the program (`RM -rf
+  .claude`, `Git grep KEY`), as their filesystems find it; what it does is checked as
+  for the lower-case name.
+- `xcopy` and `robocopy` are checked as copies: the files they write in the
+  destination, and with `robocopy /MOVE` the source, so they can't replace a guarded
+  file.
+- PowerShell on Windows: an unquoted wildcard given to a program (`findstr KEY *`,
+  each element of `a,*`) is matched as the program matches it, without case and with
+  names that start with a dot. Before, it was taken as a name.
+- PowerShell on Windows: an unquoted `~`, `~\…` or `~/…` given to a program is the
+  home folder, as PowerShell 7.6 passes it, and a program run as `& ~\…` is in the
+  home folder. When older versions' reading, a folder named `~`, may be another file,
+  the command asks.
+- PowerShell: a wildcard path under `~` (`Get-Content ~\.ssh\I*`) is matched in the
+  home folder.
+- Deny and ask rules match an option after operands (`git push origin main --force`
+  for `git push --force`), and short options however they are split or ordered
+  (`rm -r -f` and `rm -fr` for `rm -rf`).
+- PowerShell: command rules match a cmdlet's parameters however the call abbreviates
+  them, so `ri -rec` and `-Recurse:$true` match `Remove-Item -Recurse`.
+- Words a command never opens aren't checked as paths: grep's and ripgrep's pattern,
+  tr's sets, and the field delimiters of cut, awk and sort. `grep -v /` and `cut -d/`
+  were denied as reading the root directory, and `grep .env README.md` as reading
+  `.env`.
 
 ## [v1.0.0-rc.3] - 2026-10-28
 

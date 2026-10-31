@@ -1,13 +1,12 @@
 package enroll
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"uuid"
 
 	"cyberboar.dev/cyberboar/internal/atomicfile"
 	"cyberboar.dev/cyberboar/pkg/endpointauth"
@@ -33,7 +32,7 @@ func EndpointID(stateDir string) (string, error) {
 		if err := os.MkdirAll(stateDir, 0o700); err != nil {
 			return "", err
 		}
-		id := newUUID()
+		id := uuid.NewV4().String()
 		err = atomicfile.WriteNew(path, []byte(id+"\n"), 0o600)
 		if errors.Is(err, os.ErrExist) {
 			continue // another run created it first, so read theirs
@@ -44,14 +43,4 @@ func EndpointID(stateDir string) (string, error) {
 		return id, nil
 	}
 	return "", fmt.Errorf("%s: could not create or read the endpoint ID", path)
-}
-
-// newUUID returns a random (version 4) UUID.
-func newUUID() string {
-	var b [16]byte
-	rand.Read(b[:]) // never fails (crypto/rand)
-	b[6] = b[6]&0x0f | 0x40
-	b[8] = b[8]&0x3f | 0x80
-	h := hex.EncodeToString(b[:])
-	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:32]
 }

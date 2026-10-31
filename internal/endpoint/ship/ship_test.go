@@ -136,6 +136,17 @@ func appendTo(t *testing.T, path, s string) {
 	f.Close()
 }
 
+func copyTo(t *testing.T, from, to string) {
+	t.Helper()
+	data, err := os.ReadFile(from)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(to, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func run(t *testing.T, o Options) Result {
 	t.Helper()
 	res, err := Once(context.Background(), o)
@@ -248,10 +259,20 @@ func TestReplacedLogStartsOver(t *testing.T) {
 	}
 }
 
-// A run that finds the log rotated reports it, since lines the old log got
-// after the last run were never sent. It reports it once, even when the new
-// log has nothing to send yet.
-func TestRotationIsReported(t *testing.T) {
+// stats returns the totals of the last batch the console accepted.
+func (c *console) stats() audit.Stats {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.batches) == 0 || c.batches[len(c.batches)-1].Stats == nil {
+		return audit.Stats{LogsLost: -1}
+	}
+	return *c.batches[len(c.batches)-1].Stats
+}
+
+// A run that finds the log rotated ships the rest of the old log first, found
+// next to the new one by how it starts. It reports the rotation once, even
+// when the new log has nothing to send yet.
+func TestRotatedLogIsFinished(t *testing.T) {
 	c, o := setup(t)
 	appendTo(t, o.AuditPath, line(1, "deny"))
 	if res := run(t, o); res.Restarted {
@@ -261,8 +282,10 @@ func TestRotationIsReported(t *testing.T) {
 	if err := os.Rename(o.AuditPath, o.AuditPath+".1"); err != nil {
 		t.Fatal(err)
 	}
+	appendTo(t, o.AuditPath+".2", line(9, "deny")) // an older rotation, which doesn't start as the log did
+	age(t, o.AuditPath+".2", time.Hour)
 	appendTo(t, o.AuditPath, "")
-	if res := run(t, o); !res.Restarted || res.Sent != 0 {
+	if res := run(t, o); !res.Restarted || res.Sent != 1 || res.OldLog != o.AuditPath+".1" {
 		t.Errorf("run after the rotation: %+v", res)
 	}
 	if res := run(t, o); res.Restarted {
@@ -272,17 +295,199 @@ func TestRotationIsReported(t *testing.T) {
 	if res := run(t, o); res.Restarted || res.Sent != 1 {
 		t.Errorf("first event of the new log: %+v", res)
 	}
-	if got := strings.Join(c.rules(), " "); got != "r1 r3" {
+	if got := strings.Join(c.rules(), " "); got != "r1 r2 r3" {
 		t.Errorf("rules = %s", got)
 	}
+	if s := c.stats(); s != (audit.Stats{}) {
+		t.Errorf("stats = %+v, want none lost", s)
+	}
 
-	// Truncating the log in place (copytruncate) is a rotation too
+	// copytruncate leaves a copy that starts as the log did
+	age(t, o.AuditPath+".1", time.Hour)
 	appendTo(t, o.AuditPath, line(4, "deny"))
+	copyTo(t, o.AuditPath, o.AuditPath+".3")
 	if err := os.Truncate(o.AuditPath, 0); err != nil {
 		t.Fatal(err)
 	}
-	if res := run(t, o); !res.Restarted {
+	if res := run(t, o); !res.Restarted || res.OldLog != o.AuditPath+".3" {
 		t.Errorf("run after truncation: %+v", res)
+	}
+	if got := strings.Join(c.rules(), " "); got != "r1 r2 r3 r4" {
+		t.Errorf("rules = %s", got)
+	}
+}
+
+// age sets path's modification time d in the past, as a log rotated earlier has.
+func age(t *testing.T, path string, d time.Duration) {
+	t.Helper()
+	old := time.Now().Add(-d)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func rotate(t *testing.T, from, to string) {
+	t.Helper()
+	if err := os.Rename(from, to); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A log rotated away before anything was sent from it (it was empty at the
+// last run) is found by its file ID, which a rename keeps.
+func TestLogRotatedBeforeAnythingSentIsFinished(t *testing.T) {
+	c, o := setup(t)
+	appendTo(t, o.AuditPath, "")
+	run(t, o)
+	appendTo(t, o.AuditPath, line(1, "deny"))
+	rotate(t, o.AuditPath, o.AuditPath+".1")
+	appendTo(t, o.AuditPath, line(2, "deny"))
+	if res := run(t, o); !res.Restarted || res.OldLog != o.AuditPath+".1" || res.Lost != 0 {
+		t.Errorf("run after the rotation: %+v", res)
+	}
+	if got := strings.Join(c.rules(), " "); got != "r1 r2" {
+		t.Errorf("rules = %s", got)
+	}
+	if s := c.stats(); s != (audit.Stats{}) {
+		t.Errorf("stats = %+v, want none lost", s)
+	}
+}
+
+// A log rotated twice between runs: the rest of the old log is sent, then the
+// log rotated in and out between, whole, then the new log. An older log isn't
+// sent again.
+func TestLogRotatedTwiceIsFinished(t *testing.T) {
+	c, o := setup(t)
+	appendTo(t, o.AuditPath+".3", line(8, "deny")) // rotated before the first run
+	age(t, o.AuditPath+".3", 2*time.Hour)
+	appendTo(t, o.AuditPath, line(1, "deny"))
+	run(t, o)
+	appendTo(t, o.AuditPath, line(2, "deny"))
+	rotate(t, o.AuditPath, o.AuditPath+".1")
+	age(t, o.AuditPath+".1", time.Hour)
+	appendTo(t, o.AuditPath, line(3, "deny"))
+	rotate(t, o.AuditPath+".1", o.AuditPath+".2")
+	rotate(t, o.AuditPath, o.AuditPath+".1")
+	appendTo(t, o.AuditPath, line(4, "deny"))
+	res := run(t, o)
+	if !res.Restarted || res.OldLog != o.AuditPath+".2" || len(res.Between) != 1 || res.Between[0] != o.AuditPath+".1" || res.Lost != 0 {
+		t.Errorf("run after two rotations: %+v", res)
+	}
+	if got := strings.Join(c.rules(), " "); got != "r1 r2 r3 r4" {
+		t.Errorf("rules = %s", got)
+	}
+	if res := run(t, o); res.Restarted || res.Sent != 0 {
+		t.Errorf("the rotations were reported twice: %+v", res)
+	}
+}
+
+// A compressed log can't be sent: it is counted lost, once, and the logs
+// rotated after it are still sent.
+func TestCompressedLogIsCounted(t *testing.T) {
+	gz := "\x1f\x8b\x08\x00compressed"
+	t.Run("in between", func(t *testing.T) {
+		c, o := setup(t)
+		appendTo(t, o.AuditPath, line(1, "deny"))
+		run(t, o)
+		appendTo(t, o.AuditPath, line(2, "deny"))
+		rotate(t, o.AuditPath, o.AuditPath+".2")
+		age(t, o.AuditPath+".2", time.Hour)
+		appendTo(t, o.AuditPath+".1.gz", gz)
+		appendTo(t, o.AuditPath, line(4, "deny"))
+		if res := run(t, o); res.OldLog != o.AuditPath+".2" || res.Lost != 1 {
+			t.Errorf("run: %+v", res)
+		}
+		if got := strings.Join(c.rules(), " "); got != "r1 r2 r4" {
+			t.Errorf("rules = %s", got)
+		}
+		run(t, o)
+		if s := c.stats(); s.LogsLost != 1 {
+			t.Errorf("stats = %+v, want 1 log lost", s)
+		}
+	})
+	t.Run("the old log", func(t *testing.T) {
+		c, o := setup(t)
+		appendTo(t, o.AuditPath, line(1, "deny"))
+		run(t, o)
+		appendTo(t, o.AuditPath, line(2, "deny"))
+		if err := os.Remove(o.AuditPath); err != nil { // compressed, as logrotate's compress does
+			t.Fatal(err)
+		}
+		appendTo(t, o.AuditPath+".2.gz", gz)
+		appendTo(t, o.AuditPath+".1", line(3, "deny"))
+		appendTo(t, o.AuditPath, line(4, "deny"))
+		if res := run(t, o); res.OldLog != "" || len(res.Between) != 1 || res.Lost != 1 {
+			t.Errorf("run: %+v", res)
+		}
+		if got := strings.Join(c.rules(), " "); got != "r1 r3 r4" {
+			t.Errorf("rules = %s", got)
+		}
+		if s := c.stats(); s.LogsLost != 1 {
+			t.Errorf("stats = %+v, want 1 log lost", s)
+		}
+	})
+}
+
+// State saved without a file ID gets one on the next run.
+func TestOffsetGainsFileID(t *testing.T) {
+	_, o := setup(t)
+	appendTo(t, o.AuditPath, line(1, "deny"))
+	run(t, o)
+	abs, _ := filepath.Abs(o.AuditPath)
+	path := offsetFile(o.StateDir, abs)
+	st, err := loadOffset(path, abs)
+	if err != nil || st.File == "" {
+		t.Fatalf("saved state = %+v, %v", st, err)
+	}
+	st.File = ""
+	data, _ := json.Marshal(st)
+	os.WriteFile(path, data, 0o600)
+	if res := run(t, o); res.Restarted || res.Sent != 0 {
+		t.Errorf("run: %+v", res)
+	}
+	if st, err := loadOffset(path, abs); err != nil || st.File == "" {
+		t.Errorf("state after the run = %+v, %v", st, err)
+	}
+}
+
+// When the old log is gone, the run reports it, and the console learns it
+// from the totals in every batch, heartbeats included. A rotation is counted
+// once, and a run that fails to send doesn't count it again.
+func TestLostLogIsCounted(t *testing.T) {
+	c, o := setup(t)
+	appendTo(t, o.AuditPath, line(1, "deny"))
+	run(t, o)
+	appendTo(t, o.AuditPath, line(2, "deny")) // never sent: the log is deleted
+	if err := os.Remove(o.AuditPath); err != nil {
+		t.Fatal(err)
+	}
+	appendTo(t, o.AuditPath, "")
+	c.fail = true
+	if _, err := Once(context.Background(), o); err == nil {
+		t.Fatal("the failing console accepted the heartbeat")
+	}
+	c.fail = false
+	if res := run(t, o); res.Restarted || res.Batches != 1 {
+		t.Errorf("the rotation was reported twice: %+v", res)
+	}
+	if s := c.stats(); s.LogsLost != 1 {
+		t.Errorf("heartbeat stats = %+v, want 1 log lost", s)
+	}
+	// Truncating in place without a copy loses the log too
+	appendTo(t, o.AuditPath, line(3, "deny")+"not an event\n")
+	run(t, o)
+	if err := os.Truncate(o.AuditPath, 0); err != nil {
+		t.Fatal(err)
+	}
+	appendTo(t, o.AuditPath, line(4, "deny"))
+	if res := run(t, o); !res.Restarted || res.OldLog != "" {
+		t.Errorf("run after truncation: %+v", res)
+	}
+	if s := c.stats(); s != (audit.Stats{LogsLost: 2, LinesSkipped: 1}) {
+		t.Errorf("stats = %+v, want 2 logs lost and 1 line skipped", s)
+	}
+	if got := strings.Join(c.rules(), " "); got != "r1 r3 r4" {
+		t.Errorf("rules = %s", got)
 	}
 }
 

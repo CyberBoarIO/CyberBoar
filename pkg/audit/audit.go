@@ -22,7 +22,10 @@ const maxField = 4096
 // Event is one hook decision.
 // Fields may be added but never renamed.
 type Event struct {
-	Time       string   `json:"time"` // RFC 3339, UTC
+	Time string `json:"time"` // RFC 3339, UTC
+	// ID is a lowercase version 7 UUID, unique to the event. A batch can
+	// reach the console twice, and the ID tells it the event is the same.
+	ID         string   `json:"id,omitempty"`
 	Agent      string   `json:"agent"`
 	Version    string   `json:"version"`
 	Session    string   `json:"session,omitempty"`
@@ -48,6 +51,9 @@ type Event struct {
 type Action struct {
 	Tool    string `json:"tool"`
 	Command string `json:"command,omitempty"`
+	// Shell is "powershell" when the command is read as PowerShell, and empty
+	// for the POSIX shells.
+	Shell   string `json:"shell,omitempty"`
 	Path    string `json:"path,omitempty"`
 	Server  string `json:"mcpServer,omitempty"`
 	MCPTool string `json:"mcpTool,omitempty"`
@@ -61,11 +67,28 @@ type Endpoint struct {
 	Version  string `json:"version"` // cyberboar version
 }
 
-// Batch is the body of the console's POST /api/v1/events.
-// Fields a newer endpoint adds are kept.
+// Batch is the body of the console's POST /api/v1/events. Add fields, never
+// rename them.
 type Batch struct {
 	Endpoint Endpoint          `json:"endpoint"`
 	Events   []json.RawMessage `json:"events"`
+	// Stats is nil in batches from endpoints older than the field.
+	Stats *Stats `json:"stats,omitempty"`
+}
+
+// Stats are the endpoint's running totals for the audit log it ships, since
+// it began shipping that log. Every batch carries them, heartbeats included,
+// so a batch that is lost or arrives twice doesn't throw the console off: it
+// watches the totals rise. Add fields, never rename them.
+type Stats struct {
+	// LogsLost counts the times the log was replaced (rotated, truncated or
+	// deleted) before it had been shipped to its end and the old log
+	// couldn't be found next to the new one to finish it. Lines the old log
+	// got after the batch before, if there were any, never reached the console.
+	LogsLost int64 `json:"logsLost"`
+	// LinesSkipped counts lines that weren't valid audit events, which the
+	// endpoint passed over. Only damage or a hand edit makes such a line.
+	LinesSkipped int64 `json:"linesSkipped"`
 }
 
 // MaxLineBytes bounds one audit line the console accepts.

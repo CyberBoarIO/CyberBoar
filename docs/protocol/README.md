@@ -172,7 +172,7 @@ certificate (there is none yet). `Content-Type: application/json`; anything else
 `415`. Body, at most 4 KiB:
 
 ```json
-{"token":"cyberboar_enroll_…","endpoint":{"id":"3f1c6a52-…","hostname":"dev-laptop-17","version":"v1.0.0-rc.1"},
+{"token":"cyberboar_enroll_…","endpoint":{"id":"3f1c6a52-…","hostname":"dev-laptop-17","version":"v1.0.0"},
  "publicKey":"MFkw…"}
 ```
 
@@ -354,8 +354,9 @@ through a developer's browser.
 Body, at most 4 MiB:
 
 ```json
-{"endpoint":{"id":"3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24","hostname":"dev-laptop-17","version":"v1.0.0-rc.1"},
- "events":[ …audit lines, as written… ]}
+{"endpoint":{"id":"3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24","hostname":"dev-laptop-17","version":"v1.0.0"},
+ "events":[ …audit lines, as written… ],
+ "stats":{"logsLost":0,"linesSkipped":0}}
 ```
 
 | Field | Rule |
@@ -364,8 +365,9 @@ Body, at most 4 MiB:
 | `endpoint.hostname` | optional; at most 255 bytes of valid UTF-8 without control characters |
 | `endpoint.version` | required; the same rule |
 | `events` | a list (empty is a heartbeat), at most 1000 entries |
+| `stats` | optional (current endpoints always send it; older ones omit it); exactly `logsLost` and `linesSkipped`, integers from 0 to 2^53−1 |
 
-Unknown top-level or `endpoint` fields are an error. **Keys are exact and unique:** no
+Unknown top-level, `endpoint` or `stats` fields are an error. **Keys are exact and unique:** no
 object in the body, at any depth, has the same key twice, also counting keys that differ
 only in case, and a key naming a field of the batch, the endpoint, an event or an action
 is spelled exactly as here. Many JSON parsers keep the first of two equal keys and some
@@ -402,6 +404,31 @@ may be unsigned like any error answer, so the wait is the only thing an endpoint
 from them: whoever could forge one could as well refuse every batch, and the events stay
 in the endpoint's audit log.
 
+### Completeness
+
+What tells a console it has every event:
+
+- **Duplicates:** every event has an `id`, a lowercase version 7 UUID
+  unique to it. A console drops an event whose `id` it already stored; a batch sent
+  again after a lost acknowledgment then stores nothing twice. Events from older
+  endpoints have no `id`.
+- **Silence:** an endpoint whose `ship` runs sends a batch every round, empty when
+  there is nothing new (a heartbeat). A console should flag an endpoint it hasn't heard
+  from for several rounds.
+- **Loss on the endpoint:** `stats` holds running totals for the audit log the
+  endpoint ships, since it began shipping it, and every batch carries them, heartbeats
+  included. A batch lost or sent twice doesn't throw them off, and a console flags an
+  endpoint whose totals rise. `logsLost` counts the logs replaced (rotated, truncated
+  or deleted) before they had been shipped to their end that the endpoint couldn't
+  finish, the old log not found next to the new one or compressed: lines they got after
+  the batch before, if there were any, never reached the console
+  ([rotation](../deploy-mdm.md#rotate-the-audit-log)). `linesSkipped` counts lines that
+  weren't valid audit events, which only damage or a hand edit makes. A total that
+  falls means the endpoint's shipping state was reset, not that anything came back.
+
+The hook writes the audit log as the developer's account, so someone with that account
+can still change lines before they are shipped. Shipping often keeps that window short.
+
 ## Golden files
 
 `testdata/protocol/`:
@@ -421,7 +448,8 @@ in the endpoint's audit log.
 - `bundle-never-expires.json`: the same policy, serial `1790856002`, expiry `never`; accepted at
   any time.
 - `events/accept-*.json` must be accepted (`202`), `events/reject-*.json` rejected with `400`
-  and nothing stored. `accept-actions-omitted.json` has an event whose actions were cut short.
+  and nothing stored. `accept-actions-omitted.json` has an event whose actions were cut short;
+  `accept-stats.json` has `stats` and an event with an `id`.
 - `auth/`: the authentication layer, made for the clock **2026-10-01T12:00:00Z** (Unix
   1790856000) and endpoint `3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24`. The test keys are
   `insecure-endpoint` (the endpoint), `insecure-console` (the console's answers), `insecure-ca`

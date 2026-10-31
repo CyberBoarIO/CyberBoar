@@ -250,6 +250,28 @@ cases:
   - {name: recursive grep without a path reads the cwd, policy: secrets, action: {command: "grep -rn KEY"}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: ripgrep without a path reads the cwd, policy: secrets, action: {command: "rg KEY"}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: ripgrep with a clean path, policy: secrets, action: {command: "rg KEY src/"}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: git grep without a path reads the work tree, policy: secrets, action: {command: "git grep KEY"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: git grep --no-index without a path reads the cwd, policy: secrets, action: {command: "git grep --no-index -n -e KEY"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: git grep with grouped patterns and no path, policy: secrets, action: {command: "git grep \\( -e A --or -e B \\)"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: git grep with options taking values and no path, policy: secrets, action: {command: "git grep -C 3 --max-depth 2 KEY"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: git grep with a clean path, policy: secrets, action: {command: "git grep -e KEY -- src"}, expect: {decision: allow, rule: posture.deny-listed}}
+  # Words a command never opens: grep's pattern, tr's sets, a field delimiter
+  - {name: grep's pattern is not a path, policy: secrets, action: {command: "go test ./... | grep -v '/'"}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: grep's pattern may name a protected file, policy: secrets, action: {command: "grep -n .env README.md"}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: an -e pattern is not a path, policy: secrets, action: {command: "grep -e / -e.env -- README.md"}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: with -e the first operand is a file, policy: secrets, action: {command: "grep .env -e KEY"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: grep's -f names a file it reads, policy: secrets, action: {command: "grep -f .env README.md"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: grep of the root is still denied, policy: secrets, action: {command: "grep -r KEY /"}, expect: {decision: deny, rule: builtin.procfs}}
+  - {name: a run-time word may be the option naming the pattern, policy: secrets, action: {command: "grep \"$OPT\" .env"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: git grep's pattern is not a path, policy: secrets, action: {command: "git grep -n / -- src"}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: ripgrep's pattern is not a path, policy: secrets, action: {command: "rg -n / src"}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: tr's sets are not paths, policy: secrets, action: {command: "tr / _ < README.md"}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: tr still reads what is redirected to it, policy: secrets, action: {command: "tr / _ < .env"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: cut's delimiter is not a path, policy: secrets, action: {command: "cut -d/ -f2 README.md && cut -f1 -d / README.md"}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: awk's field separator is not a path, policy: secrets, action: {command: "awk -F/ '{print $1}' README.md"}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: sort's field separator is not a path, policy: secrets, action: {command: "sort -nt/ -k2 README.md"}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: cut still reads its file, policy: secrets, action: {command: "cut -d/ -f2 .env"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: a wrapped grep's words are all checked, policy: secrets, action: {command: "nice grep -v / README.md"}, expect: {decision: deny, rule: builtin.procfs}}
   - {name: git add dot, policy: secrets, action: {command: "git add ."}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: git add -A, policy: secrets, action: {command: "git add -A"}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: git add a file, policy: secrets, action: {command: "git add src/main.go"}, expect: {decision: allow, rule: posture.deny-listed}}

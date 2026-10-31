@@ -1,0 +1,32 @@
+{
+  "endpoint": {
+    "id": "3f1c6a52-8d4e-4b7a-9c21-5e0f7d9a1b24",
+    "hostname": "dev-laptop-17",
+    "version": "v1.0.0"
+  },
+  "events": [
+    {
+      "time": "2026-10-30T09:12:44.318Z",
+      "id": "019a3a1c-7e2f-7c4d-9b1a-2f6e8d0c4a17",
+      "agent": "codex",
+      "version": "v1.0.0",
+      "tool": "Bash",
+      "actions": [
+        {
+          "tool": "shell",
+          "command": "Get-Content .env",
+          "shell": "powershell"
+        }
+      ],
+      "decision": "deny",
+      "rule": "files.deny[0]",
+      "reason": "reading .env is denied",
+      "policyName": "baseline",
+      "durationMs": 1.2
+    }
+  ],
+  "stats": {
+    "logsLost": 1,
+    "linesSkipped": 0
+  }
+}
