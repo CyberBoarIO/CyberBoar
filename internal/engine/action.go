@@ -74,8 +74,9 @@ type Action struct {
 	// Protected are the absolute paths of CyberBoar's own directories and
 	// files, such as the hook's tripwire counts and shipping offsets, and the
 	// audit log. Paths inside them are denied whatever the policy says
-	// (builtin.self), and so is touching the contents of a directory that
-	// holds one. They are optional, and only file and shell actions use them.
+	// (builtin.self), as are their rotated copies, the paths beside them
+	// whose names start with theirs (audit.jsonl.1), and touching the
+	// contents of a directory that holds one. They are optional, and only file and shell actions use them.
 	Protected []string
 	// Guarded are the absolute paths of the files that decide whether and how
 	// CyberBoar runs (builtin.guarded): the agent's settings files that

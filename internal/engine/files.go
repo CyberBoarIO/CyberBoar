@@ -159,13 +159,13 @@ func (e fileEnv) guardRule(display string, candidates []string, how change) (Ver
 	return Verdict{}, false
 }
 
-// selfRule denies a path inside one of CyberBoar's own directories, or, when
-// the action touches contents, a directory that holds one (builtin.self).
-// Paths are compared folded, like deny rules.
+// selfRule denies a path inside one of CyberBoar's own directories or a
+// rotated copy of one, or, when the action touches contents, a directory
+// that holds one (builtin.self). Paths are compared folded, like deny rules.
 func (e fileEnv) selfRule(display string, candidates []string, contents bool) (Verdict, bool) {
 	for _, p := range e.protected {
 		for _, c := range candidates {
-			if isSameOrAncestor(p, c) || (contents && isSameOrAncestor(c, p)) {
+			if isSameOrAncestor(p, c) || isRotation(p, c) || (contents && isSameOrAncestor(c, p)) {
 				return deny(RuleSelf, fmt.Sprintf("%s is or holds %s's own state, which agents may not touch, so access is blocked; %s", display, brand.Name, noRetry)), true
 			}
 		}

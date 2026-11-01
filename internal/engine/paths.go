@@ -187,6 +187,16 @@ func isSameOrAncestor(dir, p string) bool {
 	return dir == "/" || dir == p || strings.HasPrefix(p, dir+"/")
 }
 
+// isRotation reports whether p is, or is inside, a path beside f whose name
+// starts with f's: the rotated copies ship reads (audit.jsonl.1,
+// audit.jsonl-20261101.gz), and any an agent could plant for it.
+func isRotation(f, p string) bool {
+	f, p = fold.String(f), fold.String(p)
+	dir, base := path.Split(f)
+	rest, ok := strings.CutPrefix(p, dir)
+	return ok && base != "" && strings.HasPrefix(rest, base)
+}
+
 // appendUnique appends the values not already in list.
 func appendUnique(list []string, vs ...string) []string {
 	for _, v := range vs {
