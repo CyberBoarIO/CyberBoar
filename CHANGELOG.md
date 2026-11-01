@@ -5,7 +5,24 @@ and enforcement. Stable releases follow [Semantic Versioning](https://semver.org
 starting with `v1.0.0`. The v1 compatibility contract covers the policy format, CLI,
 protocol, audit schema and public Go packages under `pkg/`.
 
-## [Unreleased]
+## [v1.0.0] - 2026-11-01
+
+CyberBoar 1.0, the first stable release. The v1 compatibility contract starts here:
+the policy format (`cyberboar.dev/v1`), the CLI, the console protocol, the audit
+event schema and the Go packages under `pkg/` change only by adding to them until
+v2. Fixes that make CyberBoar deny or refuse more are not breaking changes. See
+[CLI compatibility](docs/cli.md#compatibility).
+
+CyberBoar checks the file, shell and MCP tool calls of Claude Code, Codex CLI,
+GitHub Copilot CLI and Copilot in VS Code, Cursor and opencode against a YAML
+policy, on Linux, macOS and Windows. It writes an audit log of its decisions and
+can enroll with a console to pull signed policies and ship that log.
+
+Since rc.3, audit events have an `id`, and `ship` sends running totals of lost
+logs and skipped lines, so a console can tell when it is missing events. v1.0.0
+also closes policy bypasses found in final reviews; upgrade from any release
+candidate. Users of rc.3 don't need to re-run `apply`. A console must accept the
+new `stats` field in event batches, and an endpoint `version` with a leading `v`.
 
 ### Added
 
@@ -102,6 +119,27 @@ protocol, audit schema and public Go packages under `pkg/`.
   were denied as reading the root directory, and `grep .env README.md` as reading
   `.env`. A first operand counts as the pattern only when every option before or
   after it is known, so `grep --reg=KEY .env` still reads `.env`.
+
+### Known limitations
+
+- CyberBoar is a **policy hook, not an OS sandbox**. Programs an agent starts,
+  network traffic, and anything outside the agent's hooks are not controlled.
+- What CyberBoar sees depends on each agent's hooks: review the
+  [capability matrix](docs/capability-matrix.md). For example, Claude Code's own
+  `Read`/`Edit` denies, which `apply` installs, leave no audit line.
+- On native Windows, Claude Code and Codex CLI are supported; Copilot CLI, Cursor
+  and opencode are denied. PowerShell is read as a [checked subset](docs/powershell.md),
+  and Windows PowerShell 5.1 commands are read with PowerShell 7's grammar.
+- Codex on Windows: the hook's program path can't contain spaces (use an 8.3 short
+  name), and only the user and managed scopes are available.
+- A command rule matches the options it names, not their other spellings: a deny
+  rule for `rm -rf` doesn't match `rm --recursive --force`. Add a rule for each
+  spelling that matters.
+- Claude Code skills in folders below the project, and folders added with
+  `--add-dir`, are not guarded against shell writes.
+- macOS Keychain and Secure Enclave key storage, Apple notarization and Windows
+  Authenticode signing are not implemented. See
+  [system requirements](docs/system-requirements.md).
 
 ## [v1.0.0-rc.3] - 2026-10-28
 
