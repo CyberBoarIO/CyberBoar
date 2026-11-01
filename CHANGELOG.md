@@ -18,9 +18,10 @@ protocol, audit schema and public Go packages under `pkg/`.
 - `ship` finishes a rotated audit log: when the log was renamed (`audit.jsonl.1`) or
   copied and truncated, it sends the rest of the old log first, found next to the new
   one by its file or by how it starts, then any logs rotated in and out since (the log
-  rotated more than once between runs), then the new log. Before, lines the old log got
-  after the last run were lost. A compressed log, which `ship` can't read, is counted
-  lost.
+  rotated more than once between runs), then the new log. It finishes the old log also
+  before the hook has written a new one. Before, lines the old log got after the last
+  run were lost. A compressed log, which `ship` can't read, is counted lost, once, also
+  when a failed run is retried.
 - Protocol: event batches carry `stats`, running totals of logs lost to rotation (the
   old log gone) and of invalid lines skipped, so a console can see lost events.
   Consoles must accept the field; older endpoints don't send it.
@@ -89,10 +90,18 @@ protocol, audit schema and public Go packages under `pkg/`.
   (`rm -r -f` and `rm -fr` for `rm -rf`).
 - PowerShell: command rules match a cmdlet's parameters however the call abbreviates
   them, so `ri -rec` and `-Recurse:$true` match `Remove-Item -Recurse`.
+- The hook protects the audit log's rotated copies as it protects the log
+  (`builtin.self`): the files beside it whose names start with its name, which `ship`
+  sends. An agent could read, change or delete a rotated log before it was sent, or
+  plant one.
+- PowerShell: wildcards are matched by PowerShell's rules. A set has no negation, so
+  `[!a]` and `[^a]` match `a` and could name a denied file; a backtick escapes the
+  next character, so `-Path '`.env'` reads `.env`.
 - Words a command never opens aren't checked as paths: grep's and ripgrep's pattern,
   tr's sets, and the field delimiters of cut, awk and sort. `grep -v /` and `cut -d/`
   were denied as reading the root directory, and `grep .env README.md` as reading
-  `.env`.
+  `.env`. A first operand counts as the pattern only when every option before or
+  after it is known, so `grep --reg=KEY .env` still reads `.env`.
 
 ## [v1.0.0-rc.3] - 2026-10-28
 
