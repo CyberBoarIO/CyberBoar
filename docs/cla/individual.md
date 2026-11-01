@@ -18,22 +18,22 @@ with the license terms below. This agreement is for your protection as a Contrib
 well as the protection of the Project Owner and its users. It does not change your rights
 to use your own Contributions for any other purpose.
 
-Read the full agreement and keep a copy. Follow the [private signing instructions](README.md#signing).
-Do not post completed forms, signatures or personal details in a public pull request.
+## How to sign
 
-Full legal name: ________________________________________________
+You sign this Agreement electronically on CLA assistant: sign in with the GitHub
+account You contribute from, fill in the form below the Agreement, and select
+"I agree". Your GitHub account, the details in the form, the date and the revision
+of this Agreement are recorded as Your signature. If this Agreement changes, You
+are asked to sign the new revision on Your next pull request.
 
-Public name or alias: ___________________________________________
+The form's details are stored by CLA assistant and visible to the Project Owner.
+They are not published. See the [privacy notice](../../CONTRIBUTING.md#cla-signer-privacy)
+for how they are used. To correct them, contact **dev@cyberboar.io**.
 
-GitHub account: __________________________________________________
+If an employer or other company owns Your Contributions, it must also sign the
+[Corporate CLA](entity.md) by email, as described there.
 
-Residence address: ______________________________________________
-
-Country: ________________________________________________________
-
-Email: __________________________________________________________
-
-Source revision of this agreement (full Git commit SHA): __________
+## Terms
 
 You accept and agree to the following terms and conditions for Your Contributions
 (present and future) that You submit to the Project Owner. Except for the license
@@ -83,8 +83,7 @@ Project Owner, You reserve all right, title, and interest in and to Your Contrib
    has rights to intellectual property that you create that includes your Contributions, you
    represent that you have received permission to make Contributions on behalf of that
    employer, that your employer has waived such rights for your Contributions to the Project
-   Owner, or that your employer has executed a separate Corporate CLA ([entity.md](entity.md))
-   with the Project Owner.
+   Owner, or that your employer has executed a separate Corporate CLA with the Project Owner.
 
 5. You represent that each of Your Contributions is Your original creation (see section 7 for
    submissions on behalf of others). You represent that Your Contribution submissions include
@@ -107,7 +106,3 @@ Project Owner, You reserve all right, title, and interest in and to Your Contrib
 
 8. You agree to notify the Project Owner of any facts or circumstances of which you become aware
    that would make these representations inaccurate in any respect.
-
-Signature: ______________________________________________________
-
-Date: ___________________________________________________________

@@ -7,20 +7,37 @@ them in issues.
 ## Contribution intake and licensing
 
 CyberBoar is licensed under [AGPL-3.0-only](LICENSE). Code, documentation and test
-patches are welcome. Before a patch is merged, each contributor must have an accepted
+patches are welcome. Before a patch is merged, each contributor must sign the
 [Individual Contributor License Agreement](docs/cla/individual.md). If an employer
 owns the work, an authorized representative must also sign the
 [Corporate CLA](docs/cla/entity.md) and authorize the contributing employees.
 
-Follow the [private email signing process](docs/cla/README.md#signing). A maintainer
-checks CLA coverage before merging. Do not post signed forms or personal
-information in public PRs or issue comments. A commit sign-off, PR checkbox or
-ordinary issue is not a CLA signature.
+CLA assistant comments on your first pull request with a link to sign the Individual
+CLA with your GitHub account. The Corporate CLA is signed by email. See
+[signing](docs/cla/README.md#signing). A maintainer checks CLA coverage before
+merging. Do not post signed forms or personal information in public PRs or issue
+comments. A commit sign-off, PR checkbox or ordinary issue is not a CLA signature.
 
 Contributors retain copyright. The agreements grant licenses that allow contributions
 to be distributed in the open-source project and in separately licensed commercial
 products. Disclose third-party material and co-authors. You are responsible for the
 rights and correctness of submitted patches, including AI-assisted work.
+
+### CLA signer privacy
+
+When you sign the Individual CLA, the Project Owner named in it (dev@cyberboar.io)
+receives your GitHub account, legal name, email, country, your answer about employer
+rights, and the date and revision you signed. This data is used only to record the
+licenses you grant and to contact you about them; the legal basis is the agreement
+itself. Signing records are never published.
+
+Signing happens on [CLA assistant](https://cla-assistant.io), operated by SAP, which
+stores the data on Microsoft Azure in Europe. Corporate CLAs are signed by email and
+kept privately by the Project Owner.
+
+Records are kept for as long as your contributions are distributed, because the
+licenses are perpetual. Email dev@cyberboar.io to get a copy of your data or to
+correct it. You can also complain to a data protection authority.
 
 ## Report an ordinary issue
 
