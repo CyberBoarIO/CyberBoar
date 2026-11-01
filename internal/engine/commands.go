@@ -95,8 +95,24 @@ func compileCmdRules(r policy.Rules) (cmdRules, error) {
 // order (rm -r -f, rm -fr, rm -Rvf when folded). A token that is an option
 // may also come after operands, as most programs take options anywhere
 // before -- (git push origin main --force).
+//
+// Matching flags takes at most maxFlagSteps steps over runs of short-option
+// words; a command that needs more matches at best possibly, which only
+// denies or asks.
 func matchArgv(toks []cmdpattern.Token, argv []shell.Elem, folded, skipOptions bool) level {
 	memo := map[[2]int]level{}
+	// letters[i] are argv[i]'s option letters if it is short options run
+	// together (zero if not), and rest[i] those of the run from it on
+	letters, rest := make([]uint64, len(argv)), make([]uint64, len(argv)+1)
+	if skipOptions {
+		for i := len(argv) - 1; i >= 0; i-- {
+			if f, ok := cmdpattern.ShortFlags(argv[i].Text); argv[i].Kind == shell.Lit && ok {
+				letters[i] = flagMask(f, folded)
+				rest[i] = rest[i+1] | letters[i]
+			}
+		}
+	}
+	steps := 0
 	var rec func(ti, ai int) level
 	rec = func(ti, ai int) level {
 		if ti == len(toks) {
@@ -116,11 +132,14 @@ func matchArgv(toks []cmdpattern.Token, argv []shell.Elem, folded, skipOptions b
 				l = rec(ti+1, ai+1)
 			}
 			if want, ok := toks[ti].Flags(); skipOptions && ti > 0 && ok {
-				for end := ai; end < len(argv) && l < certain; end++ {
-					if _, ok := cmdpattern.ShortFlags(argv[end].Text); argv[end].Kind != shell.Lit || !ok {
+				w := flagMask(want, folded)
+				var have uint64
+				for end := ai; rest[ai]&w == w && end < len(argv) && letters[end] != 0 && l < certain; end++ {
+					if steps++; steps > maxFlagSteps {
+						l = max(l, possible)
 						break
 					}
-					if hasFlags(argv[ai:end+1], want, folded) {
+					if have |= letters[end]; have&w == w {
 						l = max(l, rec(ti+1, end+1))
 					}
 				}
@@ -153,24 +172,24 @@ func matchArgv(toks []cmdpattern.Token, argv []shell.Elem, folded, skipOptions b
 	return rec(0, 0)
 }
 
-// hasFlags reports whether words, each short options run together, hold
-// every letter of want; with folded, in any case.
-func hasFlags(words []shell.Elem, want string, folded bool) bool {
-	var have strings.Builder
-	for _, w := range words {
-		f, _ := cmdpattern.ShortFlags(w.Text)
-		have.WriteString(f)
-	}
-	h := have.String()
-	if folded {
-		h, want = strings.ToLower(h), strings.ToLower(want)
-	}
-	for _, c := range want {
-		if !strings.ContainsRune(h, c) {
-			return false
+// maxFlagSteps bounds matchArgv's steps over runs of short options, which
+// grow with the square of a run's length.
+const maxFlagSteps = 1 << 16
+
+// flagMask is the set of option letters (a-z, A-Z) in letters; with folded,
+// in any case.
+func flagMask(letters string, folded bool) uint64 {
+	var m uint64
+	for i := 0; i < len(letters); i++ {
+		c := letters[i]
+		switch {
+		case folded || 'a' <= c && c <= 'z':
+			m |= 1 << ((c | 0x20) - 'a')
+		default:
+			m |= 1 << (26 + c - 'A')
 		}
 	}
-	return true
+	return m
 }
 
 // isOption reports whether an argv word is an option ("-n", "--namespace=x").
