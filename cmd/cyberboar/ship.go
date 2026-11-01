@@ -99,7 +99,7 @@ func runShip(h host, fs *flag.FlagSet, args []string, _ io.Reader, stdout, stder
 			return err
 		}
 		res, err := ship.Once(ctx, o)
-		if res.Restarted && res.OldLog != "" {
+		if res.OldLog != "" {
 			fmt.Fprintf(stderr, "ship: %s was rotated since the last run; the rest of the old log, %s, was shipped first.\n", *auditPath, res.OldLog)
 		}
 		if len(res.Between) > 0 {

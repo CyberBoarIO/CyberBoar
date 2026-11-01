@@ -20,6 +20,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -426,6 +427,117 @@ func TestCompressedLogIsCounted(t *testing.T) {
 			t.Errorf("stats = %+v, want 1 log lost", s)
 		}
 	})
+}
+
+// A log renamed before the hook writes a new one is finished at once, not when
+// the new log appears, and a lost one is counted once while there is none.
+func TestRenamedLogWithoutReplacement(t *testing.T) {
+	t.Run("renamed", func(t *testing.T) {
+		c, o := setup(t)
+		appendTo(t, o.AuditPath, line(1, "deny"))
+		run(t, o)
+		appendTo(t, o.AuditPath, line(2, "deny"))
+		rotate(t, o.AuditPath, o.AuditPath+".1")
+		if res := run(t, o); res.OldLog != o.AuditPath+".1" || res.Sent != 1 || res.Lost != 0 {
+			t.Errorf("run: %+v", res)
+		}
+		if res := run(t, o); res.Sent != 0 || res.Lost != 0 || res.OldLog != "" {
+			t.Errorf("second run: %+v", res)
+		}
+		appendTo(t, o.AuditPath, line(3, "deny"))
+		if res := run(t, o); res.Sent != 1 || res.Lost != 0 {
+			t.Errorf("run with a new log: %+v", res)
+		}
+		if got := strings.Join(c.rules(), " "); got != "r1 r2 r3" {
+			t.Errorf("rules = %s", got)
+		}
+		if s := c.stats(); s.LogsLost != 0 {
+			t.Errorf("stats = %+v, want no log lost", s)
+		}
+	})
+	t.Run("deleted", func(t *testing.T) {
+		c, o := setup(t)
+		appendTo(t, o.AuditPath, line(1, "deny"))
+		run(t, o)
+		if err := os.Remove(o.AuditPath); err != nil {
+			t.Fatal(err)
+		}
+		if res := run(t, o); res.Lost != 1 {
+			t.Errorf("run: %+v", res)
+		}
+		run(t, o)
+		appendTo(t, o.AuditPath, line(2, "deny"))
+		if res := run(t, o); res.Lost != 0 {
+			t.Errorf("run with a new log: %+v", res)
+		}
+		if got := strings.Join(c.rules(), " "); got != "r1 r2" {
+			t.Errorf("rules = %s", got)
+		}
+		if s := c.stats(); s.LogsLost != 1 {
+			t.Errorf("stats = %+v, want 1 log lost", s)
+		}
+	})
+}
+
+// failAt fails the nth request, as an outage between two batches would.
+type failAt struct {
+	base  http.RoundTripper
+	n     int
+	calls int
+}
+
+func (f *failAt) RoundTrip(r *http.Request) (*http.Response, error) {
+	if f.calls++; f.calls == f.n {
+		if r.Body != nil {
+			r.Body.Close()
+		}
+		return nil, errors.New("injected outage")
+	}
+	return f.base.RoundTrip(r)
+}
+
+// A run that fails between any two batches, in the old log, a compressed
+// log's neighbour or the new log, is retried without counting the lost
+// log again or losing an event.
+func TestRetryCountsLostLogOnce(t *testing.T) {
+	many := func(from, n int) string {
+		var b strings.Builder
+		for i := from; i < from+n; i++ {
+			b.WriteString(line(i, "deny"))
+		}
+		return b.String()
+	}
+	for n := 1; n <= 5; n++ {
+		t.Run(strconv.Itoa(n), func(t *testing.T) {
+			c, o := setup(t)
+			appendTo(t, o.AuditPath, line(1, "deny"))
+			run(t, o)
+			appendTo(t, o.AuditPath, many(2, maxBatchEvents+1)) // two batches
+			rotate(t, o.AuditPath, o.AuditPath+".3")
+			age(t, o.AuditPath+".3", time.Hour)
+			appendTo(t, o.AuditPath+".2.gz", "\x1f\x8b\x08\x00compressed")
+			appendTo(t, o.AuditPath+".1", many(2000, maxBatchEvents+1)) // two more
+			appendTo(t, o.AuditPath, line(5000, "deny"))
+			base := o.Client.Transport
+			o.Client.Transport = &failAt{base: base, n: n}
+			if _, err := Once(context.Background(), o); err == nil {
+				t.Fatal("the injected outage didn't happen")
+			}
+			o.Client.Transport = base
+			run(t, o)
+			run(t, o)
+			if s := c.stats(); s.LogsLost != 1 {
+				t.Errorf("stats = %+v, want 1 log lost", s)
+			}
+			seen := map[string]bool{}
+			for _, r := range c.rules() {
+				seen[r] = true
+			}
+			if want := 1 + 2*(maxBatchEvents+1) + 1; len(seen) != want {
+				t.Errorf("%d events delivered, want %d", len(seen), want)
+			}
+		})
+	}
 }
 
 // State saved without a file ID gets one on the next run.

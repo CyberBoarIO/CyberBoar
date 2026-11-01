@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -62,8 +63,9 @@ type Result struct {
 	// Restarted is true when the log had been truncated or replaced since
 	// the last run, so this run shipped it from its start.
 	Restarted bool
-	// OldLog is the rotated log whose rest this run shipped first. When
-	// Restarted and OldLog is empty, the old log wasn't found.
+	// OldLog is the rotated log whose rest this run shipped first, also when
+	// no new log has been written yet. When Restarted and OldLog is empty,
+	// the old log wasn't found.
 	OldLog string
 	// Between are the logs rotated in and out since the last run (the log
 	// was rotated more than once), shipped whole after OldLog, oldest first.
@@ -103,7 +105,7 @@ func Once(ctx context.Context, o Options) (Result, error) {
 	}
 	defer unlock()
 	s := shipper{client: o.Client, sink: o.Sink, now: o.Now, auditPath: auditPath, offPath: offsetFile(o.StateDir, auditPath),
-		ep: audit.Endpoint{ID: id, Hostname: o.Hostname, Version: o.Version}}
+		ep: audit.Endpoint{ID: id, Hostname: o.Hostname, Version: o.Version}, r: bufio.NewReaderSize(nil, audit.MaxLineBytes+1)}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -112,13 +114,28 @@ func Once(ctx context.Context, o Options) (Result, error) {
 		return res, err
 	}
 	off := st.Offset
-	s.stats = st.Stats
+	s.stats, s.counted = st.Stats, st.Counted
 
 	f, err := os.Open(auditPath)
 	if errors.Is(err, os.ErrNotExist) {
-		f = nil // nothing logged yet
+		f = nil // nothing logged yet, or the log was renamed and no new one written
 	} else if err != nil {
 		return res, err
+	}
+	if f == nil && (st.File != "" || st.Offset > 0) {
+		// The rest of a renamed log is shipped now, not once the hook writes again
+		if err := s.finishRotated(ctx, st, "", &res); err != nil {
+			return res, err
+		}
+		if s.saved == "" && res.Lost > 0 {
+			st.Stats, st.Counted = s.stats, s.counted
+			if err := writeState(s.offPath, st); err != nil {
+				return res, err
+			}
+		}
+		if res.Sent == 0 && res.Lost == 0 {
+			res.OldLog = "" // already finished by an earlier run
+		}
 	}
 	if f != nil {
 		defer f.Close()
@@ -134,7 +151,6 @@ func Once(ctx context.Context, o Options) (Result, error) {
 		if err != nil {
 			return res, err
 		}
-		s.r = bufio.NewReaderSize(f, audit.MaxLineBytes+1)
 		if !same {
 			res.Restarted = true
 			if err := s.finishRotated(ctx, st, id, &res); err != nil {
@@ -143,6 +159,7 @@ func Once(ctx context.Context, o Options) (Result, error) {
 			// The new log is shipped from its start. The switch is saved at
 			// once, so a lost log is counted once even when this run sends nothing
 			off = 0
+			s.counted = nil
 			if err := s.switchTo(f, id); err != nil {
 				return res, err
 			}
@@ -181,12 +198,14 @@ type shipper struct {
 	saved     string        // the file ID this run last saved an offset in
 	r         *bufio.Reader // reads f
 	stats     audit.Stats   // the totals saved with the offset
+	counted   []string      // the lost logs stats counts (offsetState.Counted)
 }
 
 // finishRotated ships what the logs rotated away since the last run got
 // after it: the rest of the old log st points into, if it is still next to
-// the new one (whose file ID is current), then any logs rotated in and out
-// since, whole. The ones it can't ship are counted lost.
+// the new one (whose file ID is current, or "" before there is one), then
+// any logs rotated in and out since, whole. The ones it can't ship are
+// counted lost, each once, though a retried run finds them again.
 func (s *shipper) finishRotated(ctx context.Context, st offsetState, current string, res *Result) error {
 	sibs, err := siblings(s.auditPath, current)
 	if err != nil {
@@ -210,14 +229,24 @@ func (s *shipper) finishRotated(ctx context.Context, st offsetState, current str
 		since = fi.ModTime()
 	}
 	var between []rotated
-	unreadable := 0
+	var unreadable []string
 	if !since.IsZero() {
 		between, unreadable = rotatedSince(sibs, old.id, since)
 	}
-	res.Lost = unreadable
-	if !found {
-		// A compressed log may be the old one: count it once
-		res.Lost = max(1, unreadable)
+	fresh := func(key string) bool { return key == "" || !slices.Contains(s.counted, key) }
+	for _, id := range unreadable {
+		if fresh(id) {
+			res.Lost++
+			if id != "" {
+				s.counted = append(s.counted, id)
+			}
+		}
+	}
+	if key := st.lostKey(); !found && fresh(key) {
+		if res.Lost == 0 {
+			res.Lost = 1 // a compressed log may be the old one: count it once
+		}
+		s.counted = append(s.counted, key)
 	}
 	s.stats.LogsLost += int64(res.Lost)
 	if found {
@@ -264,7 +293,7 @@ func (s *shipper) shipFrom(ctx context.Context, f *os.File, id string, off int64
 
 // save saves off as the offset in s.f, with the totals.
 func (s *shipper) save(off int64) error {
-	if err := saveOffset(s.offPath, s.auditPath, s.f, s.id, off, s.stats); err != nil {
+	if err := saveOffset(s.offPath, s.auditPath, s.f, s.id, off, s.stats, s.counted); err != nil {
 		return err
 	}
 	s.saved = s.id

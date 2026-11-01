@@ -37,6 +37,18 @@ type offsetState struct {
 	// Stats are the running totals every batch carries. They are saved with
 	// the offset, so the lines behind it are counted exactly once.
 	Stats audit.Stats `json:"stats"`
+	// Counted are the logs Stats.LogsLost already counts while a rotation is
+	// being finished: compressed logs' file IDs and lostKey of an old log
+	// that wasn't found. A run that fails and is retried finds them again.
+	Counted []string `json:"counted,omitempty"`
+}
+
+// lostKey names the log st points into for Counted.
+func (st offsetState) lostKey() string {
+	if st.File != "" {
+		return st.File
+	}
+	return "head:" + st.Head
 }
 
 // loadOffset reads the saved offset of auditPath. A missing file means
@@ -62,8 +74,9 @@ func loadOffset(path, auditPath string) (offsetState, error) {
 	return st, nil
 }
 
-// headBytes is how much of the log's start identifies it
-// Every audit line starts with a nanosecond timestamp, so two logs don't share it.
+// headBytes is how much of the log's start fingerprints it. With the file ID,
+// the fingerprint tells a log replaced or truncated in place from the one
+// shipped, and finds copytruncate's copy, which starts as the log did.
 const headBytes = 4096
 
 // head returns the SHA-256 of f's first min(off, headBytes) bytes.
@@ -89,12 +102,16 @@ func sameLog(f *os.File, size int64, id string, st offsetState) (bool, error) {
 }
 
 // saveOffset replaces the offset file atomically.
-func saveOffset(path, auditPath string, f *os.File, id string, off int64, stats audit.Stats) error {
+func saveOffset(path, auditPath string, f *os.File, id string, off int64, stats audit.Stats, counted []string) error {
 	h, err := head(f, off)
 	if err != nil {
 		return err
 	}
-	data, _ := json.Marshal(offsetState{Path: auditPath, File: id, Offset: off, Head: h, Stats: stats})
+	return writeState(path, offsetState{Path: auditPath, File: id, Offset: off, Head: h, Stats: stats, Counted: counted})
+}
+
+func writeState(path string, st offsetState) error {
+	data, _ := json.Marshal(st)
 	return atomicfile.Write(path, append(data, '\n'), 0o600)
 }
 
@@ -176,15 +193,15 @@ const rotationSlack = 2 * time.Second
 
 // rotatedSince returns, oldest first, the siblings other than old written
 // since since: the logs rotated in and out between two runs, as when the log
-// was rotated twice. unreadable counts the compressed ones, whose lines can't
-// be sent.
-func rotatedSince(sibs []rotated, old string, since time.Time) (logs []rotated, unreadable int) {
+// was rotated twice. unreadable are the file IDs of the compressed ones, whose
+// lines can't be sent.
+func rotatedSince(sibs []rotated, old string, since time.Time) (logs []rotated, unreadable []string) {
 	for _, s := range sibs {
 		if s.id != "" && s.id == old || s.mod.Before(since.Add(-rotationSlack)) {
 			continue
 		}
 		if compressed(s.f) {
-			unreadable++
+			unreadable = append(unreadable, s.id)
 			continue
 		}
 		logs = append(logs, s)

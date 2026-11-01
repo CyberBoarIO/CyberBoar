@@ -337,7 +337,9 @@ sends the rest of the old log, which it looks for next to the new one: a file wh
 starts with the log's (`audit.jsonl.1`, `audit.jsonl-20261030`) that is the old log's
 file or starts as the log did. If the log was rotated more than once since the last run,
 it then sends, oldest first, the other files there written since the old log's last
-line. Then it sends the new log from its start. A log it can't send (the old log gone
+line. Then it sends the new log from its start; it doesn't wait for the hook to write a
+new log before finishing the old one. The hook denies agents any access to
+those files, as to the log itself (`builtin.self`). A log it can't send (the old log gone
 or truncated in place without a copy, a log compressed before `ship` ran) has lost the
 lines it got after the last run: `ship` warns on stderr and adds one to
 `stats.logsLost`, a total every batch carries, so the console sees it
