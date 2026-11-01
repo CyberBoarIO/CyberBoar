@@ -75,6 +75,12 @@ cases:
   - {name: a wildcard is expanded, policy: secrets, action: {command: 'Get-Content .e*'}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: wildcards ignore case, policy: secrets, action: {command: 'Get-Content .ENV*'}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: an unquoted star matches names that start with a dot, policy: secrets, action: {command: 'Get-Content *'}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: "a leading ! in a set is a character, not negation", policy: secrets, action: {command: "Get-Content -Path '.en[!v]'"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: "a leading ^ in a set is a character too", policy: secrets, action: {command: "Get-Content -Path '.en[^v]'"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: a set's range matches, policy: secrets, action: {command: "Get-Content -Path '.en[t-w]'"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: a backtick escapes a wildcard's character, policy: secrets, action: {command: "Get-Content -Path '`.env'"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: a set that matches only clean files, policy: secrets, action: {command: "Get-Content -Path 'READ[A-Z]E.md'"}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: an unclosed set can't be read, policy: secrets, action: {command: "Get-Content -Path '.en[v'"}, expect: {decision: ask, rule: "files.deny[0]"}}
   - {name: a quoted star matches names that start with a dot, policy: secrets, action: {command: "Get-Content '*'"}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: a wildcard under ~ is matched in the home folder without case, policy: secrets, action: {command: 'Get-Content -Path ~\.ssh\I*'}, expect: {decision: deny, rule: "files.deny[1]"}}
   - {name: Select-String over every file, policy: secrets, action: {command: 'Select-String KEY *'}, expect: {decision: deny, rule: "files.deny[0]"}}

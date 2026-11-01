@@ -82,7 +82,8 @@ type optSpec struct {
 	short    string          // short options that take an argument
 	optional string          // short options whose argument, if any, is the rest of the word (sed -i.bak)
 	long     map[string]bool // long options that take an argument
-	flags    map[string]bool // long options without one that begin another's name (grep --binary)
+	flags    map[string]bool // long options without one, never abbreviations (grep --binary)
+	maybe    string          // short options that take the next word in some versions only (BSD grep -C)
 	plus     bool            // +o style options too (shells)
 	permute  bool            // options may follow operands (GNU getopt), until "--"
 	abbrev   bool            // long options may be cut short (getopt_long: --sig for --signal)
