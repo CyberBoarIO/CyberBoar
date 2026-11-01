@@ -59,8 +59,6 @@ Signing copies and correspondence stay outside the public repository. To correct
 contact details or employee authorizations, contact **dev@cyberboar.io** privately.
 Do not send identity documents or personal information unrelated to the agreement.
 
-See the [maintainer procedure](maintainers.md) for acceptance and merge checks.
-
 ## Origin and changes
 
 These agreements are adapted from the Apache Software Foundation's
