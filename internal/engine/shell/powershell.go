@@ -954,7 +954,7 @@ func (a *psAnalyzer) psPathWord(e Elem, d dir, wildcard bool, use psUse) {
 		add(FileRef{Display: e.Text, Rel: tail}) // a drive New-PSDrive may have made
 		return
 	}
-	if wildcard && psHasWildcard(w) {
+	if wildcard && psHasMeta(w) { // a ` is unescaped as a wildcard's: '`.env' is .env
 		for _, pattern := range a.psTilde(w) { // ~ is the home folder before the wildcard is matched
 			if a.windows {
 				pattern = strings.ReplaceAll(pattern, `\`, "/")
@@ -1012,8 +1012,10 @@ func psOnDrive(p string) (tail string, ok bool) {
 	return strings.Trim(strings.ReplaceAll(rest, `\`, "/"), "/"), true
 }
 
-// psTilde returns the paths a word can be: PowerShell reads a leading ~ as
-// the home directory in paths it resolves, and passes it on to programs as written.
+// psTilde returns the paths a word can be: with a leading ~ (~, ~/x, ~\x),
+// the home directory's and the word as written. Paths PowerShell resolves
+// read it as the home directory; what it passes to programs is
+// psNativeTilde's.
 func (a *psAnalyzer) psTilde(w string) []string {
 	rest, ok := strings.CutPrefix(w, "~")
 	if !ok || a.home == "" || rest != "" && rest[0] != '/' && rest[0] != '\\' {

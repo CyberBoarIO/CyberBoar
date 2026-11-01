@@ -215,6 +215,11 @@ func TestShellFileURLCannotHideProtectedFile(t *testing.T) {
 	}
 	repo := t.TempDir()
 	c := protectedFixture(t, repo, "token.txt")
+	// x exists, so x/%2e%2e/ reaches token.txt whether curl drops the dot
+	// segment or the filesystem resolves it
+	if err := os.Mkdir(filepath.Join(repo, "x"), 0o700); err != nil {
+		t.Fatal(err)
+	}
 	for _, url := range []string{
 		"file://" + repo + "/%74oken.txt",
 		"file://" + repo + "/to%6Ben%2etxt",

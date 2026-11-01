@@ -261,6 +261,22 @@ cases:
   - {name: an -e pattern is not a path, policy: secrets, action: {command: "grep -e / -e.env -- README.md"}, expect: {decision: allow, rule: posture.deny-listed}}
   - {name: with -e the first operand is a file, policy: secrets, action: {command: "grep .env -e KEY"}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: grep's -f names a file it reads, policy: secrets, action: {command: "grep -f .env README.md"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: an attached --regexp leaves the next word a file, policy: secrets, action: {command: "grep --regexp=KEY .env"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: an abbreviated --regexp names the pattern, policy: secrets, action: {command: "grep --reg=KEY .env"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: an abbreviated --regexp with a separate value, policy: secrets, action: {command: "grep --reg KEY .env"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: --regexp after the file, policy: secrets, action: {command: "grep .env --regexp=KEY"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: several patterns and a file, policy: secrets, action: {command: "grep -e A --regexp=B -eC .env"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: an attached --file reads its value, policy: secrets, action: {command: "grep --file=.env README.md"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: an abbreviated --exclude-from reads its value, policy: secrets, action: {command: "grep --exclude-f .env KEY README.md"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: an unknown long option may take the pattern, policy: secrets, action: {command: "grep --some-option KEY .env"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: BSD grep's -C may leave the pattern in the next word, policy: secrets, action: {command: "grep -C KEY .env"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: a run-time word after the operands may name the pattern, policy: secrets, action: {command: "grep .env README.md \"$OPT\""}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: an option-like pattern after --, policy: secrets, action: {command: "grep -- --regexp=KEY .env"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: git grep's abbreviated --regexp, policy: secrets, action: {command: "git grep --reg=KEY .env"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: ripgrep's attached --regexp, policy: secrets, action: {command: "rg --regexp=KEY .env"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: ag's words are all checked, policy: secrets, action: {command: "ag -p .env KEY README.md"}, expect: {decision: deny, rule: "files.deny[0]"}}
+  - {name: known long flags keep the pattern unopened, policy: secrets, action: {command: "grep --ignore-case --line-number / README.md"}, expect: {decision: allow, rule: posture.deny-listed}}
+  - {name: an attached --regexp value is not a path, policy: secrets, action: {command: "grep --regexp=/ README.md"}, expect: {decision: allow, rule: posture.deny-listed}}
   - {name: grep of the root is still denied, policy: secrets, action: {command: "grep -r KEY /"}, expect: {decision: deny, rule: builtin.procfs}}
   - {name: a run-time word may be the option naming the pattern, policy: secrets, action: {command: "grep \"$OPT\" .env"}, expect: {decision: deny, rule: "files.deny[0]"}}
   - {name: git grep's pattern is not a path, policy: secrets, action: {command: "git grep -n / -- src"}, expect: {decision: allow, rule: posture.deny-listed}}

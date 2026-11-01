@@ -136,7 +136,8 @@ func absOr(p string) string {
 
 // explainShell prints what the analysis saw, which is the commands, the inline code and the paths.
 func explainShell(w io.Writer, a engine.Action) {
-	an, err := shell.Analyze(a.Command, a.Home, a.Cwd)
+	var an *shell.Analysis
+	var err error
 	if a.Shell == engine.ShellPowerShell {
 		// PowerShell reads Windows paths itself, in the engine's form
 		o := shell.Options{Cwd: a.Cwd, FS: osfs.FS{Windows: a.Platform == engine.PlatformWindows}}
@@ -146,6 +147,8 @@ func explainShell(w io.Writer, a engine.Action) {
 			home, _, _ = winpath.Path(a.Home)
 		}
 		an, err = shell.AnalyzePowerShell(a.Command, home, o)
+	} else {
+		an, err = shell.Analyze(a.Command, a.Home, a.Cwd)
 	}
 	if err != nil {
 		fmt.Fprintf(w, "\nanalysis: %v\n", err)

@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
+	"cyberboar.dev/cyberboar/internal/engine/shell"
 	"cyberboar.dev/cyberboar/internal/policy"
+	"cyberboar.dev/cyberboar/internal/policy/cmdpattern"
 )
 
 // Rules use shell quoting too, so equivalent argument spellings must match
@@ -52,6 +55,48 @@ func TestQuotedCommandPatternEscapes(t *testing.T) {
 						t.Errorf("different argument: %s by %s, want %s", v.Decision, v.Rule, other)
 					}
 				})
+			}
+		})
+	}
+}
+
+// Matching short options split over many words takes bounded work: a long
+// run without the rule's letters is passed over, and one too long to search
+// matches at best possibly, which still denies.
+func TestFlagRunMatchingIsBounded(t *testing.T) {
+	p, err := cmdpattern.Parse("rm -rf /")
+	if err != nil {
+		t.Fatal(err)
+	}
+	argv := func(n int, tail ...string) []shell.Elem {
+		out := []shell.Elem{{Kind: shell.Lit, Text: "rm"}}
+		for range n {
+			out = append(out, shell.Elem{Kind: shell.Lit, Text: "-r"})
+		}
+		for _, w := range tail {
+			out = append(out, shell.Elem{Kind: shell.Lit, Text: w})
+		}
+		return out
+	}
+	for _, tc := range []struct {
+		name string
+		argv []shell.Elem
+		min  level
+		max  level
+	}{
+		{"no f", argv(20000, "/"), noMatch, noMatch},
+		{"f at the end", argv(20000, "-f", "/"), possible, certain},
+		{"f, then no root", argv(20000, "-f", "x"), noMatch, possible},
+		{"short", argv(3, "-f", "/"), certain, certain},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			start := time.Now()
+			l := matchArgv(p.Stages[0], tc.argv, true, true)
+			if l < tc.min || l > tc.max {
+				t.Errorf("level %d, want %d to %d", l, tc.min, tc.max)
+			}
+			if d := time.Since(start); d > 2*time.Second {
+				t.Errorf("took %v", d)
 			}
 		})
 	}

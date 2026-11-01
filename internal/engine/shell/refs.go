@@ -671,19 +671,14 @@ func implicitCwd(name string, argv []Elem) bool {
 	args := argv[1:]
 	switch name {
 	case "grep", "egrep", "fgrep", "zgrep":
-		p := parseOpts(args, optSpec{short: "efABCmdD", permute: true, long: set("regexp", "file",
-			"after-context", "before-context", "context", "max-count", "include", "exclude",
-			"exclude-dir", "exclude-from", "devices", "directories", "label", "binary-files"),
-			flags: set("binary"), abbrev: true})
+		p := parseOpts(args, grepOpts)
 		recursive := p.has("r", "R", "recursive", "dereference-recursive")
 		if v, ok := p.value("d", "directories"); ok && v.Text == "recurse" {
 			recursive = true
 		}
 		return recursive && operands(p) == 0
 	case "rg", "ripgrep", "ag", "ack", "ack-grep", "pt", "ugrep":
-		p := parseOpts(args, optSpec{short: "efgtTABCmjMEr", permute: true, long: set("regexp", "file",
-			"glob", "type", "type-not", "after-context", "before-context", "context", "max-count",
-			"threads", "max-columns", "encoding", "replace", "max-depth", "ignore-file")})
+		p := parseOpts(args, rgOpts)
 		if p.has("files") {
 			return len(p.rest) == 0
 		}
@@ -713,15 +708,14 @@ func implicitCwd(name string, argv []Elem) bool {
 		case "grep":
 			// Searches the work tree, or with --no-index the directory, when
 			// given no path. ( and ) group patterns, so they aren't operands
-			p := parseOpts(args[1:], optSpec{short: "efABCm", permute: true, long: set("after-context",
-				"before-context", "context", "max-count", "threads", "max-depth")})
+			p := parseOpts(args[1:], gitGrepOpts)
 			n := 0
 			for _, e := range p.rest {
 				if e.Kind != Lit || e.Text != "(" && e.Text != ")" {
 					n++
 				}
 			}
-			if !p.hasExact("e", "f") && n > 0 {
+			if !p.hasExact("e", "f", "regexp", "file") && n > 0 {
 				n-- // the first operand is the pattern
 			}
 			return n == 0
@@ -742,14 +736,13 @@ func unopened(argv []Elem) map[int]bool {
 		name, args, base = "git grep", args[1:], 2
 	}
 	var idx []int
-	switch name {
-	case "grep", "egrep", "fgrep", "zgrep", "git grep":
-		idx = patternWords(args, "ABCmdD", set("after-context", "before-context", "context", "max-count",
-			"include", "exclude", "exclude-dir", "exclude-from", "devices", "directories", "label", "binary-files",
-			"threads", "max-depth"))
-	case "rg", "ripgrep", "ag", "ack", "ack-grep", "pt", "ugrep":
-		idx = patternWords(args, "gtTABCmjMEr", set("glob", "type", "type-not", "after-context", "before-context",
-			"context", "max-count", "threads", "max-columns", "encoding", "replace", "max-depth", "ignore-file"))
+	switch name { // ag, ack, pt and ugrep have other options, so all their words are checked
+	case "grep", "egrep", "fgrep", "zgrep":
+		idx = patternWords(args, grepOpts)
+	case "git grep":
+		idx = patternWords(args, gitGrepOpts)
+	case "rg", "ripgrep":
+		idx = patternWords(args, rgOpts)
 	case "tr":
 		for i := range args { // tr reads only its standard input
 			idx = append(idx, i)
@@ -773,19 +766,48 @@ func unopened(argv []Elem) map[int]bool {
 	return out
 }
 
+// The options of the search commands whose patterns unopened finds, also used
+// by implicitCwd. short and long hold the options that take a value, flags the
+// long ones known to take none.
+var (
+	grepOpts = optSpec{short: "efABCmdD", maybe: "C", permute: true, abbrev: true,
+		long: set("regexp", "file", "after-context", "before-context", "context", "max-count", "include",
+			"exclude", "exclude-dir", "exclude-from", "devices", "directories", "label", "binary-files"),
+		flags: set("binary", "basic-regexp", "extended-regexp", "fixed-strings", "perl-regexp", "ignore-case",
+			"no-ignore-case", "word-regexp", "line-regexp", "invert-match", "count", "files-with-matches",
+			"files-without-match", "only-matching", "quiet", "silent", "no-messages", "byte-offset",
+			"with-filename", "no-filename", "line-number", "initial-tab", "null", "null-data", "text",
+			"recursive", "dereference-recursive", "line-buffered", "color", "colour", "no-group-separator")}
+	gitGrepOpts = optSpec{short: "efABCm", permute: true, abbrev: true,
+		long: set("regexp", "file", "after-context", "before-context", "context", "max-count", "threads",
+			"max-depth"),
+		flags: set("ignore-case", "word-regexp", "invert-match", "line-number", "column", "count",
+			"files-with-matches", "name-only", "files-without-match", "null", "only-matching", "quiet",
+			"heading", "break", "full-name", "no-index", "untracked", "cached", "recurse-submodules",
+			"fixed-strings", "basic-regexp", "extended-regexp", "perl-regexp", "all-match", "and", "or", "not",
+			"show-function", "function-context", "text", "color", "no-color")}
+	rgOpts = optSpec{short: "efgtTABCmjMEr", permute: true,
+		long: set("regexp", "file", "glob", "type", "type-not", "after-context", "before-context", "context",
+			"max-count", "threads", "max-columns", "encoding", "replace", "max-depth", "ignore-file"),
+		flags: set("no-heading", "heading", "line-number", "no-line-number", "ignore-case", "case-sensitive",
+			"smart-case", "hidden", "no-ignore", "files-with-matches", "files-without-match", "count",
+			"count-matches", "fixed-strings", "word-regexp", "line-regexp", "invert-match", "multiline",
+			"with-filename", "no-filename", "only-matching", "follow", "json", "vimgrep", "text", "quiet")}
+)
+
 // patternWords returns the indices of a search command's patterns: the values
-// of -e and --regexp, or else its first operand. valueShort and valueLong are
-// the options besides -e and -f that take a value. A word only known at run
-// time before the first operand may be an option that names the pattern, so
-// then the first operand isn't one.
-func patternWords(args []Elem, valueShort string, valueLong map[string]bool) []int {
+// of -e and --regexp, or else its first operand. The first operand is the
+// pattern only when every option is known: an abbreviation or another option
+// may take the next word or name the pattern itself (grep --reg=KEY .env), and
+// a word only known at run time may be such an option, even after operands.
+func patternWords(args []Elem, spec optSpec) []int {
 	var pats, ops []int
 	explicit, unsure := false, false
 	for i := 0; i < len(args); i++ {
 		t := args[i].Text
 		switch {
 		case args[i].Kind != Lit:
-			unsure = unsure || len(ops) == 0
+			unsure = true
 			ops = append(ops, i)
 		case t == "--":
 			for j := i + 1; j < len(args); j++ {
@@ -795,31 +817,44 @@ func patternWords(args []Elem, valueShort string, valueLong map[string]bool) []i
 		case strings.HasPrefix(t, "--"):
 			name, _, attached := strings.Cut(t[2:], "=")
 			switch {
-			case name == "regexp" || name == "file":
+			case name == "regexp":
 				explicit = true
-				if name == "regexp" {
-					pats = append(pats, i, i+1) // the option and, when it isn't attached, its value
+				pats = append(pats, i)
+				if !attached {
+					pats = append(pats, i+1)
+					i++
 				}
+			case name == "file":
+				explicit = true
 				if !attached {
 					i++
 				}
-			case valueLong[name] && !attached:
-				i++
+			case spec.long[name]:
+				if !attached {
+					i++
+				}
+			case !spec.flags[name]:
+				unsure = true
 			}
 		case len(t) > 1 && t[0] == '-':
 			for j := 1; j < len(t); j++ {
 				c := t[j]
-				if c != 'e' && c != 'f' && strings.IndexByte(valueShort, c) < 0 {
+				if strings.IndexByte(spec.short, c) < 0 {
 					continue
 				}
 				explicit = explicit || c == 'e' || c == 'f'
+				last := j == len(t)-1
 				if c == 'e' {
-					pats = append(pats, i, i+1)
+					pats = append(pats, i)
+					if last {
+						pats = append(pats, i+1)
+					}
 				}
-				if j == len(t)-1 {
-					i++ // its value is the next word
-				} else if c == 'e' {
-					pats = pats[:len(pats)-1] // attached: only this word
+				if last {
+					// BSD grep -C takes no separate value, so the next word
+					// may be the pattern.
+					unsure = unsure || strings.IndexByte(spec.maybe, c) >= 0
+					i++
 				}
 				break
 			}
@@ -904,7 +939,7 @@ func (a *analyzer) expandGlob(pattern string, d dir, o globOpts) (matches []stri
 		last := i == len(segs)-1
 		var next []string
 		for _, dirPath := range current {
-			if !hasUnescapedMeta(seg) {
+			if a.powershell && !psHasMeta(seg) || !a.powershell && !hasUnescapedMeta(seg) {
 				name := unescapeGlob(seg)
 				if a.windows && !a.powershell {
 					name = gitBashNames(name) // bash expands globs itself; PowerShell uses Win32 names
@@ -953,22 +988,15 @@ func (a *analyzer) expandGlob(pattern string, d dir, o globOpts) (matches []stri
 
 // globMatcher returns what matches one segment of a glob: names bash's
 // grammar matches, with character classes ([[:digit:]]), by character and,
-// as in the C locale, by byte (?? is é), or for PowerShell, which has no
-// classes, path.Match's. An error means the segment can't be read (a
-// collating symbol, an unknown class), so neither can the glob. Neither
-// can a bracket expression for a name that isn't ASCII, whose classes and
-// ranges depend on the locale.
+// as in the C locale, by byte (?? is é), or PowerShell's wildcard's. An
+// error means the segment can't be read (a collating symbol, an unknown
+// class), so neither can the glob. Neither can a bracket expression for a
+// name that isn't ASCII, whose classes and ranges depend on the locale.
 func (a *analyzer) globMatcher(seg string, nocase bool) func(string) (bool, error) {
 	if a.powershell {
-		seg = strings.ReplaceAll(seg, "[!", "[^")
-		if nocase {
-			seg = strings.ToLower(seg)
-		}
+		w, err := psWildcard(seg)
 		return func(name string) (bool, error) {
-			if nocase {
-				name = strings.ToLower(name)
-			}
-			return path.Match(seg, name)
+			return err == nil && psWildcardMatch(w, name, nocase), err
 		}
 	}
 	mode := pattern.Filenames | pattern.EntireString | pattern.GlobLeadingDot // expandGlob decides on leading dots
