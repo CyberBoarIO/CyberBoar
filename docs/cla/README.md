@@ -1,9 +1,9 @@
 # Contributor License Agreements
 
 CyberBoar accepts contributions after the required Contributor License Agreements
-(CLAs) have been signed and accepted by the Project Owner. Signing is handled
-privately by email; a maintainer verifies coverage before merging a pull request.
-A pull-request checkbox is not a signature.
+(CLAs) have been signed. Individuals sign on CLA assistant from their pull request;
+companies sign by email. A maintainer verifies coverage before merging a pull
+request. A pull-request checkbox is not a signature.
 
 | Contributor | Agreement |
 |---|---|
@@ -27,31 +27,37 @@ privately under [SECURITY.md](../../SECURITY.md).
 
 ## Signing
 
-1. Read the full agreement at a specific commit of this repository. Keep that full
-   commit SHA with the copy you sign, along with the agreement version printed in
-   the document. Do not use a mutable `main` URL as the only record of the terms.
-2. Complete the Individual CLA and save the entire agreement, including its terms
-   and signature, as a PDF. Include your GitHub account so the
-   signed agreement can be matched to your contributions. If an employer owns the
-   work, also arrange for an authorized representative to sign the Corporate CLA
-   and list the contributing employees in Schedule A.
+### Individual CLA
+
+1. Open a pull request. CLA assistant comments on it with a link to the agreement.
+2. Sign in with the GitHub account the commits come from, fill in the form and
+   select "I agree". The pull request's `license/cla` check turns green.
+3. Later pull requests need no new signature unless the agreement changes.
+
+Each commit author signs with their own account, co-authors included. A PR comment,
+commit sign-off or Git commit signature is not a signature. The form's details are
+not published; see the [privacy notice](../../CONTRIBUTING.md#cla-signer-privacy).
+
+### Corporate CLA
+
+1. Read the [Corporate CLA](entity.md) at a specific commit of this repository. Keep
+   that full commit SHA with the copy you sign, along with the agreement version
+   printed in the document. Do not use a mutable `main` URL as the only record of
+   the terms.
+2. An authorized representative completes the agreement, lists the contributing
+   employees and their GitHub accounts in Schedule A, and saves the entire
+   agreement, including its terms and signature, as a PDF.
 3. Sign the PDF using a drawn or electronic signature. Alternatively, attach a
    detached GPG signature and provide the verification key and fingerprint.
-   A typed name, PR comment, commit sign-off or Git commit signature alone is not
-   the signing process used here.
 4. Email the signed agreement to **dev@cyberboar.io** from the email address in the
-   form. Include your GitHub profile and pull-request URL. Do not copy public
-   mailing lists or attach the agreement to an issue or pull request. Keep a copy.
-5. Wait for a private acceptance reply. A maintainer confirms CLA coverage on the
-   pull request without publishing the signed form or its personal information.
-   If you already have an accepted agreement covering the contribution, identify
-   the earlier acceptance in your email instead of signing again.
+   form. Do not copy public mailing lists or attach the agreement to an issue or
+   pull request. Keep a copy.
+5. Wait for a private acceptance reply. Each listed employee also signs the
+   Individual CLA on CLA assistant.
 
 Signing copies and correspondence stay outside the public repository. To correct
 contact details or employee authorizations, contact **dev@cyberboar.io** privately.
 Do not send identity documents or personal information unrelated to the agreement.
-
-See the [maintainer procedure](maintainers.md) for acceptance and merge checks.
 
 ## Origin and changes
 
@@ -61,10 +67,11 @@ These agreements are adapted from the Apache Software Foundation's
 Apache explicitly permits [reuse and modification of its CLAs](https://www.apache.org/foundation/license-faq.html#CLA-using).
 The adaptations are not Apache agreements and do not imply Apache endorsement.
 
-The adaptations identify the CyberBoar recipient by its public GitHub account,
-replace Apache contact and signing instructions with the private email process
-above, and replace Apache-specific profile fields with GitHub account information
-and an agreement source revision. Apache's nonprofit-status and bylaws commitment
+The adaptations identify the CyberBoar recipient by its public GitHub account and
+replace Apache contact and signing instructions with the processes above. The
+Individual CLA is signed electronically, so its signature block is replaced by a
+signing section. The Corporate CLA replaces Apache-specific profile fields with
+GitHub account information and an agreement source revision. Apache's nonprofit-status and bylaws commitment
 does not apply to this project and is omitted. Its copyright and patent grant
 clauses, contributor representations and disclaimer are retained. The corporate
 agreement includes both Schedule A and the optional software grant in Schedule B.

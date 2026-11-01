@@ -118,7 +118,7 @@ auditing](docs/operations.md) for both deployment options.
 ## Project information
 
 - [Contributing](CONTRIBUTING.md): development workflow and contribution guidelines.
-  Bug reports, proposals and patches are welcome. Patches require an accepted
+  Bug reports, proposals and patches are welcome. Patches require a signed
   [CLA](docs/cla/README.md) before merging.
 - [Security policy](SECURITY.md): report vulnerabilities privately by
   [email](mailto:security@cyberboar.io) or
