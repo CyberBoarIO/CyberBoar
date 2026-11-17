@@ -8,6 +8,6 @@ require (
 	github.com/google/go-tpm v0.9.8
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	golang.org/x/sys v0.50.0
-	golang.org/x/text v0.43.0
+	golang.org/x/text v0.44.0
 	mvdan.cc/sh/v3 v3.14.1
 )
