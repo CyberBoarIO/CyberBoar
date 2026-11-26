@@ -84,7 +84,7 @@ else
 fi
 
 step "govulncheck"
-go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+go run golang.org/x/vuln/cmd/govulncheck@v1.10.0 ./...
 
 step "latency budget"
 # Alone, so other packages' tests don't skew the timing (docs/latency.md).
